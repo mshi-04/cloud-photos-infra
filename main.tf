@@ -2,7 +2,7 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 5.0"
+      version = "~> 6.0"
     }
   }
 }
@@ -25,7 +25,7 @@ resource "aws_cognito_user_pool" "main" {
   username_attributes      = ["email"]
   auto_verified_attributes = ["email"]
 
-  deletion_protection = var.deletion_protection
+  deletion_protection = var.env == "prod" ? "ACTIVE" : var.deletion_protection
 
   password_policy {
     minimum_length    = var.password_minimum_length
@@ -42,7 +42,7 @@ resource "aws_cognito_user_pool" "main" {
     }
   }
 
-  mfa_configuration = "OPTIONAL"
+  mfa_configuration = var.env == "prod" ? "ON" : "OPTIONAL"
   software_token_mfa_configuration {
     enabled = true
   }
