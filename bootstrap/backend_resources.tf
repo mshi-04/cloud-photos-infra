@@ -73,7 +73,7 @@ resource "aws_s3_bucket_policy" "terraform_state" {
               "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/gh-terraform-apply-dev",
               "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/gh-terraform-apply-prod",
               # ★TODO: 現在このコードを実行しているユーザー/ロールのARNも追加しないと自分も書き込めなくなります
-              "arn:aws:iam::${data.aws_caller_identity.current.account_id}:user/masato" 
+              "arn:aws:iam::${data.aws_caller_identity.current.account_id}:user/masato"
             ]
           }
         }
