@@ -20,7 +20,7 @@ locals {
       "cognito-idp:ListUserPoolClients",
       "cognito-idp:ListTagsForResource"
     ]
-    Resource = "arn:aws:cognito-idp:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:userpool/*"
+    Resource = "arn:aws:cognito-idp:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:userpool/*"
   }
 }
 
@@ -146,11 +146,13 @@ resource "aws_iam_role_policy" "apply_dev" {
           "cognito-idp:DeleteUserPoolClient",
           "cognito-idp:DescribeUserPoolClient",
           "cognito-idp:ListUserPoolClients",
+          "cognito-idp:SetUserPoolMfaConfig",
+          "cognito-idp:GetUserPoolMfaConfig",
           "cognito-idp:TagResource",
           "cognito-idp:UntagResource",
           "cognito-idp:ListTagsForResource"
         ]
-        Resource = "arn:aws:cognito-idp:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:userpool/*"
+        Resource = "arn:aws:cognito-idp:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:userpool/*"
       }
     ]
   })
@@ -277,11 +279,13 @@ resource "aws_iam_role_policy" "apply_prod" {
           "cognito-idp:DeleteUserPoolClient",
           "cognito-idp:DescribeUserPoolClient",
           "cognito-idp:ListUserPoolClients",
+          "cognito-idp:SetUserPoolMfaConfig",
+          "cognito-idp:GetUserPoolMfaConfig",
           "cognito-idp:TagResource",
           "cognito-idp:UntagResource",
           "cognito-idp:ListTagsForResource"
         ]
-        Resource = "arn:aws:cognito-idp:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:userpool/*"
+        Resource = "arn:aws:cognito-idp:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:userpool/*"
       }
     ]
   })
