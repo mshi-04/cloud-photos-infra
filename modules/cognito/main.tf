@@ -21,7 +21,7 @@ resource "aws_cognito_user_pool" "main" {
     }
   }
 
-  mfa_configuration = var.env == "prod" ? "ON" : "OPTIONAL"
+  mfa_configuration = var.mfa_configuration
   software_token_mfa_configuration {
     enabled = true
   }

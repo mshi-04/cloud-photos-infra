@@ -28,3 +28,9 @@ variable "deletion_protection" {
     error_message = "deletion_protection は ACTIVE または INACTIVE を指定してください。"
   }
 }
+
+variable "mfa_configuration" {
+  description = "MFA configuration for the user pool"
+  type        = string
+  default     = "OPTIONAL"
+}
