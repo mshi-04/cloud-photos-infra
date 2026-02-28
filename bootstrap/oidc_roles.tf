@@ -68,7 +68,7 @@ resource "aws_iam_role_policy" "plan_dev" {
         Sid      = "AllowCognitoReadOnly"
         Effect   = "Allow"
         Action   = ["cognito-idp:Describe*", "cognito-idp:Get*", "cognito-idp:ListUsers", "cognito-idp:ListUsersInGroup", "cognito-idp:ListUserPoolClients", "cognito-idp:ListGroups", "cognito-idp:ListIdentityProviders", "cognito-idp:ListResourceServers", "cognito-idp:ListTagsForResource", "cognito-idp:ListUserImportJobs"]
-        Resource = "arn:aws:cognito-idp:ap-northeast-1:${data.aws_caller_identity.current.account_id}:userpool/*"
+        Resource = "arn:aws:cognito-idp:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:userpool/*"
       }
     ]
   })
@@ -132,7 +132,7 @@ resource "aws_iam_role_policy" "apply_dev" {
         Sid      = "AllowCognitoManage"
         Effect   = "Allow"
         Action   = ["cognito-idp:Describe*", "cognito-idp:Get*", "cognito-idp:ListUsers", "cognito-idp:ListUsersInGroup", "cognito-idp:ListUserPoolClients", "cognito-idp:ListGroups", "cognito-idp:ListIdentityProviders", "cognito-idp:ListResourceServers", "cognito-idp:ListTagsForResource", "cognito-idp:ListUserImportJobs", "cognito-idp:CreateUserPool", "cognito-idp:UpdateUserPool", "cognito-idp:DeleteUserPool", "cognito-idp:CreateUserPoolClient", "cognito-idp:UpdateUserPoolClient", "cognito-idp:DeleteUserPoolClient"]
-        Resource = "arn:aws:cognito-idp:ap-northeast-1:${data.aws_caller_identity.current.account_id}:userpool/*"
+        Resource = "arn:aws:cognito-idp:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:userpool/*"
       }
     ]
   })
@@ -194,7 +194,7 @@ resource "aws_iam_role_policy" "plan_prod" {
         Sid      = "AllowCognitoReadOnly"
         Effect   = "Allow"
         Action   = ["cognito-idp:Describe*", "cognito-idp:Get*", "cognito-idp:ListUsers", "cognito-idp:ListUsersInGroup", "cognito-idp:ListUserPoolClients", "cognito-idp:ListGroups", "cognito-idp:ListIdentityProviders", "cognito-idp:ListResourceServers", "cognito-idp:ListTagsForResource", "cognito-idp:ListUserImportJobs"]
-        Resource = "arn:aws:cognito-idp:ap-northeast-1:${data.aws_caller_identity.current.account_id}:userpool/*"
+        Resource = "arn:aws:cognito-idp:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:userpool/*"
       }
     ]
   })
@@ -258,7 +258,7 @@ resource "aws_iam_role_policy" "apply_prod" {
         Sid      = "AllowCognitoManage"
         Effect   = "Allow"
         Action   = ["cognito-idp:Describe*", "cognito-idp:Get*", "cognito-idp:ListUsers", "cognito-idp:ListUsersInGroup", "cognito-idp:ListUserPoolClients", "cognito-idp:ListGroups", "cognito-idp:ListIdentityProviders", "cognito-idp:ListResourceServers", "cognito-idp:ListTagsForResource", "cognito-idp:ListUserImportJobs", "cognito-idp:CreateUserPool", "cognito-idp:UpdateUserPool", "cognito-idp:DeleteUserPool", "cognito-idp:CreateUserPoolClient", "cognito-idp:UpdateUserPoolClient", "cognito-idp:DeleteUserPoolClient"]
-        Resource = "arn:aws:cognito-idp:ap-northeast-1:${data.aws_caller_identity.current.account_id}:userpool/*"
+        Resource = "arn:aws:cognito-idp:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:userpool/*"
       }
     ]
   })
