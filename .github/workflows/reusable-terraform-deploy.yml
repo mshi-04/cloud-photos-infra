@@ -60,19 +60,10 @@ jobs:
 
       - name: Terraform show (summary)
         run: |
-          echo "## Terraform Plan (${{ inputs.env_name }})" >> $GITHUB_STEP_SUMMARY
+          SUMMARY_LINE=$(terraform show -no-color tfplan | grep -E '^(Plan:|No changes\.)' | tail -n 1)
+          echo "${SUMMARY_LINE:-Plan summary unavailable.}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo '```hcl' >> $GITHUB_STEP_SUMMARY
-          PLAN_OUTPUT=$(terraform show -no-color tfplan)
-          PLAN_LINES=$(echo "$PLAN_OUTPUT" | wc -l)
-          echo "$PLAN_OUTPUT" | head -n 400 >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          if [ "$PLAN_LINES" -gt 400 ]; then
-            echo "⚠️ Output truncated ($PLAN_LINES lines total). Full tfplan is uploaded as artifact." >> $GITHUB_STEP_SUMMARY
-          else
-            echo "Full tfplan is uploaded as artifact." >> $GITHUB_STEP_SUMMARY
-          fi
+          echo "詳細差分は artifact (tfplan-${{ inputs.env_name }}) を参照してください。" >> $GITHUB_STEP_SUMMARY
 
       - name: Upload plan artifact
         uses: actions/upload-artifact@v4
@@ -83,6 +74,9 @@ jobs:
   apply:
     runs-on: ubuntu-latest
     needs: plan
+    concurrency:
+      group: terraform-apply-${{ inputs.env_name }}-${{ inputs.tf_working_dir }}
+      cancel-in-progress: false
     # environmentが空文字に評価される場合、承認ゲート（Environment）を使用せずに実行されます
     environment: ${{ inputs.environment_name }}
     defaults:

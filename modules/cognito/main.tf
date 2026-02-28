@@ -4,7 +4,7 @@ resource "aws_cognito_user_pool" "main" {
   username_attributes      = ["email"]
   auto_verified_attributes = ["email"]
 
-  deletion_protection = var.env == "prod" ? "ACTIVE" : var.deletion_protection
+  deletion_protection = var.deletion_protection
 
   password_policy {
     minimum_length    = var.password_minimum_length

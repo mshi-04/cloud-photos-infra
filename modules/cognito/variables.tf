@@ -22,7 +22,7 @@ variable "password_minimum_length" {
 variable "deletion_protection" {
   description = "リソースの削除保護を有効にするか。本番環境はACTIVE推奨"
   type        = string
-  default     = "ACTIVE"
+  default     = "INACTIVE"
   validation {
     condition     = contains(["ACTIVE", "INACTIVE"], var.deletion_protection)
     error_message = "deletion_protection は ACTIVE または INACTIVE を指定してください。"
