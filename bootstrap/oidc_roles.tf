@@ -53,7 +53,7 @@ resource "aws_iam_role_policy" "plan_dev" {
         Resource = aws_kms_key.terraform_state.arn
       },
       {
-        Sid      = "AllowDynamoDBLockRead"
+        Sid      = "AllowDynamoDBLock"
         Effect   = "Allow"
         Action   = ["dynamodb:DescribeTable", "dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:DeleteItem", "dynamodb:Query", "dynamodb:Scan"]
         Resource = aws_dynamodb_table.terraform_state_lock.arn
@@ -86,12 +86,9 @@ resource "aws_iam_role" "apply_dev" {
       Principal = { Federated = aws_iam_openid_connect_provider.github.arn }
       Action    = "sts:AssumeRoleWithWebIdentity"
       Condition = {
-        StringEquals = { "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com" }
-        StringLike = {
-          "token.actions.githubusercontent.com:sub" = [
-            "repo:${local.github_repo}:ref:refs/heads/main",
-            "repo:${local.github_repo}:ref:refs/heads/develop"
-          ]
+        StringEquals = {
+          "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
+          "token.actions.githubusercontent.com:sub" = "repo:${local.github_repo}:environment:development"
         }
       }
     }]
@@ -182,7 +179,7 @@ resource "aws_iam_role_policy" "plan_prod" {
         Resource = aws_kms_key.terraform_state.arn
       },
       {
-        Sid      = "AllowDynamoDBLockRead"
+        Sid      = "AllowDynamoDBLock"
         Effect   = "Allow"
         Action   = ["dynamodb:DescribeTable", "dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:DeleteItem", "dynamodb:Query", "dynamodb:Scan"]
         Resource = aws_dynamodb_table.terraform_state_lock.arn
