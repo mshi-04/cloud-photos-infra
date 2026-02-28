@@ -47,16 +47,22 @@ resource "aws_iam_role_policy" "plan_dev" {
         ]
       },
       {
+        Sid      = "AllowKMSDecrypt"
+        Effect   = "Allow"
+        Action   = ["kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey"]
+        Resource = aws_kms_key.terraform_state.arn
+      },
+      {
         Sid      = "AllowDynamoDBLockRead"
         Effect   = "Allow"
-        Action   = ["dynamodb:DescribeTable", "dynamodb:GetItem", "dynamodb:Query", "dynamodb:Scan"]
+        Action   = ["dynamodb:DescribeTable", "dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:DeleteItem", "dynamodb:Query", "dynamodb:Scan"]
         Resource = aws_dynamodb_table.terraform_state_lock.arn
       },
       {
         Sid      = "AllowCognitoReadOnly"
         Effect   = "Allow"
         Action   = ["cognito-idp:Describe*", "cognito-idp:Get*", "cognito-idp:List*"]
-        Resource = "*"
+        Resource = "arn:aws:cognito-idp:ap-northeast-1:${data.aws_caller_identity.current.account_id}:*"
       }
     ]
   })
@@ -75,7 +81,12 @@ resource "aws_iam_role" "apply_dev" {
       Action    = "sts:AssumeRoleWithWebIdentity"
       Condition = {
         StringEquals = { "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com" }
-        StringLike   = { "token.actions.githubusercontent.com:sub" = "repo:${local.github_repo}:ref:refs/heads/main" }
+        StringLike = {
+          "token.actions.githubusercontent.com:sub" = [
+            "repo:${local.github_repo}:ref:refs/heads/main",
+            "repo:${local.github_repo}:ref:refs/heads/develop"
+          ]
+        }
       }
     }]
   })
@@ -97,6 +108,12 @@ resource "aws_iam_role_policy" "apply_dev" {
         ]
       },
       {
+        Sid      = "AllowKMSEncryptDecrypt"
+        Effect   = "Allow"
+        Action   = ["kms:Encrypt", "kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey"]
+        Resource = aws_kms_key.terraform_state.arn
+      },
+      {
         Sid      = "AllowDynamoDBLockReadWrite"
         Effect   = "Allow"
         Action   = ["dynamodb:DescribeTable", "dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:DeleteItem", "dynamodb:Query", "dynamodb:Scan"]
@@ -106,7 +123,7 @@ resource "aws_iam_role_policy" "apply_dev" {
         Sid      = "AllowCognitoManage"
         Effect   = "Allow"
         Action   = ["cognito-idp:Describe*", "cognito-idp:Get*", "cognito-idp:List*", "cognito-idp:CreateUserPool", "cognito-idp:UpdateUserPool", "cognito-idp:DeleteUserPool", "cognito-idp:CreateUserPoolClient", "cognito-idp:UpdateUserPoolClient", "cognito-idp:DeleteUserPoolClient"]
-        Resource = "*"
+        Resource = "arn:aws:cognito-idp:ap-northeast-1:${data.aws_caller_identity.current.account_id}:*"
       }
     ]
   })
@@ -147,9 +164,15 @@ resource "aws_iam_role_policy" "plan_prod" {
         ]
       },
       {
+        Sid      = "AllowKMSDecrypt"
+        Effect   = "Allow"
+        Action   = ["kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey"]
+        Resource = aws_kms_key.terraform_state.arn
+      },
+      {
         Sid      = "AllowDynamoDBLockRead"
         Effect   = "Allow"
-        Action   = ["dynamodb:DescribeTable", "dynamodb:GetItem", "dynamodb:Query", "dynamodb:Scan"]
+        Action   = ["dynamodb:DescribeTable", "dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:DeleteItem", "dynamodb:Query", "dynamodb:Scan"]
         Resource = aws_dynamodb_table.terraform_state_lock.arn
       },
       {
@@ -199,15 +222,21 @@ resource "aws_iam_role_policy" "apply_prod" {
         ]
       },
       {
+        Sid      = "AllowKMSEncryptDecrypt"
+        Effect   = "Allow"
+        Action   = ["kms:Encrypt", "kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey"]
+        Resource = aws_kms_key.terraform_state.arn
+      },
+      {
         Sid      = "AllowDynamoDBLockReadWrite"
         Effect   = "Allow"
         Action   = ["dynamodb:DescribeTable", "dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:DeleteItem", "dynamodb:Query", "dynamodb:Scan"]
         Resource = aws_dynamodb_table.terraform_state_lock.arn
       },
       {
-        Sid      = "AllowCognitoManage"
-        Effect   = "Allow"
-        Action   = [
+        Sid    = "AllowCognitoManage"
+        Effect = "Allow"
+        Action = [
           "cognito-idp:Describe*",
           "cognito-idp:Get*",
           "cognito-idp:List*",
@@ -218,7 +247,7 @@ resource "aws_iam_role_policy" "apply_prod" {
           "cognito-idp:UpdateUserPoolClient",
           "cognito-idp:DeleteUserPoolClient"
         ]
-        Resource = "*"
+        Resource = "arn:aws:cognito-idp:ap-northeast-1:${data.aws_caller_identity.current.account_id}:*"
       }
     ]
   })

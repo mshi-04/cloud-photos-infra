@@ -151,9 +151,9 @@ resource "aws_s3_bucket_lifecycle_configuration" "terraform_state" {
 # DynamoDB Table for State Lock
 # ==========================================
 resource "aws_dynamodb_table" "terraform_state_lock" {
-  name         = "terraform-state-lock"
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "LockID"
+  name                        = "terraform-state-lock"
+  billing_mode                = "PAY_PER_REQUEST"
+  hash_key                    = "LockID"
   deletion_protection_enabled = true
 
   attribute {
