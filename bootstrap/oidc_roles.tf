@@ -55,7 +55,7 @@ resource "aws_iam_role_policy" "plan_dev" {
       {
         Sid    = "AllowStateLock"
         Effect = "Allow"
-        Action = ["s3:PutObject", "s3:DeleteObject"]
+        Action = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
         Resource = [
           "${aws_s3_bucket.terraform_state.arn}/dev/terraform.tfstate.tflock"
         ]
@@ -158,7 +158,7 @@ resource "aws_iam_role_policy" "plan_prod" {
       {
         Sid    = "AllowStateLock"
         Effect = "Allow"
-        Action = ["s3:PutObject", "s3:DeleteObject"]
+        Action = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
         Resource = [
           "${aws_s3_bucket.terraform_state.arn}/prod/terraform.tfstate.tflock"
         ]
