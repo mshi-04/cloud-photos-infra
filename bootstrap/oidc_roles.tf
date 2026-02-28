@@ -127,10 +127,17 @@ resource "aws_iam_role_policy" "apply_dev" {
         Resource = aws_kms_key.terraform_state.arn
       },
       {
-        Sid    = "AllowCognitoManagement"
+        Sid    = "AllowCognitoCreateUserPool"
         Effect = "Allow"
         Action = [
-          "cognito-idp:CreateUserPool",
+          "cognito-idp:CreateUserPool"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "AllowCognitoManagementUserPool"
+        Effect = "Allow"
+        Action = [
           "cognito-idp:UpdateUserPool",
           "cognito-idp:DeleteUserPool",
           "cognito-idp:DescribeUserPool",
@@ -251,10 +258,17 @@ resource "aws_iam_role_policy" "apply_prod" {
         Resource = aws_kms_key.terraform_state.arn
       },
       {
-        Sid    = "AllowCognitoManagement"
+        Sid    = "AllowCognitoCreateUserPool"
         Effect = "Allow"
         Action = [
-          "cognito-idp:CreateUserPool",
+          "cognito-idp:CreateUserPool"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "AllowCognitoManagementUserPool"
+        Effect = "Allow"
+        Action = [
           "cognito-idp:UpdateUserPool",
           "cognito-idp:DeleteUserPool",
           "cognito-idp:DescribeUserPool",
