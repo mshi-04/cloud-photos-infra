@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - develop
     paths:
       - 'envs/**'
       - 'modules/**'
@@ -12,13 +13,13 @@ permissions:
   id-token: write
   contents: read
 
-
 concurrency:
   group: terraform-cd
   cancel-in-progress: false
 
 jobs:
   deploy-dev:
+    # dev環境へのデプロイは main と develop ブランチ दोनोंで実行
     uses: ./.github/workflows/reusable-terraform-deploy.yml
     with:
       env_name: dev
@@ -28,6 +29,8 @@ jobs:
       role_apply: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/gh-terraform-apply-dev
 
   deploy-prod:
+    # prod環境へのデプロイは main ブランチのみ実行
+    if: github.ref == 'refs/heads/main'
     needs: deploy-dev
     uses: ./.github/workflows/reusable-terraform-deploy.yml
     with:
