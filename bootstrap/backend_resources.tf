@@ -148,29 +148,6 @@ resource "aws_s3_bucket_lifecycle_configuration" "terraform_state" {
   }
 }
 
-# ==========================================
-# DynamoDB Table for State Lock
-# ==========================================
-resource "aws_dynamodb_table" "terraform_state_lock" {
-  name                        = "terraform-state-lock"
-  billing_mode                = "PAY_PER_REQUEST"
-  hash_key                    = "LockID"
-  deletion_protection_enabled = true
-
-  attribute {
-    name = "LockID"
-    type = "S"
-  }
-
-  point_in_time_recovery {
-    enabled = true
-  }
-}
-
 output "state_bucket_name" {
   value = aws_s3_bucket.terraform_state.bucket
-}
-
-output "dynamodb_table_name" {
-  value = aws_dynamodb_table.terraform_state_lock.name
 }
