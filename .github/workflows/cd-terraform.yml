@@ -24,18 +24,18 @@ jobs:
     uses: ./.github/workflows/reusable-terraform-deploy.yml
     with:
       env_name: dev
-      tf_working_dir: infra/envs/dev
+      tf_working_dir: envs/dev
       aws_region: ap-northeast-1
-      role_plan: arn:aws:iam::<ACCOUNT_ID>:role/gh-terraform-plan-dev
-      role_apply: arn:aws:iam::<ACCOUNT_ID>:role/gh-terraform-apply-dev
+      role_plan: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/gh-terraform-plan-dev
+      role_apply: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/gh-terraform-apply-dev
 
   deploy-prod:
     needs: deploy-dev
     uses: ./.github/workflows/reusable-terraform-deploy.yml
     with:
       env_name: prod
-      tf_working_dir: infra/envs/prod
+      tf_working_dir: envs/prod
       aws_region: ap-northeast-1
-      role_plan: arn:aws:iam::<ACCOUNT_ID>:role/gh-terraform-plan-prod
-      role_apply: arn:aws:iam::<ACCOUNT_ID>:role/gh-terraform-apply-prod
+      role_plan: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/gh-terraform-plan-prod
+      role_apply: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/gh-terraform-apply-prod
       environment_name: production

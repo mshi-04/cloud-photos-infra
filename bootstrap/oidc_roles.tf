@@ -49,7 +49,7 @@ resource "aws_iam_role_policy" "plan_dev" {
       {
         Sid      = "AllowDynamoDBLockRead"
         Effect   = "Allow"
-        Action   = ["dynamodb:GetItem", "dynamodb:Query", "dynamodb:Scan"]
+        Action   = ["dynamodb:DescribeTable", "dynamodb:GetItem", "dynamodb:Query", "dynamodb:Scan"]
         Resource = aws_dynamodb_table.terraform_state_lock.arn
       },
       {
@@ -207,7 +207,17 @@ resource "aws_iam_role_policy" "apply_prod" {
       {
         Sid      = "AllowCognitoManage"
         Effect   = "Allow"
-        Action   = ["cognito-idp:*"]
+        Action   = [
+          "cognito-idp:Describe*",
+          "cognito-idp:Get*",
+          "cognito-idp:List*",
+          "cognito-idp:CreateUserPool",
+          "cognito-idp:UpdateUserPool",
+          "cognito-idp:DeleteUserPool",
+          "cognito-idp:CreateUserPoolClient",
+          "cognito-idp:UpdateUserPoolClient",
+          "cognito-idp:DeleteUserPoolClient"
+        ]
         Resource = "*"
       }
     ]
