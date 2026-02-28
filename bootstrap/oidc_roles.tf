@@ -66,6 +66,17 @@ resource "aws_iam_role_policy" "plan_dev" {
         Action   = ["kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey"]
         Resource = aws_kms_key.terraform_state.arn
       },
+      {
+        Sid    = "AllowCognitoRead"
+        Effect = "Allow"
+        Action = [
+          "cognito-idp:DescribeUserPool",
+          "cognito-idp:DescribeUserPoolClient",
+          "cognito-idp:ListUserPoolClients",
+          "cognito-idp:ListTagsForResource"
+        ]
+        Resource = "arn:aws:cognito-idp:ap-northeast-1:${data.aws_caller_identity.current.account_id}:userpool/*"
+      }
     ]
   })
 }
@@ -113,6 +124,25 @@ resource "aws_iam_role_policy" "apply_dev" {
         Action   = ["kms:Encrypt", "kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey"]
         Resource = aws_kms_key.terraform_state.arn
       },
+      {
+        Sid    = "AllowCognitoManagement"
+        Effect = "Allow"
+        Action = [
+          "cognito-idp:CreateUserPool",
+          "cognito-idp:UpdateUserPool",
+          "cognito-idp:DeleteUserPool",
+          "cognito-idp:DescribeUserPool",
+          "cognito-idp:CreateUserPoolClient",
+          "cognito-idp:UpdateUserPoolClient",
+          "cognito-idp:DeleteUserPoolClient",
+          "cognito-idp:DescribeUserPoolClient",
+          "cognito-idp:ListUserPoolClients",
+          "cognito-idp:TagResource",
+          "cognito-idp:UntagResource",
+          "cognito-idp:ListTagsForResource"
+        ]
+        Resource = "arn:aws:cognito-idp:ap-northeast-1:${data.aws_caller_identity.current.account_id}:userpool/*"
+      }
     ]
   })
 }
@@ -170,6 +200,18 @@ resource "aws_iam_role_policy" "plan_prod" {
         Action   = ["kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey"]
         Resource = aws_kms_key.terraform_state.arn
       },
+      {
+        Sid    = "AllowCognitoRead"
+        Effect = "Allow"
+        Action = [
+          "cognito-idp:DescribeUserPool",
+          "cognito-idp:DescribeUserPoolClient",
+          "cognito-idp:ListUserPoolClients",
+          "cognito-idp:ListTagsForResource"
+        ]
+        Resource = "arn:aws:cognito-idp:ap-northeast-1:${data.aws_caller_identity.current.account_id}:userpool/*"
+      }
+
     ]
   })
 }
@@ -216,6 +258,25 @@ resource "aws_iam_role_policy" "apply_prod" {
         Effect   = "Allow"
         Action   = ["kms:Encrypt", "kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey"]
         Resource = aws_kms_key.terraform_state.arn
+      },
+      {
+        Sid    = "AllowCognitoManagement"
+        Effect = "Allow"
+        Action = [
+          "cognito-idp:CreateUserPool",
+          "cognito-idp:UpdateUserPool",
+          "cognito-idp:DeleteUserPool",
+          "cognito-idp:DescribeUserPool",
+          "cognito-idp:CreateUserPoolClient",
+          "cognito-idp:UpdateUserPoolClient",
+          "cognito-idp:DeleteUserPoolClient",
+          "cognito-idp:DescribeUserPoolClient",
+          "cognito-idp:ListUserPoolClients",
+          "cognito-idp:TagResource",
+          "cognito-idp:UntagResource",
+          "cognito-idp:ListTagsForResource"
+        ]
+        Resource = "arn:aws:cognito-idp:ap-northeast-1:${data.aws_caller_identity.current.account_id}:userpool/*"
       }
     ]
   })
