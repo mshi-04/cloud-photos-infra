@@ -166,7 +166,6 @@ resource "aws_iam_role" "plan_prod" {
         StringLike   = { 
           "token.actions.githubusercontent.com:sub" = [
             "repo:${local.github_repo}:pull_request",
-            "repo:${local.github_repo}:ref:refs/heads/develop",
             "repo:${local.github_repo}:ref:refs/heads/main"
           ]
         }
