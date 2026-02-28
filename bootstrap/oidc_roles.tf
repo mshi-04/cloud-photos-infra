@@ -25,7 +25,7 @@ resource "aws_iam_role" "plan_dev" {
       Action    = "sts:AssumeRoleWithWebIdentity"
       Condition = {
         StringEquals = { "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com" }
-        StringLike   = { 
+        StringLike = {
           "token.actions.githubusercontent.com:sub" = [
             "repo:${local.github_repo}:pull_request",
             "repo:${local.github_repo}:ref:refs/heads/develop",
@@ -53,29 +53,19 @@ resource "aws_iam_role_policy" "plan_dev" {
         ]
       },
       {
+        Sid    = "AllowStateLock"
+        Effect = "Allow"
+        Action = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
+        Resource = [
+          "${aws_s3_bucket.terraform_state.arn}/dev/terraform.tfstate.tflock"
+        ]
+      },
+      {
         Sid      = "AllowKMSDecrypt"
         Effect   = "Allow"
         Action   = ["kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey"]
         Resource = aws_kms_key.terraform_state.arn
       },
-      {
-        Sid      = "AllowDynamoDBLock"
-        Effect   = "Allow"
-        Action   = ["dynamodb:DescribeTable", "dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:DeleteItem", "dynamodb:Query", "dynamodb:Scan"]
-        Resource = aws_dynamodb_table.terraform_state_lock.arn
-      },
-      {
-        Sid      = "AllowCognitoListPools"
-        Effect   = "Allow"
-        Action   = ["cognito-idp:ListUserPools"]
-        Resource = "*"
-      },
-      {
-        Sid      = "AllowCognitoReadOnly"
-        Effect   = "Allow"
-        Action   = ["cognito-idp:Describe*", "cognito-idp:Get*", "cognito-idp:ListUsers", "cognito-idp:ListUsersInGroup", "cognito-idp:ListUserPoolClients", "cognito-idp:ListGroups", "cognito-idp:ListIdentityProviders", "cognito-idp:ListResourceServers", "cognito-idp:ListTagsForResource", "cognito-idp:ListUserImportJobs"]
-        Resource = "arn:aws:cognito-idp:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:userpool/*"
-      }
     ]
   })
 }
@@ -113,7 +103,8 @@ resource "aws_iam_role_policy" "apply_dev" {
         Action = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket"]
         Resource = [
           aws_s3_bucket.terraform_state.arn,
-          "${aws_s3_bucket.terraform_state.arn}/dev/terraform.tfstate"
+          "${aws_s3_bucket.terraform_state.arn}/dev/terraform.tfstate",
+          "${aws_s3_bucket.terraform_state.arn}/dev/terraform.tfstate.tflock"
         ]
       },
       {
@@ -122,30 +113,6 @@ resource "aws_iam_role_policy" "apply_dev" {
         Action   = ["kms:Encrypt", "kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey"]
         Resource = aws_kms_key.terraform_state.arn
       },
-      {
-        Sid      = "AllowDynamoDBLockReadWrite"
-        Effect   = "Allow"
-        Action   = ["dynamodb:DescribeTable", "dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:DeleteItem", "dynamodb:Query", "dynamodb:Scan"]
-        Resource = aws_dynamodb_table.terraform_state_lock.arn
-      },
-      {
-        Sid      = "AllowCognitoListPools"
-        Effect   = "Allow"
-        Action   = ["cognito-idp:ListUserPools"]
-        Resource = "*"
-      },
-      {
-        Sid      = "AllowCognitoManage"
-        Effect   = "Allow"
-        Action   = ["cognito-idp:Describe*", "cognito-idp:Get*", "cognito-idp:ListUsers", "cognito-idp:ListUsersInGroup", "cognito-idp:ListUserPoolClients", "cognito-idp:ListGroups", "cognito-idp:ListIdentityProviders", "cognito-idp:ListResourceServers", "cognito-idp:ListTagsForResource", "cognito-idp:ListUserImportJobs", "cognito-idp:UpdateUserPool", "cognito-idp:DeleteUserPool", "cognito-idp:CreateUserPoolClient", "cognito-idp:UpdateUserPoolClient", "cognito-idp:DeleteUserPoolClient"]
-        Resource = "arn:aws:cognito-idp:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:userpool/*"
-      },
-      {
-        Sid      = "AllowCognitoCreateUserPool"
-        Effect   = "Allow"
-        Action   = ["cognito-idp:CreateUserPool"]
-        Resource = "*"
-      }
     ]
   })
 }
@@ -163,7 +130,7 @@ resource "aws_iam_role" "plan_prod" {
       Action    = "sts:AssumeRoleWithWebIdentity"
       Condition = {
         StringEquals = { "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com" }
-        StringLike   = { 
+        StringLike = {
           "token.actions.githubusercontent.com:sub" = [
             "repo:${local.github_repo}:pull_request",
             "repo:${local.github_repo}:ref:refs/heads/main"
@@ -190,29 +157,19 @@ resource "aws_iam_role_policy" "plan_prod" {
         ]
       },
       {
+        Sid    = "AllowStateLock"
+        Effect = "Allow"
+        Action = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
+        Resource = [
+          "${aws_s3_bucket.terraform_state.arn}/prod/terraform.tfstate.tflock"
+        ]
+      },
+      {
         Sid      = "AllowKMSDecrypt"
         Effect   = "Allow"
         Action   = ["kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey"]
         Resource = aws_kms_key.terraform_state.arn
       },
-      {
-        Sid      = "AllowDynamoDBLock"
-        Effect   = "Allow"
-        Action   = ["dynamodb:DescribeTable", "dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:DeleteItem", "dynamodb:Query", "dynamodb:Scan"]
-        Resource = aws_dynamodb_table.terraform_state_lock.arn
-      },
-      {
-        Sid      = "AllowCognitoListPools"
-        Effect   = "Allow"
-        Action   = ["cognito-idp:ListUserPools"]
-        Resource = "*"
-      },
-      {
-        Sid      = "AllowCognitoReadOnly"
-        Effect   = "Allow"
-        Action   = ["cognito-idp:Describe*", "cognito-idp:Get*", "cognito-idp:ListUsers", "cognito-idp:ListUsersInGroup", "cognito-idp:ListUserPoolClients", "cognito-idp:ListGroups", "cognito-idp:ListIdentityProviders", "cognito-idp:ListResourceServers", "cognito-idp:ListTagsForResource", "cognito-idp:ListUserImportJobs"]
-        Resource = "arn:aws:cognito-idp:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:userpool/*"
-      }
     ]
   })
 }
@@ -250,7 +207,8 @@ resource "aws_iam_role_policy" "apply_prod" {
         Action = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket"]
         Resource = [
           aws_s3_bucket.terraform_state.arn,
-          "${aws_s3_bucket.terraform_state.arn}/prod/terraform.tfstate"
+          "${aws_s3_bucket.terraform_state.arn}/prod/terraform.tfstate",
+          "${aws_s3_bucket.terraform_state.arn}/prod/terraform.tfstate.tflock"
         ]
       },
       {
@@ -258,24 +216,6 @@ resource "aws_iam_role_policy" "apply_prod" {
         Effect   = "Allow"
         Action   = ["kms:Encrypt", "kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey"]
         Resource = aws_kms_key.terraform_state.arn
-      },
-      {
-        Sid      = "AllowDynamoDBLockReadWrite"
-        Effect   = "Allow"
-        Action   = ["dynamodb:DescribeTable", "dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:DeleteItem", "dynamodb:Query", "dynamodb:Scan"]
-        Resource = aws_dynamodb_table.terraform_state_lock.arn
-      },
-      {
-        Sid      = "AllowCognitoListPools"
-        Effect   = "Allow"
-        Action   = ["cognito-idp:ListUserPools"]
-        Resource = "*"
-      },
-      {
-        Sid      = "AllowCognitoManage"
-        Effect   = "Allow"
-        Action   = ["cognito-idp:Describe*", "cognito-idp:Get*", "cognito-idp:ListUsers", "cognito-idp:ListUsersInGroup", "cognito-idp:ListUserPoolClients", "cognito-idp:ListGroups", "cognito-idp:ListIdentityProviders", "cognito-idp:ListResourceServers", "cognito-idp:ListTagsForResource", "cognito-idp:ListUserImportJobs", "cognito-idp:CreateUserPool", "cognito-idp:UpdateUserPool", "cognito-idp:DeleteUserPool", "cognito-idp:CreateUserPoolClient", "cognito-idp:UpdateUserPoolClient", "cognito-idp:DeleteUserPoolClient"]
-        Resource = "arn:aws:cognito-idp:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:userpool/*"
       }
     ]
   })
