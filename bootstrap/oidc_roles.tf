@@ -53,6 +53,14 @@ resource "aws_iam_role_policy" "plan_dev" {
         ]
       },
       {
+        Sid    = "AllowStateLock"
+        Effect = "Allow"
+        Action = ["s3:PutObject", "s3:DeleteObject"]
+        Resource = [
+          "${aws_s3_bucket.terraform_state.arn}/dev/terraform.tfstate.tflock"
+        ]
+      },
+      {
         Sid      = "AllowKMSDecrypt"
         Effect   = "Allow"
         Action   = ["kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey"]
@@ -145,6 +153,14 @@ resource "aws_iam_role_policy" "plan_prod" {
         Resource = [
           aws_s3_bucket.terraform_state.arn,
           "${aws_s3_bucket.terraform_state.arn}/prod/terraform.tfstate"
+        ]
+      },
+      {
+        Sid    = "AllowStateLock"
+        Effect = "Allow"
+        Action = ["s3:PutObject", "s3:DeleteObject"]
+        Resource = [
+          "${aws_s3_bucket.terraform_state.arn}/prod/terraform.tfstate.tflock"
         ]
       },
       {
