@@ -103,7 +103,8 @@ resource "aws_iam_role_policy" "apply_dev" {
         Action = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket"]
         Resource = [
           aws_s3_bucket.terraform_state.arn,
-          "${aws_s3_bucket.terraform_state.arn}/dev/terraform.tfstate"
+          "${aws_s3_bucket.terraform_state.arn}/dev/terraform.tfstate",
+          "${aws_s3_bucket.terraform_state.arn}/dev/terraform.tfstate.tflock"
         ]
       },
       {
@@ -206,7 +207,8 @@ resource "aws_iam_role_policy" "apply_prod" {
         Action = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket"]
         Resource = [
           aws_s3_bucket.terraform_state.arn,
-          "${aws_s3_bucket.terraform_state.arn}/prod/terraform.tfstate"
+          "${aws_s3_bucket.terraform_state.arn}/prod/terraform.tfstate",
+          "${aws_s3_bucket.terraform_state.arn}/prod/terraform.tfstate.tflock"
         ]
       },
       {
