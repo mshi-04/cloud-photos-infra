@@ -105,7 +105,7 @@ resource "aws_iam_role_policy" "apply_dev" {
       {
         Sid      = "AllowCognitoManage"
         Effect   = "Allow"
-        Action   = ["cognito-idp:*"]
+        Action   = ["cognito-idp:Describe*", "cognito-idp:Get*", "cognito-idp:List*"]
         Resource = "*"
       }
     ]
@@ -175,12 +175,8 @@ resource "aws_iam_role" "apply_prod" {
       Action    = "sts:AssumeRoleWithWebIdentity"
       Condition = {
         StringEquals = { "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com" }
-        StringLike = {
-          # Environmentからのアクセス、またはmainブランチからのアクセスのみ許可
-          "token.actions.githubusercontent.com:sub" = [
-            "repo:${local.github_repo}:environment:production",
-            "repo:${local.github_repo}:ref:refs/heads/main"
-          ]
+        StringEquals = {
+          "token.actions.githubusercontent.com:sub" = "repo:${local.github_repo}:environment:production"
         }
       }
     }]

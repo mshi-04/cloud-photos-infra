@@ -1,0 +1,108 @@
+name: reusable-terraform-deploy
+
+on:
+  workflow_call:
+    inputs:
+      env_name:
+        description: "環境名(e.g. dev, prod)。アーティファクト名に使用されます。"
+        required: true
+        type: string
+      tf_working_dir:
+        required: true
+        type: string
+      aws_region:
+        required: true
+        type: string
+      role_plan:
+        required: true
+        type: string
+      role_apply:
+        required: true
+        type: string
+      environment_name:
+        description: "手動承認用のGitHub Environment名(e.g. production)。空文字の場合は承認なしで実行されます。"
+        required: false
+        type: string
+        default: ""
+      tf_version:
+        required: false
+        type: string
+        default: "1.14.3"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.tf_working_dir }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ inputs.tf_version }}
+
+      - name: Configure AWS (OIDC) - plan role
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ inputs.role_plan }}
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Terraform init
+        run: terraform init
+
+      - name: Terraform plan (save)
+        run: terraform plan -out=tfplan
+
+      - name: Terraform show (summary)
+        run: |
+          echo "## Terraform Plan (${{ inputs.env_name }})" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```hcl' >> $GITHUB_STEP_SUMMARY
+          terraform show -no-color tfplan | head -n 400 >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Full tfplan is uploaded as artifact." >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload plan artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-${{ inputs.env_name }}
+          path: ${{ inputs.tf_working_dir }}/tfplan
+
+  apply:
+    runs-on: ubuntu-latest
+    needs: plan
+    # environmentが空文字に評価される場合、承認ゲート（Environment）を使用せずに実行されます
+    environment: ${{ inputs.environment_name }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.tf_working_dir }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ inputs.tf_version }}
+
+      - name: Download plan artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan-${{ inputs.env_name }}
+          path: ${{ inputs.tf_working_dir }}
+
+      - name: Configure AWS (OIDC) - apply role
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ inputs.role_apply }}
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Terraform init
+        run: terraform init
+
+      - name: Terraform apply (from saved plan)
+        run: terraform apply tfplan

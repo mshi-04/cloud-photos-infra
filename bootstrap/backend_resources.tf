@@ -1,8 +1,10 @@
 terraform {
+  required_version = "1.14.3"
+
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 5.0"
+      version = "6.28.0"
     }
   }
 }
@@ -24,7 +26,7 @@ data "aws_caller_identity" "current" {}
 # ==========================================
 resource "aws_s3_bucket" "terraform_state" {
   # ★TODO: バケット名は世界で一意にする必要があります（アカウント名などを付与推奨）
-  bucket = "mshi-04-cloud-photos-tfstate"
+  bucket = "${data.aws_caller_identity.current.account_id}-mshi-04-cloud-photos-tfstate"
 }
 
 resource "aws_s3_bucket_versioning" "terraform_state" {
@@ -34,12 +36,20 @@ resource "aws_s3_bucket_versioning" "terraform_state" {
   }
 }
 
+resource "aws_kms_key" "terraform_state" {
+  description             = "Terraform Stateバケット用KMSキー"
+  deletion_window_in_days = 30
+  enable_key_rotation     = true
+}
+
 resource "aws_s3_bucket_server_side_encryption_configuration" "terraform_state" {
   bucket = aws_s3_bucket.terraform_state.id
   rule {
     apply_server_side_encryption_by_default {
-      sse_algorithm = "AES256"
+      sse_algorithm     = "aws:kms"
+      kms_master_key_id = aws_kms_key.terraform_state.arn
     }
+    bucket_key_enabled = true
   }
 }
 
@@ -68,12 +78,10 @@ resource "aws_s3_bucket_policy" "terraform_state" {
         ]
         Resource = "${aws_s3_bucket.terraform_state.arn}/*"
         Condition = {
-          StringNotLike = {
+          ArnNotEquals = {
             "aws:PrincipalArn" = [
-              "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/gh-terraform-apply-dev",
-              "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/gh-terraform-apply-prod",
-              # ★TODO: 現在このコードを実行しているユーザー/ロールのARNも追加しないと自分も書き込めなくなります
-              "arn:aws:iam::${data.aws_caller_identity.current.account_id}:user/masato"
+              "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/gh-terraform-apply-*",
+              "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/AdministratorAccess*"
             ]
           }
         }
