@@ -25,11 +25,19 @@ override.tf.json
 # Include override files you do wish to add to version control using !
 # !example_override.tf
 
-# Include plugin cache directory
-.terraform.lock.hcl
-
-# Include plan files
+# Ignore plan files
 *.tfplan
 
-# Include var-file files
-*.tfvars
+# Ignore CLI configuration files
+.terraformrc
+terraform.rc
+
+# =========================
+# OS / Editor specific
+# =========================
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+Thumbs.db

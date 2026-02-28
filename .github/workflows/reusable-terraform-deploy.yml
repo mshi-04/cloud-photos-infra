@@ -56,7 +56,7 @@ jobs:
         run: terraform init
 
       - name: Terraform plan (save)
-        run: terraform plan -out=tfplan
+        run: terraform plan -no-color -out=tfplan
 
       - name: Terraform show (summary)
         run: |

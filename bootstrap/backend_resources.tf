@@ -1,8 +1,10 @@
 terraform {
+  required_version = "1.14.6"
+
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "6.28.0"
+      version = "6.32.1"
     }
   }
 }
@@ -18,6 +20,7 @@ provider "aws" {
 }
 
 data "aws_caller_identity" "current" {}
+data "aws_region" "current" {}
 
 # ==========================================
 # S3 Bucket for Terraform State
@@ -71,6 +74,11 @@ resource "aws_kms_key" "terraform_state" {
       }
     ]
   })
+}
+
+resource "aws_kms_alias" "terraform_state" {
+  name          = "alias/terraform-state"
+  target_key_id = aws_kms_key.terraform_state.key_id
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "terraform_state" {
@@ -128,6 +136,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "terraform_state" {
     id     = "expire-old-versions"
     status = "Enabled"
 
+    filter {}
+
     abort_incomplete_multipart_upload {
       days_after_initiation = 7
     }
@@ -142,9 +152,10 @@ resource "aws_s3_bucket_lifecycle_configuration" "terraform_state" {
 # DynamoDB Table for State Lock
 # ==========================================
 resource "aws_dynamodb_table" "terraform_state_lock" {
-  name         = "terraform-state-lock"
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "LockID"
+  name                        = "terraform-state-lock"
+  billing_mode                = "PAY_PER_REQUEST"
+  hash_key                    = "LockID"
+  deletion_protection_enabled = true
 
   attribute {
     name = "LockID"
