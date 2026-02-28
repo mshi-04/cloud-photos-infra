@@ -18,6 +18,7 @@ locals {
       "cognito-idp:DescribeUserPool",
       "cognito-idp:DescribeUserPoolClient",
       "cognito-idp:ListUserPoolClients",
+      "cognito-idp:GetUserPoolMfaConfig",
       "cognito-idp:ListTagsForResource"
     ]
     Resource = "arn:aws:cognito-idp:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:userpool/*"
