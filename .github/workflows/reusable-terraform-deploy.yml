@@ -24,6 +24,10 @@ on:
         required: false
         type: string
         default: ""
+      tf_version:
+        required: false
+        type: string
+        default: "1.14.6"
 
 permissions:
   id-token: write
@@ -40,7 +44,7 @@ jobs:
 
       - uses: hashicorp/setup-terraform@v3
         with:
-          terraform_wrapper: false
+          terraform_version: ${{ inputs.tf_version }}
 
       - name: Configure AWS (OIDC) - plan role
         uses: aws-actions/configure-aws-credentials@v4
@@ -59,10 +63,16 @@ jobs:
           echo "## Terraform Plan (${{ inputs.env_name }})" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo '```hcl' >> $GITHUB_STEP_SUMMARY
-          terraform show -no-color tfplan | head -n 400 >> $GITHUB_STEP_SUMMARY
+          PLAN_OUTPUT=$(terraform show -no-color tfplan)
+          PLAN_LINES=$(echo "$PLAN_OUTPUT" | wc -l)
+          echo "$PLAN_OUTPUT" | head -n 400 >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Full tfplan is uploaded as artifact." >> $GITHUB_STEP_SUMMARY
+          if [ "$PLAN_LINES" -gt 400 ]; then
+            echo "⚠️ Output truncated ($PLAN_LINES lines total). Full tfplan is uploaded as artifact." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Full tfplan is uploaded as artifact." >> $GITHUB_STEP_SUMMARY
+          fi
 
       - name: Upload plan artifact
         uses: actions/upload-artifact@v4
@@ -83,7 +93,7 @@ jobs:
 
       - uses: hashicorp/setup-terraform@v3
         with:
-          terraform_wrapper: false
+          terraform_version: ${{ inputs.tf_version }}
 
       - name: Download plan artifact
         uses: actions/download-artifact@v4

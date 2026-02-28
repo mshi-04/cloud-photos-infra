@@ -23,7 +23,6 @@ data "aws_caller_identity" "current" {}
 # S3 Bucket for Terraform State
 # ==========================================
 resource "aws_s3_bucket" "terraform_state" {
-  # ★TODO: バケット名は世界で一意にする必要があります（アカウント名などを付与推奨）
   bucket = "${data.aws_caller_identity.current.account_id}-mshi-04-cloud-photos-tfstate"
 }
 
