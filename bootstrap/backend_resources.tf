@@ -1,6 +1,4 @@
 terraform {
-  required_version = "1.14.6"
-
   required_providers {
     aws = {
       source  = "hashicorp/aws"
@@ -58,14 +56,17 @@ resource "aws_kms_key" "terraform_state" {
         Effect = "Allow"
         Principal = {
           AWS = [
+            "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/gh-terraform-plan-dev",
             "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/gh-terraform-apply-dev",
+            "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/gh-terraform-plan-prod",
             "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/gh-terraform-apply-prod"
           ]
         }
         Action = [
           "kms:Encrypt",
           "kms:Decrypt",
-          "kms:GenerateDataKey"
+          "kms:GenerateDataKey",
+          "kms:DescribeKey"
         ]
         Resource = "*"
       }
@@ -127,6 +128,10 @@ resource "aws_s3_bucket_lifecycle_configuration" "terraform_state" {
   rule {
     id     = "expire-old-versions"
     status = "Enabled"
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
 
     noncurrent_version_expiration {
       noncurrent_days = 90

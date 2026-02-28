@@ -24,10 +24,6 @@ on:
         required: false
         type: string
         default: ""
-      tf_version:
-        required: false
-        type: string
-        default: "1.14.3"
 
 permissions:
   id-token: write
@@ -44,7 +40,7 @@ jobs:
 
       - uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: ${{ inputs.tf_version }}
+          terraform_wrapper: false
 
       - name: Configure AWS (OIDC) - plan role
         uses: aws-actions/configure-aws-credentials@v4
@@ -87,7 +83,7 @@ jobs:
 
       - uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: ${{ inputs.tf_version }}
+          terraform_wrapper: false
 
       - name: Download plan artifact
         uses: actions/download-artifact@v4

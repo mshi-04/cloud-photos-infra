@@ -99,7 +99,7 @@ resource "aws_iam_role_policy" "apply_dev" {
       {
         Sid      = "AllowDynamoDBLockReadWrite"
         Effect   = "Allow"
-        Action   = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:DeleteItem", "dynamodb:Query", "dynamodb:Scan"]
+        Action   = ["dynamodb:DescribeTable", "dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:DeleteItem", "dynamodb:Query", "dynamodb:Scan"]
         Resource = aws_dynamodb_table.terraform_state_lock.arn
       },
       {
@@ -149,7 +149,7 @@ resource "aws_iam_role_policy" "plan_prod" {
       {
         Sid      = "AllowDynamoDBLockRead"
         Effect   = "Allow"
-        Action   = ["dynamodb:GetItem", "dynamodb:Query", "dynamodb:Scan"]
+        Action   = ["dynamodb:DescribeTable", "dynamodb:GetItem", "dynamodb:Query", "dynamodb:Scan"]
         Resource = aws_dynamodb_table.terraform_state_lock.arn
       },
       {
@@ -174,8 +174,8 @@ resource "aws_iam_role" "apply_prod" {
       Principal = { Federated = aws_iam_openid_connect_provider.github.arn }
       Action    = "sts:AssumeRoleWithWebIdentity"
       Condition = {
-        StringEquals = { "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com" }
         StringEquals = {
+          "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
           "token.actions.githubusercontent.com:sub" = "repo:${local.github_repo}:environment:production"
         }
       }
