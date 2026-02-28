@@ -82,12 +82,18 @@ jobs:
             ${botComment}`;
             
             // Find existing comment
-            const { data: comments } = await github.rest.issues.listComments({
+            const comments = await github.paginate(github.rest.issues.listComments, {
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
+              per_page: 100,
             });
-            const existingComment = comments.find(c => c.body.includes(botComment));
+            const existingComment = comments.find(
+              (c) =>
+                c.user?.login === "github-actions[bot]" &&
+                typeof c.body === "string" &&
+                c.body.includes(botComment)
+            );
             
             if (existingComment) {
               await github.rest.issues.updateComment({
