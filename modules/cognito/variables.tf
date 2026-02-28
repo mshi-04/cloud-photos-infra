@@ -33,4 +33,8 @@ variable "mfa_configuration" {
   description = "MFA configuration for the user pool"
   type        = string
   default     = "OPTIONAL"
+  validation {
+    condition     = contains(["ON", "OPTIONAL"], var.mfa_configuration)
+    error_message = "mfa_configuration は ON または OPTIONAL を指定してください。"
+  }
 }

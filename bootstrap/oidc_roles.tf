@@ -156,7 +156,7 @@ resource "aws_iam_role_policy" "plan_prod" {
         Sid      = "AllowCognitoReadOnly"
         Effect   = "Allow"
         Action   = ["cognito-idp:Describe*", "cognito-idp:Get*", "cognito-idp:List*"]
-        Resource = "*"
+        Resource = "arn:aws:cognito-idp:ap-northeast-1:${data.aws_caller_identity.current.account_id}:*"
       }
     ]
   })

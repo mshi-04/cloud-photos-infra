@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   deploy-dev:
-    # dev環境へのデプロイは main と develop ブランチ दोनोंで実行
+    # dev環境へのデプロイは main と develop ブランチで実行
     uses: ./.github/workflows/reusable-terraform-deploy.yml
     with:
       env_name: dev
