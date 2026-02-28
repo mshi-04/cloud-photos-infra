@@ -1,0 +1,89 @@
+name: "Terraform CI (Plan)"
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'envs/**'
+      - 'modules/**'
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  plan:
+    name: "Plan ${{ matrix.env }}"
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - env: dev
+            working_dir: envs/dev
+            role_suffix: plan-dev
+          - env: prod
+            working_dir: envs/prod
+            role_suffix: plan-prod
+    defaults:
+      run:
+        working-directory: ${{ matrix.working_dir }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/gh-terraform-${{ matrix.role_suffix }}
+          aws-region: ap-northeast-1
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: true
+          terraform_version: "1.14.6"
+          
+      - name: Terraform Format
+        id: fmt
+        run: terraform fmt -check -recursive
+        
+      - name: Terraform Init
+        id: init
+        run: terraform init
+        
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate -no-color
+
+      - name: Terraform Plan
+        id: plan
+        run: terraform plan -no-color -out=tfplan
+        continue-on-error: true
+
+      - name: Comment PR (${{ matrix.env }})
+        uses: actions/github-script@v7
+        env:
+          PLAN: "terraform\n${{ steps.plan.outputs.stdout }}"
+        with:
+          script: |
+            const output = `#### Terraform ${{ matrix.env }} Plan 📖\`${{ steps.plan.outcome }}\`
+            
+            <details><summary>Show Plan</summary>
+            
+            \`\`\`\n
+            ${process.env.PLAN}
+            \`\`\`
+            
+            </details>`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            })
+            
+      - name: Check Plan Status
+        if: steps.plan.outcome == 'failure'
+        run: exit 1

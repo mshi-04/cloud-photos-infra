@@ -3,12 +3,6 @@ variable "env" {
   type        = string
 }
 
-variable "aws_region" {
-  description = "AWSリージョン"
-  type        = string
-  default     = "ap-northeast-1"
-}
-
 variable "project_name" {
   description = "プロジェクト名"
   type        = string
@@ -33,4 +27,10 @@ variable "deletion_protection" {
     condition     = contains(["ACTIVE", "INACTIVE"], var.deletion_protection)
     error_message = "deletion_protection は ACTIVE または INACTIVE を指定してください。"
   }
+}
+
+variable "mfa_configuration" {
+  description = "MFA configuration for the user pool"
+  type        = string
+  default     = "OPTIONAL"
 }

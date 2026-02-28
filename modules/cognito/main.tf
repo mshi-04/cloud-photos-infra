@@ -1,31 +1,10 @@
-terraform {
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 6.0"
-    }
-  }
-}
-
-provider "aws" {
-  region = var.aws_region
-
-  default_tags {
-    tags = {
-      Project     = var.project_name
-      Environment = var.env
-      ManagedBy   = "Terraform"
-    }
-  }
-}
-
 resource "aws_cognito_user_pool" "main" {
   name = "${var.project_name}-user-pool-${var.env}"
 
   username_attributes      = ["email"]
   auto_verified_attributes = ["email"]
 
-  deletion_protection = var.env == "prod" ? "ACTIVE" : var.deletion_protection
+  deletion_protection = var.deletion_protection
 
   password_policy {
     minimum_length    = var.password_minimum_length
@@ -42,7 +21,7 @@ resource "aws_cognito_user_pool" "main" {
     }
   }
 
-  mfa_configuration = var.env == "prod" ? "ON" : "OPTIONAL"
+  mfa_configuration = var.mfa_configuration
   software_token_mfa_configuration {
     enabled = true
   }
@@ -62,7 +41,7 @@ resource "aws_cognito_user_pool_client" "main" {
   name         = "${var.project_name}-user-pool-client-${var.env}"
   user_pool_id = aws_cognito_user_pool.main.id
 
-  generate_secret = false
+  generate_secret               = false
   prevent_user_existence_errors = "ENABLED"
 
   explicit_auth_flows = [
