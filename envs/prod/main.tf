@@ -27,5 +27,5 @@ module "cognito" {
   env                 = "prod"
   project_name        = "cloud-photos"
   deletion_protection = "ACTIVE"
-  mfa_configuration = "ON"
+  mfa_configuration   = "ON"
 }

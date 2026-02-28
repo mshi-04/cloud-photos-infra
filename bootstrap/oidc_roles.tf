@@ -25,7 +25,7 @@ resource "aws_iam_role" "plan_dev" {
       Action    = "sts:AssumeRoleWithWebIdentity"
       Condition = {
         StringEquals = { "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com" }
-        StringLike   = { 
+        StringLike = {
           "token.actions.githubusercontent.com:sub" = [
             "repo:${local.github_repo}:pull_request",
             "repo:${local.github_repo}:ref:refs/heads/develop",
@@ -121,7 +121,7 @@ resource "aws_iam_role" "plan_prod" {
       Action    = "sts:AssumeRoleWithWebIdentity"
       Condition = {
         StringEquals = { "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com" }
-        StringLike   = { 
+        StringLike = {
           "token.actions.githubusercontent.com:sub" = [
             "repo:${local.github_repo}:pull_request",
             "repo:${local.github_repo}:ref:refs/heads/main"
