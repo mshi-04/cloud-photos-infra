@@ -60,7 +60,7 @@ jobs:
 
       - name: Terraform show (summary)
         run: |
-          SUMMARY_LINE=$(terraform show -no-color tfplan | grep -E '^(Plan:|No changes\.)' | tail -n 1)
+          SUMMARY_LINE=$(terraform show -no-color tfplan | grep -E '^(Plan:|No changes\.)' | tail -n 1 || true)
           echo "${SUMMARY_LINE:-Plan summary unavailable.}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "詳細差分は artifact (tfplan-${{ inputs.env_name }}) を参照してください。" >> $GITHUB_STEP_SUMMARY
