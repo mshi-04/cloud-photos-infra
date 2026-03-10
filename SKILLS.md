@@ -37,8 +37,9 @@ Apply the same pattern for new resources: dev is permissive, prod is strict.
 
 1. Edit files under `modules/<name>/`
 2. If adding a new variable, provide a sensible `default` so existing environments don't break
-3. If the new variable needs different values per environment, explicitly set it in `envs/prod/main.tf`
-4. Add `validation` blocks for variables that accept constrained values
+3. Security-sensitive variables (e.g., `force_destroy`, `deletion_protection`) must NOT have a default — require explicit setting in all `envs/*/main.tf`
+4. If a variable needs different values per environment, explicitly set it in both `envs/dev/main.tf` and `envs/prod/main.tf` — do not use `var.env == "prod" ? ...` logic inside modules
+5. Add `validation` blocks for variables that accept constrained values
 
 ### Variable validation style
 ```hcl
@@ -84,7 +85,7 @@ If a new environment (e.g., staging) is needed:
 The `bootstrap/` directory is applied manually (not via CI/CD). It contains:
 - **S3 bucket** for Terraform state (`backend_resources.tf`)
 - **KMS key** for state encryption
-- **DynamoDB table** for state locking
+- State locking uses file-based locking (`use_lockfile = true`), not DynamoDB
 - **GitHub OIDC provider and IAM roles** (`oidc_roles.tf`)
 
 To modify bootstrap resources, edit files in `bootstrap/` and apply locally with appropriate AWS credentials. These changes do NOT go through the CI/CD pipeline.
@@ -94,5 +95,5 @@ To modify bootstrap resources, edit files in `bootstrap/` and apply locally with
 - Always run `terraform fmt -recursive` before committing
 - Use `jsonencode()` for inline IAM policies (not heredoc)
 - Provider version pinned in `envs/<env>/main.tf` (currently `hashicorp/aws 6.32.1`)
-- Backend config uses `use_lockfile = true` (file-based locking, not DynamoDB)
+- Backend config uses `use_lockfile = true` (file-based locking via S3, DynamoDB is not used)
 - `default_tags` on the provider — do not duplicate Project/Environment/ManagedBy tags on individual resources

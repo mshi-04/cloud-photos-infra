@@ -3,7 +3,7 @@
     "allow": [
       "Bash(terraform init*)",
       "Bash(terraform plan*)",
-      "Bash(terraform apply*)",
+      "Bash(terraform fmt*)",
       "Edit",
       "Write"
     ]

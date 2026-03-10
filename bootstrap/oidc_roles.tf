@@ -99,17 +99,7 @@ resource "aws_iam_role_policy" "plan_dev" {
         Sid    = "AllowMediaBucketRead"
         Effect = "Allow"
         Action = [
-          "s3:GetBucketLocation",
-          "s3:GetBucketVersioning",
-          "s3:GetBucketPolicy",
-          "s3:GetBucketPublicAccessBlock",
-          "s3:GetBucketAcl",
-          "s3:GetBucketCORS",
-          "s3:GetBucketObjectLockConfiguration",
-          "s3:GetAccelerateConfiguration",
-          "s3:GetEncryptionConfiguration",
-          "s3:GetLifecycleConfiguration",
-          "s3:GetBucketTagging",
+          "s3:Get*",
           "s3:ListBucket"
         ]
         Resource = local.media_bucket_arn_dev
@@ -227,28 +217,12 @@ resource "aws_iam_role_policy" "apply_dev" {
         Sid    = "AllowMediaBucketManagement"
         Effect = "Allow"
         Action = [
+          "s3:Get*",
+          "s3:Put*",
+          "s3:List*",
           "s3:CreateBucket",
           "s3:DeleteBucket",
-          "s3:GetBucketLocation",
-          "s3:GetBucketVersioning",
-          "s3:PutBucketVersioning",
-          "s3:GetBucketPolicy",
-          "s3:PutBucketPolicy",
-          "s3:DeleteBucketPolicy",
-          "s3:GetBucketPublicAccessBlock",
-          "s3:PutBucketPublicAccessBlock",
-          "s3:GetBucketAcl",
-          "s3:GetBucketCORS",
-          "s3:GetBucketObjectLockConfiguration",
-          "s3:GetAccelerateConfiguration",
-          "s3:GetEncryptionConfiguration",
-          "s3:PutEncryptionConfiguration",
-          "s3:GetLifecycleConfiguration",
-          "s3:PutLifecycleConfiguration",
-          "s3:GetBucketTagging",
-          "s3:PutBucketTagging",
-          "s3:ListBucket",
-          "s3:ListBucketVersions"
+          "s3:DeleteBucketPolicy"
         ]
         Resource = local.media_bucket_arn_dev
       },
@@ -343,17 +317,7 @@ resource "aws_iam_role_policy" "plan_prod" {
         Sid    = "AllowMediaBucketRead"
         Effect = "Allow"
         Action = [
-          "s3:GetBucketLocation",
-          "s3:GetBucketVersioning",
-          "s3:GetBucketPolicy",
-          "s3:GetBucketPublicAccessBlock",
-          "s3:GetBucketAcl",
-          "s3:GetBucketCORS",
-          "s3:GetBucketObjectLockConfiguration",
-          "s3:GetAccelerateConfiguration",
-          "s3:GetEncryptionConfiguration",
-          "s3:GetLifecycleConfiguration",
-          "s3:GetBucketTagging",
+          "s3:Get*",
           "s3:ListBucket"
         ]
         Resource = local.media_bucket_arn_prod
@@ -471,28 +435,12 @@ resource "aws_iam_role_policy" "apply_prod" {
         Sid    = "AllowMediaBucketManagement"
         Effect = "Allow"
         Action = [
+          "s3:Get*",
+          "s3:Put*",
+          "s3:List*",
           "s3:CreateBucket",
           "s3:DeleteBucket",
-          "s3:GetBucketLocation",
-          "s3:GetBucketVersioning",
-          "s3:PutBucketVersioning",
-          "s3:GetBucketPolicy",
-          "s3:PutBucketPolicy",
-          "s3:DeleteBucketPolicy",
-          "s3:GetBucketPublicAccessBlock",
-          "s3:PutBucketPublicAccessBlock",
-          "s3:GetBucketAcl",
-          "s3:GetBucketCORS",
-          "s3:GetBucketObjectLockConfiguration",
-          "s3:GetAccelerateConfiguration",
-          "s3:GetEncryptionConfiguration",
-          "s3:PutEncryptionConfiguration",
-          "s3:GetLifecycleConfiguration",
-          "s3:PutLifecycleConfiguration",
-          "s3:GetBucketTagging",
-          "s3:PutBucketTagging",
-          "s3:ListBucket",
-          "s3:ListBucketVersions"
+          "s3:DeleteBucketPolicy"
         ]
         Resource = local.media_bucket_arn_prod
       },

@@ -31,8 +31,10 @@ module "cognito" {
 module "media_storage" {
   source = "../../modules/media_storage"
 
-  env          = "dev"
-  project_name = "cloud-photos"
+  env                                = "dev"
+  project_name                       = "cloud-photos"
+  force_destroy                      = true
+  noncurrent_version_expiration_days = 30
 }
 
 module "identity_pool" {

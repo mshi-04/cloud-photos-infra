@@ -10,9 +10,8 @@ variable "project_name" {
 }
 
 variable "force_destroy" {
-  description = "バケット削除時にオブジェクトも強制削除するか。本番環境はfalse推奨"
+  description = "バケット削除時にオブジェクトも強制削除するか。各環境で明示的に指定すること（dev: true, prod: false）"
   type        = bool
-  default     = true
 }
 
 variable "noncurrent_version_expiration_days" {

@@ -2,13 +2,13 @@
 
 ## Project Overview
 AWS infrastructure for a cloud photos application, managed with Terraform.
-Currently manages Cognito User Pool for authentication.
+Manages user authentication (Cognito User Pool + Identity Pool) and media storage (S3) with per-user access isolation.
 
 ## Tech Stack
 - **IaC**: Terraform 1.14.6
 - **Cloud**: AWS (ap-northeast-1)
 - **CI/CD**: GitHub Actions (OIDC authentication)
-- **State Backend**: S3 + DynamoDB (lock) + KMS (encryption)
+- **State Backend**: S3 + KMS (encryption), file-based locking (`use_lockfile = true`)
 
 ## Project Structure
 ```
@@ -18,7 +18,9 @@ envs/
   prod/             # Prod environment Terraform root
 environments/       # .tfvars files per environment
 modules/
-  cognito/          # Reusable Cognito User Pool module
+  cognito/          # Cognito User Pool (authentication)
+  identity_pool/    # Cognito Identity Pool (temporary AWS credentials for app users)
+  media_storage/    # S3 bucket for user media (photos/videos)
 .github/workflows/  # CI (plan on PR) / CD (apply on merge)
 ```
 
@@ -41,4 +43,5 @@ modules/
 
 ## Working with This Repo
 - When adding new AWS resources, create a new module under `modules/` and reference it from `envs/dev/main.tf` and `envs/prod/main.tf`
-- Environment differences (deletion protection, MFA, password policy) are controlled via module variables
+- Environment differences (deletion protection, MFA, password policy, force_destroy) are controlled via module variables
+- Security-sensitive variables (e.g., force_destroy) must be set explicitly in all environments, not rely on module defaults
