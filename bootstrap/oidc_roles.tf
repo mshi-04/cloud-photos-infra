@@ -9,7 +9,8 @@ resource "aws_iam_openid_connect_provider" "github" {
 
 # ローカル変数としてリポジトリ情報を定義
 locals {
-  github_repo = "mshi-04/cloud-photos-infra"
+  github_repo  = "mshi-04/cloud-photos-infra"
+  project_name = "cloud-photos"
 
   cognito_read_policy = {
     Sid    = "AllowCognitoRead"
@@ -35,11 +36,11 @@ locals {
     Resource = "arn:aws:cognito-identity:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:identitypool/*"
   }
 
-  media_bucket_arn_dev  = "arn:aws:s3:::${data.aws_caller_identity.current.account_id}-cloud-photos-media-dev"
-  media_bucket_arn_prod = "arn:aws:s3:::${data.aws_caller_identity.current.account_id}-cloud-photos-media-prod"
+  media_bucket_arn_dev  = "arn:aws:s3:::${data.aws_caller_identity.current.account_id}-${local.project_name}-media-dev"
+  media_bucket_arn_prod = "arn:aws:s3:::${data.aws_caller_identity.current.account_id}-${local.project_name}-media-prod"
 
-  cognito_authenticated_role_arn_dev  = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/cloud-photos-cognito-authenticated-dev"
-  cognito_authenticated_role_arn_prod = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/cloud-photos-cognito-authenticated-prod"
+  cognito_authenticated_role_arn_dev  = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-cognito-authenticated-dev"
+  cognito_authenticated_role_arn_prod = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-cognito-authenticated-prod"
 }
 
 # ==========================================

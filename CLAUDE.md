@@ -11,7 +11,7 @@ Manages user authentication (Cognito User Pool + Identity Pool) and media storag
 - **State Backend**: S3 + KMS (encryption), file-based locking (`use_lockfile = true`)
 
 ## Project Structure
-```
+```text
 bootstrap/          # One-time setup resources (S3 state bucket, OIDC roles)
 envs/
   dev/              # Dev environment Terraform root

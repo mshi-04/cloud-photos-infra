@@ -66,7 +66,7 @@ Workflow files are in `.github/workflows/`.
 - Terraform version must match `.terraform-version` (currently `1.14.6`)
 - IAM role ARN format: `arn:aws:iam::<account_id>:role/gh-terraform-<plan|apply>-<env>`
 - Account ID is stored in `vars.AWS_ACCOUNT_ID` (GitHub Actions variable, not a secret)
-- CI triggers only on changes to `envs/**` or `modules/**`
+- CI triggers only on changes to `envs/**`, `modules/**`, or `.github/workflows/**`
 - Prod apply runs only on `main` branch and requires manual approval
 
 ## Skill: Add a New Environment
