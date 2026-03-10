@@ -139,7 +139,8 @@ resource "aws_s3_bucket_policy" "terraform_state" {
           ArnNotEquals = {
             "aws:PrincipalArn" = [
               "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/gh-terraform-apply-*",
-              "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/AdministratorAccess*"
+              "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/AdministratorAccess*",
+              "arn:aws:iam::${data.aws_caller_identity.current.account_id}:user/terraform"
             ]
           }
         }

@@ -23,6 +23,20 @@ locals {
     ]
     Resource = "arn:aws:cognito-idp:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:userpool/*"
   }
+
+  identity_pool_read_policy = {
+    Sid    = "AllowIdentityPoolRead"
+    Effect = "Allow"
+    Action = [
+      "cognito-identity:DescribeIdentityPool",
+      "cognito-identity:GetIdentityPoolRoles",
+      "cognito-identity:ListTagsForResource"
+    ]
+    Resource = "arn:aws:cognito-identity:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:identitypool/*"
+  }
+
+  media_bucket_arn_dev  = "arn:aws:s3:::${data.aws_caller_identity.current.account_id}-cloud-photos-media-dev"
+  media_bucket_arn_prod = "arn:aws:s3:::${data.aws_caller_identity.current.account_id}-cloud-photos-media-prod"
 }
 
 # ==========================================
@@ -79,7 +93,37 @@ resource "aws_iam_role_policy" "plan_dev" {
         Action   = ["kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey"]
         Resource = aws_kms_key.terraform_state.arn
       },
-      local.cognito_read_policy
+      local.cognito_read_policy,
+      local.identity_pool_read_policy,
+      {
+        Sid    = "AllowMediaBucketRead"
+        Effect = "Allow"
+        Action = [
+          "s3:GetBucketLocation",
+          "s3:GetBucketVersioning",
+          "s3:GetBucketPolicy",
+          "s3:GetBucketPublicAccessBlock",
+          "s3:GetBucketAcl",
+          "s3:GetBucketObjectLockConfiguration",
+          "s3:GetAccelerateConfiguration",
+          "s3:GetEncryptionConfiguration",
+          "s3:GetLifecycleConfiguration",
+          "s3:GetBucketTagging",
+          "s3:ListBucket"
+        ]
+        Resource = local.media_bucket_arn_dev
+      },
+      {
+        Sid    = "AllowIAMReadForPlan"
+        Effect = "Allow"
+        Action = [
+          "iam:GetRole",
+          "iam:GetRolePolicy",
+          "iam:ListRolePolicies",
+          "iam:ListAttachedRolePolicies"
+        ]
+        Resource = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/cloud-photos-cognito-authenticated-dev"
+      }
     ]
   })
 }
@@ -154,6 +198,85 @@ resource "aws_iam_role_policy" "apply_dev" {
           "cognito-idp:ListTagsForResource"
         ]
         Resource = "arn:aws:cognito-idp:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:userpool/*"
+      },
+      {
+        Sid    = "AllowIdentityPoolCreate"
+        Effect = "Allow"
+        Action = [
+          "cognito-identity:CreateIdentityPool"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "AllowIdentityPoolManagement"
+        Effect = "Allow"
+        Action = [
+          "cognito-identity:DescribeIdentityPool",
+          "cognito-identity:UpdateIdentityPool",
+          "cognito-identity:DeleteIdentityPool",
+          "cognito-identity:SetIdentityPoolRoles",
+          "cognito-identity:GetIdentityPoolRoles",
+          "cognito-identity:TagResource",
+          "cognito-identity:UntagResource",
+          "cognito-identity:ListTagsForResource"
+        ]
+        Resource = "arn:aws:cognito-identity:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:identitypool/*"
+      },
+      {
+        Sid    = "AllowMediaBucketManagement"
+        Effect = "Allow"
+        Action = [
+          "s3:CreateBucket",
+          "s3:DeleteBucket",
+          "s3:GetBucketLocation",
+          "s3:GetBucketVersioning",
+          "s3:PutBucketVersioning",
+          "s3:GetBucketPolicy",
+          "s3:PutBucketPolicy",
+          "s3:DeleteBucketPolicy",
+          "s3:GetBucketPublicAccessBlock",
+          "s3:PutBucketPublicAccessBlock",
+          "s3:GetBucketAcl",
+          "s3:GetBucketObjectLockConfiguration",
+          "s3:GetAccelerateConfiguration",
+          "s3:GetEncryptionConfiguration",
+          "s3:PutEncryptionConfiguration",
+          "s3:GetLifecycleConfiguration",
+          "s3:PutLifecycleConfiguration",
+          "s3:GetBucketTagging",
+          "s3:PutBucketTagging",
+          "s3:ListBucket",
+          "s3:ListBucketVersions"
+        ]
+        Resource = local.media_bucket_arn_dev
+      },
+      {
+        Sid    = "AllowMediaBucketObjectManagement"
+        Effect = "Allow"
+        Action = [
+          "s3:DeleteObject",
+          "s3:DeleteObjectVersion"
+        ]
+        Resource = "${local.media_bucket_arn_dev}/*"
+      },
+      {
+        Sid    = "AllowIAMForAuthenticatedRole"
+        Effect = "Allow"
+        Action = [
+          "iam:CreateRole",
+          "iam:DeleteRole",
+          "iam:GetRole",
+          "iam:PutRolePolicy",
+          "iam:DeleteRolePolicy",
+          "iam:GetRolePolicy",
+          "iam:ListRolePolicies",
+          "iam:ListAttachedRolePolicies",
+          "iam:TagRole",
+          "iam:UntagRole",
+          "iam:ListInstanceProfilesForRole",
+          "iam:PassRole"
+        ]
+        Resource = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/cloud-photos-cognito-authenticated-dev"
       }
     ]
   })
@@ -212,7 +335,37 @@ resource "aws_iam_role_policy" "plan_prod" {
         Action   = ["kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey"]
         Resource = aws_kms_key.terraform_state.arn
       },
-      local.cognito_read_policy
+      local.cognito_read_policy,
+      local.identity_pool_read_policy,
+      {
+        Sid    = "AllowMediaBucketRead"
+        Effect = "Allow"
+        Action = [
+          "s3:GetBucketLocation",
+          "s3:GetBucketVersioning",
+          "s3:GetBucketPolicy",
+          "s3:GetBucketPublicAccessBlock",
+          "s3:GetBucketAcl",
+          "s3:GetBucketObjectLockConfiguration",
+          "s3:GetAccelerateConfiguration",
+          "s3:GetEncryptionConfiguration",
+          "s3:GetLifecycleConfiguration",
+          "s3:GetBucketTagging",
+          "s3:ListBucket"
+        ]
+        Resource = local.media_bucket_arn_prod
+      },
+      {
+        Sid    = "AllowIAMReadForPlan"
+        Effect = "Allow"
+        Action = [
+          "iam:GetRole",
+          "iam:GetRolePolicy",
+          "iam:ListRolePolicies",
+          "iam:ListAttachedRolePolicies"
+        ]
+        Resource = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/cloud-photos-cognito-authenticated-prod"
+      }
     ]
   })
 }
@@ -287,6 +440,85 @@ resource "aws_iam_role_policy" "apply_prod" {
           "cognito-idp:ListTagsForResource"
         ]
         Resource = "arn:aws:cognito-idp:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:userpool/*"
+      },
+      {
+        Sid    = "AllowIdentityPoolCreate"
+        Effect = "Allow"
+        Action = [
+          "cognito-identity:CreateIdentityPool"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "AllowIdentityPoolManagement"
+        Effect = "Allow"
+        Action = [
+          "cognito-identity:DescribeIdentityPool",
+          "cognito-identity:UpdateIdentityPool",
+          "cognito-identity:DeleteIdentityPool",
+          "cognito-identity:SetIdentityPoolRoles",
+          "cognito-identity:GetIdentityPoolRoles",
+          "cognito-identity:TagResource",
+          "cognito-identity:UntagResource",
+          "cognito-identity:ListTagsForResource"
+        ]
+        Resource = "arn:aws:cognito-identity:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:identitypool/*"
+      },
+      {
+        Sid    = "AllowMediaBucketManagement"
+        Effect = "Allow"
+        Action = [
+          "s3:CreateBucket",
+          "s3:DeleteBucket",
+          "s3:GetBucketLocation",
+          "s3:GetBucketVersioning",
+          "s3:PutBucketVersioning",
+          "s3:GetBucketPolicy",
+          "s3:PutBucketPolicy",
+          "s3:DeleteBucketPolicy",
+          "s3:GetBucketPublicAccessBlock",
+          "s3:PutBucketPublicAccessBlock",
+          "s3:GetBucketAcl",
+          "s3:GetBucketObjectLockConfiguration",
+          "s3:GetAccelerateConfiguration",
+          "s3:GetEncryptionConfiguration",
+          "s3:PutEncryptionConfiguration",
+          "s3:GetLifecycleConfiguration",
+          "s3:PutLifecycleConfiguration",
+          "s3:GetBucketTagging",
+          "s3:PutBucketTagging",
+          "s3:ListBucket",
+          "s3:ListBucketVersions"
+        ]
+        Resource = local.media_bucket_arn_prod
+      },
+      {
+        Sid    = "AllowMediaBucketObjectManagement"
+        Effect = "Allow"
+        Action = [
+          "s3:DeleteObject",
+          "s3:DeleteObjectVersion"
+        ]
+        Resource = "${local.media_bucket_arn_prod}/*"
+      },
+      {
+        Sid    = "AllowIAMForAuthenticatedRole"
+        Effect = "Allow"
+        Action = [
+          "iam:CreateRole",
+          "iam:DeleteRole",
+          "iam:GetRole",
+          "iam:PutRolePolicy",
+          "iam:DeleteRolePolicy",
+          "iam:GetRolePolicy",
+          "iam:ListRolePolicies",
+          "iam:ListAttachedRolePolicies",
+          "iam:TagRole",
+          "iam:UntagRole",
+          "iam:ListInstanceProfilesForRole",
+          "iam:PassRole"
+        ]
+        Resource = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/cloud-photos-cognito-authenticated-prod"
       }
     ]
   })

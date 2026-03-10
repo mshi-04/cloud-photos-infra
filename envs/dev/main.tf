@@ -27,3 +27,20 @@ module "cognito" {
   env          = "dev"
   project_name = "cloud-photos"
 }
+
+module "media_storage" {
+  source = "../../modules/media_storage"
+
+  env          = "dev"
+  project_name = "cloud-photos"
+}
+
+module "identity_pool" {
+  source = "../../modules/identity_pool"
+
+  env                 = "dev"
+  project_name        = "cloud-photos"
+  user_pool_id        = module.cognito.user_pool_id
+  user_pool_client_id = module.cognito.user_pool_client_id
+  media_bucket_arn    = module.media_storage.bucket_arn
+}
