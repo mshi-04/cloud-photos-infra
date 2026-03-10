@@ -37,6 +37,9 @@ locals {
 
   media_bucket_arn_dev  = "arn:aws:s3:::${data.aws_caller_identity.current.account_id}-cloud-photos-media-dev"
   media_bucket_arn_prod = "arn:aws:s3:::${data.aws_caller_identity.current.account_id}-cloud-photos-media-prod"
+
+  cognito_authenticated_role_arn_dev  = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/cloud-photos-cognito-authenticated-dev"
+  cognito_authenticated_role_arn_prod = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/cloud-photos-cognito-authenticated-prod"
 }
 
 # ==========================================
@@ -113,7 +116,7 @@ resource "aws_iam_role_policy" "plan_dev" {
           "iam:ListRolePolicies",
           "iam:ListAttachedRolePolicies"
         ]
-        Resource = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/cloud-photos-cognito-authenticated-dev"
+        Resource = local.cognito_authenticated_role_arn_dev
       }
     ]
   })
@@ -250,9 +253,10 @@ resource "aws_iam_role_policy" "apply_dev" {
           "iam:TagRole",
           "iam:UntagRole",
           "iam:ListInstanceProfilesForRole",
+          "iam:UpdateAssumeRolePolicy",
           "iam:PassRole"
         ]
-        Resource = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/cloud-photos-cognito-authenticated-dev"
+        Resource = local.cognito_authenticated_role_arn_dev
       }
     ]
   })
@@ -331,7 +335,7 @@ resource "aws_iam_role_policy" "plan_prod" {
           "iam:ListRolePolicies",
           "iam:ListAttachedRolePolicies"
         ]
-        Resource = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/cloud-photos-cognito-authenticated-prod"
+        Resource = local.cognito_authenticated_role_arn_prod
       }
     ]
   })
@@ -468,9 +472,10 @@ resource "aws_iam_role_policy" "apply_prod" {
           "iam:TagRole",
           "iam:UntagRole",
           "iam:ListInstanceProfilesForRole",
+          "iam:UpdateAssumeRolePolicy",
           "iam:PassRole"
         ]
-        Resource = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/cloud-photos-cognito-authenticated-prod"
+        Resource = local.cognito_authenticated_role_arn_prod
       }
     ]
   })
