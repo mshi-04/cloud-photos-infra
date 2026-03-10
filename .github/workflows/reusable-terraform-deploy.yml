@@ -44,6 +44,7 @@ jobs:
 
       - uses: hashicorp/setup-terraform@v3
         with:
+          terraform_wrapper: false
           terraform_version: ${{ inputs.tf_version }}
 
       - name: Configure AWS (OIDC) - plan role
@@ -70,6 +71,7 @@ jobs:
         with:
           name: tfplan-${{ inputs.env_name }}
           path: ${{ inputs.tf_working_dir }}/tfplan
+          retention-days: 7
 
   apply:
     runs-on: ubuntu-latest
@@ -87,6 +89,7 @@ jobs:
 
       - uses: hashicorp/setup-terraform@v3
         with:
+          terraform_wrapper: false
           terraform_version: ${{ inputs.tf_version }}
 
       - name: Download plan artifact

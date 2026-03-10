@@ -8,6 +8,7 @@ on:
     paths:
       - 'envs/**'
       - 'modules/**'
+      - '.github/workflows/**'
 
 permissions:
   id-token: write
