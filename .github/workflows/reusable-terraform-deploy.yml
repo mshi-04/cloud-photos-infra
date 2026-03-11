@@ -24,6 +24,10 @@ on:
         required: false
         type: string
         default: ""
+      tf_state_bucket:
+        description: "Terraform state用S3バケット名"
+        required: true
+        type: string
       tf_version:
         required: false
         type: string
@@ -64,7 +68,7 @@ jobs:
           aws-region: ${{ inputs.aws_region }}
 
       - name: Terraform init
-        run: terraform init
+        run: terraform init -backend-config="bucket=${{ inputs.tf_state_bucket }}"
 
       - name: Terraform plan (save)
         run: terraform plan -no-color -out=tfplan
@@ -125,7 +129,7 @@ jobs:
           aws-region: ${{ inputs.aws_region }}
 
       - name: Terraform init
-        run: terraform init
+        run: terraform init -backend-config="bucket=${{ inputs.tf_state_bucket }}"
 
       - name: Terraform apply (from saved plan)
         run: terraform apply tfplan
