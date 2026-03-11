@@ -44,7 +44,13 @@ jobs:
 
       - name: Read Terraform version
         id: tf_version
-        run: echo "version=$(cat "$GITHUB_WORKSPACE/.terraform-version")" >> "$GITHUB_OUTPUT"
+        run: |
+          TF_VERSION_FILE="$GITHUB_WORKSPACE/.terraform-version"
+          if [ ! -f "$TF_VERSION_FILE" ]; then
+            echo "::error::.terraform-version file not found at repository root"
+            exit 1
+          fi
+          echo "version=$(cat "$TF_VERSION_FILE")" >> "$GITHUB_OUTPUT"
 
       - uses: hashicorp/setup-terraform@v3
         with:
@@ -93,7 +99,13 @@ jobs:
 
       - name: Read Terraform version
         id: tf_version
-        run: echo "version=$(cat "$GITHUB_WORKSPACE/.terraform-version")" >> "$GITHUB_OUTPUT"
+        run: |
+          TF_VERSION_FILE="$GITHUB_WORKSPACE/.terraform-version"
+          if [ ! -f "$TF_VERSION_FILE" ]; then
+            echo "::error::.terraform-version file not found at repository root"
+            exit 1
+          fi
+          echo "version=$(cat "$TF_VERSION_FILE")" >> "$GITHUB_OUTPUT"
 
       - uses: hashicorp/setup-terraform@v3
         with:
