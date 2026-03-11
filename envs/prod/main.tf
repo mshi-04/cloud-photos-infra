@@ -29,3 +29,22 @@ module "cognito" {
   deletion_protection = "ACTIVE"
   mfa_configuration   = "ON"
 }
+
+module "media_storage" {
+  source = "../../modules/media_storage"
+
+  env                                = "prod"
+  project_name                       = "cloud-photos"
+  force_destroy                      = false
+  noncurrent_version_expiration_days = 90
+}
+
+module "identity_pool" {
+  source = "../../modules/identity_pool"
+
+  env                 = "prod"
+  project_name        = "cloud-photos"
+  user_pool_id        = module.cognito.user_pool_id
+  user_pool_client_id = module.cognito.user_pool_client_id
+  media_bucket_arn    = module.media_storage.bucket_arn
+}

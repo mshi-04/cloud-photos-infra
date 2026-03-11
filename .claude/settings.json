@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(terraform init*)",
+      "Bash(terraform plan*)",
+      "Bash(terraform fmt*)",
+      "Edit(bootstrap/**)",
+      "Edit(envs/**)",
+      "Edit(modules/**)",
+      "Edit(.github/workflows/**)",
+      "Edit(CLAUDE.md)",
+      "Edit(SKILLS.md)",
+      "Write(bootstrap/**)",
+      "Write(envs/**)",
+      "Write(modules/**)",
+      "Write(.github/workflows/**)"
+    ]
+  }
+}
