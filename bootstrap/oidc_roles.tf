@@ -254,10 +254,20 @@ resource "aws_iam_role_policy" "apply_dev" {
           "iam:TagRole",
           "iam:UntagRole",
           "iam:ListInstanceProfilesForRole",
-          "iam:UpdateAssumeRolePolicy",
-          "iam:PassRole"
+          "iam:UpdateAssumeRolePolicy"
         ]
         Resource = local.cognito_authenticated_role_arn_dev
+      },
+      {
+        Sid    = "AllowPassRoleToCognitoIdentity"
+        Effect = "Allow"
+        Action = ["iam:PassRole"]
+        Resource = local.cognito_authenticated_role_arn_dev
+        Condition = {
+          StringEquals = {
+            "iam:PassedToService" = "cognito-identity.amazonaws.com"
+          }
+        }
       }
     ]
   })
@@ -473,10 +483,20 @@ resource "aws_iam_role_policy" "apply_prod" {
           "iam:TagRole",
           "iam:UntagRole",
           "iam:ListInstanceProfilesForRole",
-          "iam:UpdateAssumeRolePolicy",
-          "iam:PassRole"
+          "iam:UpdateAssumeRolePolicy"
         ]
         Resource = local.cognito_authenticated_role_arn_prod
+      },
+      {
+        Sid    = "AllowPassRoleToCognitoIdentity"
+        Effect = "Allow"
+        Action = ["iam:PassRole"]
+        Resource = local.cognito_authenticated_role_arn_prod
+        Condition = {
+          StringEquals = {
+            "iam:PassedToService" = "cognito-identity.amazonaws.com"
+          }
+        }
       }
     ]
   })

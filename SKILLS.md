@@ -25,6 +25,7 @@ When asked to add a new AWS resource (e.g., S3 bucket, Lambda, API Gateway):
 - Module variable descriptions: written in Japanese
 
 ### Environment differences pattern
+
 | Setting | Dev | Prod |
 |---------|-----|------|
 | deletion_protection | INACTIVE | ACTIVE |
