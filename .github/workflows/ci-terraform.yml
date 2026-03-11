@@ -5,10 +5,12 @@ on:
     types: [opened, synchronize, reopened]
     branches:
       - main
+      - develop
     paths:
       - 'envs/**'
       - 'modules/**'
       - '.github/workflows/**'
+      - '.terraform-version'
 
 permissions:
   id-token: write
@@ -61,7 +63,7 @@ jobs:
 
       - name: Read Terraform version
         id: tf_version
-        run: echo "version=$(cat .terraform-version)" >> "$GITHUB_OUTPUT"
+        run: echo "version=$(cat "$GITHUB_WORKSPACE/.terraform-version")" >> "$GITHUB_OUTPUT"
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
