@@ -8,7 +8,7 @@ When asked to add a new AWS resource (e.g., S3 bucket, Lambda, API Gateway):
 
 1. **Create a module** under `modules/<resource_name>/`
    - `main.tf` — resource definitions
-   - `variables.tf` — input variables with `description`, `type`, `default`, and `validation` blocks
+   - `variables.tf` — input variables with `description`, `type`, and `validation` blocks; add `default` only for non-security-sensitive variables
    - `outputs.tf` — output values
 2. **Wire it into both environments**
    - `envs/dev/main.tf` — add `module "<name>" { source = "../../modules/<name>" ... }` with dev defaults
@@ -17,6 +17,7 @@ When asked to add a new AWS resource (e.g., S3 bucket, Lambda, API Gateway):
    - Add read permissions to `plan_dev` and `plan_prod` role policies
    - Add full CRUD permissions to `apply_dev` and `apply_prod` role policies
    - Use resource-level ARN scoping wherever possible; use `"*"` only for create actions that require it
+   - **Bootstrap changes are NOT applied via CI/CD** — manually run `terraform init && terraform apply` in the `bootstrap/` directory after editing
 4. Run `terraform fmt -recursive` before committing
 
 ### Naming conventions
@@ -37,9 +38,9 @@ Apply the same pattern for new resources: dev is permissive, prod is strict.
 ## Skill: Modify an Existing Module
 
 1. Edit files under `modules/<name>/`
-2. If adding a new variable, provide a sensible `default` so existing environments don't break
+2. If adding a new variable, provide a sensible `default` so existing environments don't break — but if the value differs between environments, always set it explicitly in both `envs/dev/main.tf` and `envs/prod/main.tf` regardless of whether a default exists
 3. Security-sensitive variables (e.g., `force_destroy`, `deletion_protection`) must NOT have a default — require explicit setting in all `envs/*/main.tf`
-4. If a variable needs different values per environment, explicitly set it in both `envs/dev/main.tf` and `envs/prod/main.tf` — do not use `var.env == "prod" ? ...` logic inside modules
+4. Never use `var.env == "prod" ? ...` logic inside modules — environment differences belong in `envs/*/main.tf`, not in module code
 5. Add `validation` blocks for variables that accept constrained values
 
 ### Variable validation style
@@ -77,6 +78,7 @@ If a new environment (e.g., staging) is needed:
 2. Set the S3 backend key to `staging/terraform.tfstate`
 3. Add `default_tags` with `Environment = "staging"`
 4. Add IAM roles (`plan-staging`, `apply-staging`) in `bootstrap/oidc_roles.tf`
+   - **Bootstrap changes are NOT applied via CI/CD** — after editing `bootstrap/oidc_roles.tf`, manually run `terraform init && terraform apply` in the `bootstrap/` directory with appropriate AWS credentials before proceeding
 5. Add matrix entries in CI/CD workflows
 6. Create the GitHub Environment with appropriate protection rules
 
