@@ -44,13 +44,12 @@ Apply the same pattern for new resources: dev is permissive, prod is strict.
 
 ### Variable validation style
 ```hcl
-variable "example" {
-  description = "説明文（日本語）"
+variable "env" {
+  description = "環境名"
   type        = string
-  default     = "value"
   validation {
-    condition     = contains(["value_a", "value_b"], var.example)
-    error_message = "example は value_a または value_b を指定してください。"
+    condition     = contains(["dev", "prod"], var.env)
+    error_message = "env は dev または prod を指定してください。"
   }
 }
 ```
@@ -64,7 +63,7 @@ Workflow files are in `.github/workflows/`.
 - `reusable-terraform-deploy.yml` — shared deploy logic
 
 ### Key rules
-- Terraform version must match `.terraform-version` (currently `1.14.6`)
+- Terraform version must match `.terraform-version` (see `.terraform-version` for the current version)
 - IAM role ARN format: `arn:aws:iam::<account_id>:role/gh-terraform-<plan|apply>-<env>`
 - Account ID is stored in `vars.AWS_ACCOUNT_ID` (GitHub Actions variable, not a secret)
 - CI triggers only on changes to `envs/**`, `modules/**`, or `.github/workflows/**`
@@ -95,6 +94,6 @@ To modify bootstrap resources, edit files in `bootstrap/` and apply locally with
 
 - Always run `terraform fmt -recursive` before committing
 - Use `jsonencode()` for inline IAM policies (not heredoc)
-- Provider version pinned in `envs/<env>/main.tf` (currently `hashicorp/aws 6.32.1`)
+- Provider version pinned in `envs/<env>/main.tf` — check that file for the current `hashicorp/aws` version
 - Backend config uses `use_lockfile = true` (file-based locking via S3, DynamoDB is not used)
 - `default_tags` on the provider — do not duplicate Project/Environment/ManagedBy tags on individual resources
