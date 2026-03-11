@@ -7,11 +7,12 @@ resource "aws_cognito_user_pool" "main" {
   deletion_protection = var.deletion_protection
 
   password_policy {
-    minimum_length    = var.password_minimum_length
-    require_lowercase = true
-    require_uppercase = true
-    require_numbers   = true
-    require_symbols   = true
+    minimum_length                   = var.password_minimum_length
+    require_lowercase                = true
+    require_uppercase                = true
+    require_numbers                  = true
+    require_symbols                  = true
+    temporary_password_validity_days = var.temporary_password_validity_days
   }
 
   account_recovery_setting {

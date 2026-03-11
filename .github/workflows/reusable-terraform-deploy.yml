@@ -24,10 +24,14 @@ on:
         required: false
         type: string
         default: ""
+      tf_state_bucket:
+        description: "Terraform state用S3バケット名"
+        required: true
+        type: string
       tf_version:
         required: false
         type: string
-        default: "1.14.6"
+        default: ""
 
 permissions:
   id-token: write
@@ -42,9 +46,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Read Terraform version
+        id: tf_version
+        run: |
+          TF_VERSION_FILE="$GITHUB_WORKSPACE/.terraform-version"
+          if [ ! -f "$TF_VERSION_FILE" ]; then
+            echo "::error::.terraform-version file not found at repository root"
+            exit 1
+          fi
+          echo "version=$(cat "$TF_VERSION_FILE")" >> "$GITHUB_OUTPUT"
+
       - uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: ${{ inputs.tf_version }}
+          terraform_wrapper: false
+          terraform_version: ${{ inputs.tf_version || steps.tf_version.outputs.version }}
 
       - name: Configure AWS (OIDC) - plan role
         uses: aws-actions/configure-aws-credentials@v4
@@ -53,7 +68,7 @@ jobs:
           aws-region: ${{ inputs.aws_region }}
 
       - name: Terraform init
-        run: terraform init
+        run: terraform init -backend-config="bucket=${{ inputs.tf_state_bucket }}"
 
       - name: Terraform plan (save)
         run: terraform plan -no-color -out=tfplan
@@ -70,6 +85,7 @@ jobs:
         with:
           name: tfplan-${{ inputs.env_name }}
           path: ${{ inputs.tf_working_dir }}/tfplan
+          retention-days: 90
 
   apply:
     runs-on: ubuntu-latest
@@ -85,9 +101,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Read Terraform version
+        id: tf_version
+        run: |
+          TF_VERSION_FILE="$GITHUB_WORKSPACE/.terraform-version"
+          if [ ! -f "$TF_VERSION_FILE" ]; then
+            echo "::error::.terraform-version file not found at repository root"
+            exit 1
+          fi
+          echo "version=$(cat "$TF_VERSION_FILE")" >> "$GITHUB_OUTPUT"
+
       - uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: ${{ inputs.tf_version }}
+          terraform_wrapper: false
+          terraform_version: ${{ inputs.tf_version || steps.tf_version.outputs.version }}
 
       - name: Download plan artifact
         uses: actions/download-artifact@v4
@@ -102,7 +129,7 @@ jobs:
           aws-region: ${{ inputs.aws_region }}
 
       - name: Terraform init
-        run: terraform init
+        run: terraform init -backend-config="bucket=${{ inputs.tf_state_bucket }}"
 
       - name: Terraform apply (from saved plan)
         run: terraform apply tfplan

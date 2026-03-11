@@ -14,8 +14,26 @@ variable "password_minimum_length" {
   type        = number
   default     = 8
   validation {
-    condition     = var.password_minimum_length >= 8 && var.password_minimum_length == floor(var.password_minimum_length)
-    error_message = "password_minimum_length は 8 以上の整数を指定してください。"
+    condition     = var.password_minimum_length >= 8 && var.password_minimum_length <= 99
+    error_message = "password_minimum_length は 8 から 99 までの値を指定してください。"
+  }
+  validation {
+    condition     = var.password_minimum_length == floor(var.password_minimum_length)
+    error_message = "password_minimum_length は整数を指定してください。"
+  }
+}
+
+variable "temporary_password_validity_days" {
+  description = "一時パスワードの有効期間（日数）"
+  type        = number
+  default     = 7
+  validation {
+    condition     = var.temporary_password_validity_days >= 1 && var.temporary_password_validity_days <= 365
+    error_message = "temporary_password_validity_days は 1 から 365 までの値を指定してください。"
+  }
+  validation {
+    condition     = var.temporary_password_validity_days == floor(var.temporary_password_validity_days)
+    error_message = "temporary_password_validity_days は整数を指定してください。"
   }
 }
 
@@ -30,7 +48,7 @@ variable "deletion_protection" {
 }
 
 variable "mfa_configuration" {
-  description = "MFA configuration for the user pool"
+  description = "ユーザープールのMFA設定"
   type        = string
   default     = "OPTIONAL"
   validation {
