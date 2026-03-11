@@ -27,7 +27,7 @@ on:
       tf_version:
         required: false
         type: string
-        default: "1.14.6"
+        default: ""
 
 permissions:
   id-token: write
@@ -42,10 +42,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Read Terraform version
+        id: tf_version
+        run: echo "version=$(cat .terraform-version)" >> "$GITHUB_OUTPUT"
+
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_wrapper: false
-          terraform_version: ${{ inputs.tf_version }}
+          terraform_version: ${{ inputs.tf_version || steps.tf_version.outputs.version }}
 
       - name: Configure AWS (OIDC) - plan role
         uses: aws-actions/configure-aws-credentials@v4
@@ -87,10 +91,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Read Terraform version
+        id: tf_version
+        run: echo "version=$(cat .terraform-version)" >> "$GITHUB_OUTPUT"
+
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_wrapper: false
-          terraform_version: ${{ inputs.tf_version }}
+          terraform_version: ${{ inputs.tf_version || steps.tf_version.outputs.version }}
 
       - name: Download plan artifact
         uses: actions/download-artifact@v4

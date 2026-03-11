@@ -14,14 +14,14 @@ When asked to add a new AWS resource (e.g., S3 bucket, Lambda, API Gateway):
    - `envs/dev/main.tf` — add `module "<name>" { source = "../../modules/<name>" ... }` with dev defaults
    - `envs/prod/main.tf` — add the same module with prod overrides (stricter settings)
 3. **Update IAM roles** in `bootstrap/oidc_roles.tf`
-   - Add read permissions to `plan_dev` and `plan_prod` role policies
-   - Add full CRUD permissions to `apply_dev` and `apply_prod` role policies
+   - Add read permissions to `gh-terraform-plan-dev` and `gh-terraform-plan-prod` role policies
+   - Add full CRUD permissions to `gh-terraform-apply-dev` and `gh-terraform-apply-prod` role policies
    - Use resource-level ARN scoping wherever possible; use `"*"` only for create actions that require it
    - **Bootstrap changes are NOT applied via CI/CD** — manually run `terraform init && terraform apply` in the `bootstrap/` directory after editing
 4. Run `terraform fmt -recursive` before committing
 
 ### Naming conventions
-- Resource names: `${var.project_name}-<resource>-${var.env}` (e.g., `cloud-photos-user-pool-dev`)
+- Resource names: `${var.project_name}-<resource>-${var.env}` (e.g., `cloud-photos-user-pool-dev`). S3 buckets use `${account_id}-${var.project_name}-<resource>-${var.env}` for global uniqueness
 - IAM policy Sids: `Allow<Service><Action>` (e.g., `AllowCognitoManagementUserPool`)
 - Module variable descriptions: written in Japanese
 
@@ -31,7 +31,7 @@ When asked to add a new AWS resource (e.g., S3 bucket, Lambda, API Gateway):
 |---------|-----|------|
 | deletion_protection | INACTIVE | ACTIVE |
 | MFA | OPTIONAL | ON |
-| Password length | 8 | 12+ |
+| Password length | 8 | 8 |
 
 Apply the same pattern for new resources: dev is permissive, prod is strict.
 
@@ -39,7 +39,7 @@ Apply the same pattern for new resources: dev is permissive, prod is strict.
 
 1. Edit files under `modules/<name>/`
 2. If adding a new variable, provide a sensible `default` so existing environments don't break — but if the value differs between environments, always set it explicitly in both `envs/dev/main.tf` and `envs/prod/main.tf` regardless of whether a default exists
-3. Security-sensitive variables (e.g., `force_destroy`, `deletion_protection`) must NOT have a default — require explicit setting in all `envs/*/main.tf`
+3. Security-sensitive variables (e.g., `force_destroy`) must NOT have a default — require explicit setting in all `envs/*/main.tf`. Variables with a safe fallback (e.g., `deletion_protection` defaulting to `"INACTIVE"`) may have a default, but prod must always override them explicitly
 4. Never use `var.env == "prod" ? ...` logic inside modules — environment differences belong in `envs/*/main.tf`, not in module code
 5. Add `validation` blocks for variables that accept constrained values
 
@@ -67,7 +67,7 @@ Workflow files are in `.github/workflows/`.
 - Terraform version must match `.terraform-version` (see `.terraform-version` for the current version)
 - IAM role ARN format: `arn:aws:iam::<account_id>:role/gh-terraform-<plan|apply>-<env>`
 - Account ID is stored in `vars.AWS_ACCOUNT_ID` (GitHub Actions variable, not a secret)
-- CI triggers only on changes to `envs/**`, `modules/**`, or `.github/workflows/**`
+- CI triggers on changes to `envs/**`, `modules/**`, or `.github/workflows/**`; CD triggers on `envs/**` and `modules/**` only (workflow changes do not trigger auto-apply)
 - Prod apply runs only on `main` branch and requires manual approval
 
 ## Skill: Add a New Environment
@@ -77,7 +77,7 @@ If a new environment (e.g., staging) is needed:
 1. Create `envs/staging/` with `backend.tf`, `main.tf`, `outputs.tf`
 2. Set the S3 backend key to `staging/terraform.tfstate`
 3. Add `default_tags` with `Environment = "staging"`
-4. Add IAM roles (`plan-staging`, `apply-staging`) in `bootstrap/oidc_roles.tf`
+4. Add IAM roles (`gh-terraform-plan-staging`, `gh-terraform-apply-staging`) in `bootstrap/oidc_roles.tf`
    - **Bootstrap changes are NOT applied via CI/CD** — after editing `bootstrap/oidc_roles.tf`, manually run `terraform init && terraform apply` in the `bootstrap/` directory with appropriate AWS credentials before proceeding
 5. Add matrix entries in CI/CD workflows
 6. Create the GitHub Environment with appropriate protection rules

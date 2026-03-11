@@ -48,7 +48,7 @@ variable "deletion_protection" {
 }
 
 variable "mfa_configuration" {
-  description = "MFA configuration for the user pool"
+  description = "ユーザープールのMFA設定"
   type        = string
   default     = "OPTIONAL"
   validation {
