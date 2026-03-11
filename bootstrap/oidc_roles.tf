@@ -259,9 +259,9 @@ resource "aws_iam_role_policy" "apply_dev" {
         Resource = local.cognito_authenticated_role_arn_dev
       },
       {
-        Sid    = "AllowPassRoleToCognitoIdentity"
-        Effect = "Allow"
-        Action = ["iam:PassRole"]
+        Sid      = "AllowPassRoleToCognitoIdentity"
+        Effect   = "Allow"
+        Action   = ["iam:PassRole"]
         Resource = local.cognito_authenticated_role_arn_dev
         Condition = {
           StringEquals = {
@@ -488,9 +488,9 @@ resource "aws_iam_role_policy" "apply_prod" {
         Resource = local.cognito_authenticated_role_arn_prod
       },
       {
-        Sid    = "AllowPassRoleToCognitoIdentity"
-        Effect = "Allow"
-        Action = ["iam:PassRole"]
+        Sid      = "AllowPassRoleToCognitoIdentity"
+        Effect   = "Allow"
+        Action   = ["iam:PassRole"]
         Resource = local.cognito_authenticated_role_arn_prod
         Condition = {
           StringEquals = {
