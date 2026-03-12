@@ -73,6 +73,25 @@ resource "aws_iam_role_policy" "authenticated_s3" {
 }
 
 # ==========================================
+# API Gateway Access (if API is configured)
+# ==========================================
+resource "aws_iam_role_policy" "authenticated_api" {
+  count = var.api_execution_arn != "" ? 1 : 0
+  name  = "media-api-access"
+  role  = aws_iam_role.authenticated.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid      = "AllowAPIGatewayInvoke"
+      Effect   = "Allow"
+      Action   = "execute-api:Invoke"
+      Resource = "${var.api_execution_arn}/*"
+    }]
+  })
+}
+
+# ==========================================
 # Role Attachment
 # ==========================================
 resource "aws_cognito_identity_pool_roles_attachment" "main" {

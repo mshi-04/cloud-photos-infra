@@ -32,6 +32,9 @@ override.tf.json
 .terraformrc
 terraform.rc
 
+# Lambda build artifacts
+.build/
+
 # =========================
 # OS / Editor specific
 # =========================
