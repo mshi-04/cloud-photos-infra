@@ -34,3 +34,8 @@ variable "lambda_timeout" {
   type        = number
   default     = 10
 }
+
+variable "log_retention_in_days" {
+  description = "CloudWatch Logs の保持期間 (日)"
+  type        = number
+}

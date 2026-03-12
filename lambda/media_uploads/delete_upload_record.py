@@ -7,15 +7,19 @@ dynamodb = boto3.resource("dynamodb")
 table = dynamodb.Table(os.environ["TABLE_NAME"])
 
 
-def handler(event, context):
-    identity_id = event["requestContext"]["identity"]["cognitoIdentityId"]
+def handler(event, _context):
+    identity_id = (
+        event.get("requestContext", {})
+        .get("identity", {})
+        .get("cognitoIdentityId")
+    )
     if not identity_id:
         return {
             "statusCode": 403,
             "body": json.dumps({"message": "Unauthorized"}),
         }
 
-    media_id = event["pathParameters"].get("mediaId")
+    media_id = (event.get("pathParameters") or {}).get("mediaId")
     if not media_id:
         return {
             "statusCode": 400,

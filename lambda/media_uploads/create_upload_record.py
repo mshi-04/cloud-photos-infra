@@ -8,15 +8,25 @@ dynamodb = boto3.resource("dynamodb")
 table = dynamodb.Table(os.environ["TABLE_NAME"])
 
 
-def handler(event, context):
-    identity_id = event["requestContext"]["identity"]["cognitoIdentityId"]
+def handler(event, _context):
+    identity_id = (
+        event.get("requestContext", {})
+        .get("identity", {})
+        .get("cognitoIdentityId")
+    )
     if not identity_id:
         return {
             "statusCode": 403,
             "body": json.dumps({"message": "Unauthorized"}),
         }
 
-    body = json.loads(event.get("body") or "{}")
+    try:
+        body = json.loads(event.get("body") or "{}")
+    except json.JSONDecodeError:
+        return {
+            "statusCode": 400,
+            "body": json.dumps({"message": "Invalid JSON body"}),
+        }
 
     required_fields = ["mediaId", "cloudStoragePath", "contentType", "mediaType"]
     for field in required_fields:
@@ -52,7 +62,17 @@ def handler(event, context):
     if "fileSize" in body:
         item["fileSize"] = body["fileSize"]
 
-    table.put_item(Item=item)
+    try:
+        table.put_item(
+            Item=item,
+            ConditionExpression="attribute_not_exists(userId) AND attribute_not_exists(mediaId)",
+        )
+    except dynamodb.meta.client.exceptions.ConditionalCheckFailedException:
+        return {
+            "statusCode": 409,
+            "headers": {"Content-Type": "application/json"},
+            "body": json.dumps({"message": "Record already exists"}),
+        }
 
     return {
         "statusCode": 201,

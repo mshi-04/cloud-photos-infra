@@ -59,8 +59,9 @@ module "media_db" {
 module "media_api" {
   source = "../../modules/media_api"
 
-  env                 = "dev"
-  project_name        = "cloud-photos"
-  dynamodb_table_name = module.media_db.table_name
-  dynamodb_table_arn  = module.media_db.table_arn
+  env                   = "dev"
+  project_name          = "cloud-photos"
+  dynamodb_table_name   = module.media_db.table_name
+  dynamodb_table_arn    = module.media_db.table_arn
+  log_retention_in_days = 14
 }

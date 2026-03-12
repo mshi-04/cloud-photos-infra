@@ -4,9 +4,9 @@ data "aws_caller_identity" "current" {}
 locals {
   function_prefix = "${var.project_name}-${var.env}"
   lambda_functions = {
-    get_upload_records   = "get_upload_records"
-    create_upload_record = "create_upload_record"
-    delete_upload_record = "delete_upload_record"
+    get_upload_records   = "get-upload-records"
+    create_upload_record = "create-upload-record"
+    delete_upload_record = "delete-upload-record"
   }
 }
 
@@ -74,33 +74,18 @@ resource "aws_iam_role_policy" "lambda_logs" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Sid    = "AllowCloudWatchLogs"
-      Effect = "Allow"
-      Action = [
-        "logs:CreateLogStream",
-        "logs:PutLogEvents"
-      ]
-      Resource = "${aws_cloudwatch_log_group.lambda["get_upload_records"].arn}:*"
-      },
+    Statement = [
       {
-        Sid    = "AllowCloudWatchLogsCreate"
+        Sid    = "AllowCloudWatchLogsWrite"
         Effect = "Allow"
         Action = [
+          "logs:CreateLogGroup",
           "logs:CreateLogStream",
           "logs:PutLogEvents"
         ]
-        Resource = "${aws_cloudwatch_log_group.lambda["create_upload_record"].arn}:*"
-      },
-      {
-        Sid    = "AllowCloudWatchLogsDelete"
-        Effect = "Allow"
-        Action = [
-          "logs:CreateLogStream",
-          "logs:PutLogEvents"
-        ]
-        Resource = "${aws_cloudwatch_log_group.lambda["delete_upload_record"].arn}:*"
-    }]
+        Resource = [for k, _ in local.lambda_functions : "${aws_cloudwatch_log_group.lambda[k].arn}:*"]
+      }
+    ]
   })
 }
 
@@ -110,7 +95,7 @@ resource "aws_iam_role_policy" "lambda_logs" {
 resource "aws_cloudwatch_log_group" "lambda" {
   for_each          = local.lambda_functions
   name              = "/aws/lambda/${local.function_prefix}-${each.value}"
-  retention_in_days = var.env == "prod" ? 90 : 14
+  retention_in_days = var.log_retention_in_days
 }
 
 # ==========================================

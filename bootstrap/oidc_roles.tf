@@ -49,7 +49,6 @@ locals {
   lambda_function_arn_prefix_dev  = "arn:aws:lambda:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:function:${local.project_name}-dev-*"
   lambda_function_arn_prefix_prod = "arn:aws:lambda:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:function:${local.project_name}-prod-*"
 
-  api_gateway_arn_dev  = "arn:aws:apigateway:${data.aws_region.current.id}::/restapis/*"
   lambda_role_arn_dev  = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-dev-media-api-lambda"
   lambda_role_arn_prod = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-prod-media-api-lambda"
 
@@ -333,9 +332,9 @@ resource "aws_iam_role_policy" "apply_dev" {
         ]
       },
       {
-        Sid      = "AllowPassRole"
-        Effect   = "Allow"
-        Action   = ["iam:PassRole"]
+        Sid    = "AllowPassRole"
+        Effect = "Allow"
+        Action = ["iam:PassRole"]
         Resource = [
           local.cognito_authenticated_role_arn_dev,
           local.lambda_role_arn_dev
@@ -665,9 +664,9 @@ resource "aws_iam_role_policy" "apply_prod" {
         ]
       },
       {
-        Sid      = "AllowPassRole"
-        Effect   = "Allow"
-        Action   = ["iam:PassRole"]
+        Sid    = "AllowPassRole"
+        Effect = "Allow"
+        Action = ["iam:PassRole"]
         Resource = [
           local.cognito_authenticated_role_arn_prod,
           local.lambda_role_arn_prod
