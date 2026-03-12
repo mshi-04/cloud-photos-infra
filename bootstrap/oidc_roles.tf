@@ -181,10 +181,17 @@ resource "aws_iam_role_policy" "plan_dev" {
         Resource = "arn:aws:apigateway:${data.aws_region.current.id}::/*"
       },
       {
+        Sid    = "AllowCloudWatchLogsDescribeAll"
+        Effect = "Allow"
+        Action = [
+          "logs:DescribeLogGroups"
+        ]
+        Resource = "*"
+      },
+      {
         Sid    = "AllowCloudWatchLogsReadForPlan"
         Effect = "Allow"
         Action = [
-          "logs:DescribeLogGroups",
           "logs:ListTagsForResource"
         ]
         Resource = local.log_group_arn_dev
@@ -397,12 +404,19 @@ resource "aws_iam_role_policy" "apply_dev" {
         Resource = "arn:aws:apigateway:${data.aws_region.current.id}::/*"
       },
       {
+        Sid    = "AllowCloudWatchLogsDescribeAll"
+        Effect = "Allow"
+        Action = [
+          "logs:DescribeLogGroups"
+        ]
+        Resource = "*"
+      },
+      {
         Sid    = "AllowCloudWatchLogsManagement"
         Effect = "Allow"
         Action = [
           "logs:CreateLogGroup",
           "logs:DeleteLogGroup",
-          "logs:DescribeLogGroups",
           "logs:PutRetentionPolicy",
           "logs:TagResource",
           "logs:UntagResource",
@@ -513,10 +527,17 @@ resource "aws_iam_role_policy" "plan_prod" {
         Resource = "arn:aws:apigateway:${data.aws_region.current.id}::/*"
       },
       {
+        Sid    = "AllowCloudWatchLogsDescribeAll"
+        Effect = "Allow"
+        Action = [
+          "logs:DescribeLogGroups"
+        ]
+        Resource = "*"
+      },
+      {
         Sid    = "AllowCloudWatchLogsReadForPlan"
         Effect = "Allow"
         Action = [
-          "logs:DescribeLogGroups",
           "logs:ListTagsForResource"
         ]
         Resource = local.log_group_arn_prod
@@ -729,12 +750,19 @@ resource "aws_iam_role_policy" "apply_prod" {
         Resource = "arn:aws:apigateway:${data.aws_region.current.id}::/*"
       },
       {
+        Sid    = "AllowCloudWatchLogsDescribeAll"
+        Effect = "Allow"
+        Action = [
+          "logs:DescribeLogGroups"
+        ]
+        Resource = "*"
+      },
+      {
         Sid    = "AllowCloudWatchLogsManagement"
         Effect = "Allow"
         Action = [
           "logs:CreateLogGroup",
           "logs:DeleteLogGroup",
-          "logs:DescribeLogGroups",
           "logs:PutRetentionPolicy",
           "logs:TagResource",
           "logs:UntagResource",
