@@ -2,6 +2,7 @@ import json
 import os
 
 import boto3
+from boto3.dynamodb.conditions import Key
 
 dynamodb = boto3.resource("dynamodb")
 table = dynamodb.Table(os.environ["TABLE_NAME"])
@@ -31,19 +32,39 @@ def handler(event, _context):
         }
 
     query_params = {
-        "KeyConditionExpression": boto3.dynamodb.conditions.Key("userId").eq(identity_id),
+        "KeyConditionExpression": Key("userId").eq(identity_id),
         "Limit": limit,
     }
 
     last_key = params.get("lastEvaluatedKey")
     if last_key:
         try:
-            query_params["ExclusiveStartKey"] = json.loads(last_key)
+            exclusive_start_key = json.loads(last_key)
         except json.JSONDecodeError:
             return {
                 "statusCode": 400,
                 "body": json.dumps({"message": "Invalid lastEvaluatedKey parameter"}),
             }
+
+        if not isinstance(exclusive_start_key, dict):
+            return {
+                "statusCode": 400,
+                "body": json.dumps({"message": "lastEvaluatedKey must be an object"}),
+            }
+
+        if exclusive_start_key.get("userId") != identity_id:
+            return {
+                "statusCode": 403,
+                "body": json.dumps({"message": "lastEvaluatedKey does not match your identity"}),
+            }
+
+        if not exclusive_start_key.get("mediaId"):
+            return {
+                "statusCode": 400,
+                "body": json.dumps({"message": "lastEvaluatedKey.mediaId is required"}),
+            }
+
+        query_params["ExclusiveStartKey"] = exclusive_start_key
 
     response = table.query(**query_params)
 

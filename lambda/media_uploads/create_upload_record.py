@@ -69,9 +69,9 @@ def handler(event, _context):
         )
     except dynamodb.meta.client.exceptions.ConditionalCheckFailedException:
         return {
-            "statusCode": 409,
+            "statusCode": 200,
             "headers": {"Content-Type": "application/json"},
-            "body": json.dumps({"message": "Record already exists"}),
+            "body": json.dumps({"message": "Record already exists, skipped"}),
         }
 
     return {
