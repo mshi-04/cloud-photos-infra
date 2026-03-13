@@ -41,8 +41,8 @@ resource "aws_iam_role" "get_upload_records" {
 }
 
 resource "aws_iam_role_policy" "get_upload_records_dynamodb" {
-  name   = "dynamodb-query"
-  role   = aws_iam_role.get_upload_records.id
+  name = "dynamodb-query"
+  role = aws_iam_role.get_upload_records.id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
@@ -54,8 +54,8 @@ resource "aws_iam_role_policy" "get_upload_records_dynamodb" {
 }
 
 resource "aws_iam_role_policy" "get_upload_records_logs" {
-  name   = "cloudwatch-logs"
-  role   = aws_iam_role.get_upload_records.id
+  name = "cloudwatch-logs"
+  role = aws_iam_role.get_upload_records.id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -74,8 +74,8 @@ resource "aws_iam_role" "create_upload_record" {
 }
 
 resource "aws_iam_role_policy" "create_upload_record_dynamodb" {
-  name   = "dynamodb-put"
-  role   = aws_iam_role.create_upload_record.id
+  name = "dynamodb-put"
+  role = aws_iam_role.create_upload_record.id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
@@ -87,8 +87,8 @@ resource "aws_iam_role_policy" "create_upload_record_dynamodb" {
 }
 
 resource "aws_iam_role_policy" "create_upload_record_logs" {
-  name   = "cloudwatch-logs"
-  role   = aws_iam_role.create_upload_record.id
+  name = "cloudwatch-logs"
+  role = aws_iam_role.create_upload_record.id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -107,8 +107,8 @@ resource "aws_iam_role" "delete_upload_record" {
 }
 
 resource "aws_iam_role_policy" "delete_upload_record_dynamodb" {
-  name   = "dynamodb-delete"
-  role   = aws_iam_role.delete_upload_record.id
+  name = "dynamodb-delete"
+  role = aws_iam_role.delete_upload_record.id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
@@ -120,8 +120,8 @@ resource "aws_iam_role_policy" "delete_upload_record_dynamodb" {
 }
 
 resource "aws_iam_role_policy" "delete_upload_record_logs" {
-  name   = "cloudwatch-logs"
-  role   = aws_iam_role.delete_upload_record.id
+  name = "cloudwatch-logs"
+  role = aws_iam_role.delete_upload_record.id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [

@@ -10,7 +10,7 @@ output "api_id" {
 
 output "api_execution_arns" {
   description = "API Gateway 実行 ARN のリスト"
-  value       = [
+  value = [
     "${aws_api_gateway_rest_api.media.execution_arn}/*/GET/media/uploads",
     "${aws_api_gateway_rest_api.media.execution_arn}/*/POST/media/uploads",
     "${aws_api_gateway_rest_api.media.execution_arn}/*/DELETE/media/uploads/*"
@@ -19,7 +19,7 @@ output "api_execution_arns" {
 
 output "lambda_role_arns" {
   description = "Lambda 実行ロール ARN リスト"
-  value       = [
+  value = [
     aws_iam_role.get_upload_records.arn,
     aws_iam_role.create_upload_record.arn,
     aws_iam_role.delete_upload_record.arn
@@ -28,7 +28,7 @@ output "lambda_role_arns" {
 
 output "lambda_role_names" {
   description = "Lambda 実行ロール名 リスト"
-  value       = [
+  value = [
     aws_iam_role.get_upload_records.name,
     aws_iam_role.create_upload_record.name,
     aws_iam_role.delete_upload_record.name

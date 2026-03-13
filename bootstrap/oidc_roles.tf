@@ -341,9 +341,9 @@ resource "aws_iam_role_policy" "apply_dev" {
         Resource = concat([local.cognito_authenticated_role_arn_dev], local.lambda_role_arns_dev)
       },
       {
-        Sid    = "AllowPassRole"
-        Effect = "Allow"
-        Action = ["iam:PassRole"]
+        Sid      = "AllowPassRole"
+        Effect   = "Allow"
+        Action   = ["iam:PassRole"]
         Resource = concat([local.cognito_authenticated_role_arn_dev], local.lambda_role_arns_dev)
         Condition = {
           StringEquals = {
@@ -678,9 +678,9 @@ resource "aws_iam_role_policy" "apply_prod" {
         Resource = concat([local.cognito_authenticated_role_arn_prod], local.lambda_role_arns_prod)
       },
       {
-        Sid    = "AllowPassRole"
-        Effect = "Allow"
-        Action = ["iam:PassRole"]
+        Sid      = "AllowPassRole"
+        Effect   = "Allow"
+        Action   = ["iam:PassRole"]
         Resource = concat([local.cognito_authenticated_role_arn_prod], local.lambda_role_arns_prod)
         Condition = {
           StringEquals = {
