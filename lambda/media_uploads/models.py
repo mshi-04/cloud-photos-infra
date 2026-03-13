@@ -63,12 +63,11 @@ class CreateUploadRecordRequest:
             raise ValidationError(f"{FIELD_MEDIA_TYPE} must be IMAGE or VIDEO")
 
         if file_size is not None:
-            if isinstance(file_size, bool):
+            if isinstance(file_size, bool) or not isinstance(file_size, (int, float)):
                 raise ValidationError(f"{FIELD_FILE_SIZE} must be a number")
-            try:
-                file_size = int(file_size)
-            except (ValueError, TypeError):
-                raise ValidationError(f"{FIELD_FILE_SIZE} must be a number") from None
+            if isinstance(file_size, float) and not file_size.is_integer():
+                raise ValidationError(f"{FIELD_FILE_SIZE} must be an integer")
+            file_size = int(file_size)
             if file_size < 0:
                 raise ValidationError(f"{FIELD_FILE_SIZE} must be non-negative")
 
@@ -93,8 +92,11 @@ class GetUploadRecordsRequest:
             params = {}
         elif not isinstance(params, dict):
             raise ValidationError("params must be a dict")
+        raw_limit = params.get("limit", DEFAULT_LIMIT)
+        if isinstance(raw_limit, bool):
+            raise ValidationError("Invalid limit parameter")
         try:
-            limit = int(params.get("limit", DEFAULT_LIMIT))
+            limit = int(raw_limit)
             limit = max(1, min(limit, MAX_LIMIT))
         except (ValueError, TypeError):
             raise ValidationError("Invalid limit parameter") from None
