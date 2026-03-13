@@ -49,13 +49,13 @@ class CreateUploadRecordRequest:
 
         if cloud_storage_path is None:
             raise ValidationError(f"Missing required field: {FIELD_CLOUD_STORAGE_PATH}")
-        if not isinstance(cloud_storage_path, str):
-            raise ValidationError(f"{FIELD_CLOUD_STORAGE_PATH} must be a string")
+        if not isinstance(cloud_storage_path, str) or not cloud_storage_path.strip():
+            raise ValidationError(f"{FIELD_CLOUD_STORAGE_PATH} must be a non-empty string")
 
         if content_type is None:
             raise ValidationError(f"Missing required field: {FIELD_CONTENT_TYPE}")
-        if not isinstance(content_type, str):
-            raise ValidationError(f"{FIELD_CONTENT_TYPE} must be a string")
+        if not isinstance(content_type, str) or not content_type.strip():
+            raise ValidationError(f"{FIELD_CONTENT_TYPE} must be a non-empty string")
 
         if media_type is None:
             raise ValidationError(f"Missing required field: {FIELD_MEDIA_TYPE}")
