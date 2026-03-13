@@ -4,7 +4,7 @@ from typing import Any, Dict
 from auth import get_identity_id
 from constants import FIELD_MEDIA_ID, FIELD_USER_ID
 from db import deserialize_item, dynamodb_client, serialize_item, table_name
-from models import GetUploadRecordsRequest, ValidationError
+from models import AuthorizationError, GetUploadRecordsRequest, ValidationError
 from response import error, success
 
 
@@ -19,7 +19,7 @@ def handler(event: Dict[str, Any], _context: Any) -> Dict[str, Any]:
         request_data = GetUploadRecordsRequest.from_dict(params, identity_id)
     except ValidationError as e:
         return error(HTTPStatus.BAD_REQUEST, str(e))
-    except ValueError as e:
+    except AuthorizationError as e:
         return error(HTTPStatus.FORBIDDEN, str(e))
 
     query_params: Dict[str, Any] = {

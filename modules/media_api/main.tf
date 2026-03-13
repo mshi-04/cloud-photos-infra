@@ -11,24 +11,12 @@ locals {
 }
 
 # ==========================================
-# Lambda Source Archives
+# Lambda Source Archive
 # ==========================================
-data "archive_file" "get_upload_records" {
+data "archive_file" "media_uploads" {
   type        = "zip"
-  source_file = "${path.module}/../../lambda/media_uploads/get_upload_records.py"
-  output_path = "${path.module}/../../.build/get_upload_records.zip"
-}
-
-data "archive_file" "create_upload_record" {
-  type        = "zip"
-  source_file = "${path.module}/../../lambda/media_uploads/create_upload_record.py"
-  output_path = "${path.module}/../../.build/create_upload_record.zip"
-}
-
-data "archive_file" "delete_upload_record" {
-  type        = "zip"
-  source_file = "${path.module}/../../lambda/media_uploads/delete_upload_record.py"
-  output_path = "${path.module}/../../.build/delete_upload_record.zip"
+  source_dir  = "${path.module}/../../lambda/media_uploads"
+  output_path = "${path.module}/../../.build/media_uploads.zip"
 }
 
 # ==========================================
@@ -108,8 +96,8 @@ resource "aws_lambda_function" "get_upload_records" {
   runtime          = "python3.12"
   memory_size      = var.lambda_memory_size
   timeout          = var.lambda_timeout
-  filename         = data.archive_file.get_upload_records.output_path
-  source_code_hash = data.archive_file.get_upload_records.output_base64sha256
+  filename         = data.archive_file.media_uploads.output_path
+  source_code_hash = data.archive_file.media_uploads.output_base64sha256
 
   environment {
     variables = {
@@ -127,8 +115,8 @@ resource "aws_lambda_function" "create_upload_record" {
   runtime          = "python3.12"
   memory_size      = var.lambda_memory_size
   timeout          = var.lambda_timeout
-  filename         = data.archive_file.create_upload_record.output_path
-  source_code_hash = data.archive_file.create_upload_record.output_base64sha256
+  filename         = data.archive_file.media_uploads.output_path
+  source_code_hash = data.archive_file.media_uploads.output_base64sha256
 
   environment {
     variables = {
@@ -146,8 +134,8 @@ resource "aws_lambda_function" "delete_upload_record" {
   runtime          = "python3.12"
   memory_size      = var.lambda_memory_size
   timeout          = var.lambda_timeout
-  filename         = data.archive_file.delete_upload_record.output_path
-  source_code_hash = data.archive_file.delete_upload_record.output_base64sha256
+  filename         = data.archive_file.media_uploads.output_path
+  source_code_hash = data.archive_file.media_uploads.output_base64sha256
 
   environment {
     variables = {

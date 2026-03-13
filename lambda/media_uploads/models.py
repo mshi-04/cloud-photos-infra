@@ -19,6 +19,10 @@ class ValidationError(Exception):
     pass
 
 
+class AuthorizationError(Exception):
+    pass
+
+
 @dataclass
 class CreateUploadRecordRequest:
     media_id: str
@@ -64,7 +68,7 @@ class CreateUploadRecordRequest:
             try:
                 file_size = int(file_size)
             except (ValueError, TypeError):
-                raise ValidationError(f"{FIELD_FILE_SIZE} must be a number")
+                raise ValidationError(f"{FIELD_FILE_SIZE} must be a number") from None
 
         return cls(
             media_id=media_id.strip(),
@@ -88,7 +92,7 @@ class GetUploadRecordsRequest:
             limit = int(params.get("limit", DEFAULT_LIMIT))
             limit = max(1, min(limit, MAX_LIMIT))
         except (ValueError, TypeError):
-            raise ValidationError("Invalid limit parameter")
+            raise ValidationError("Invalid limit parameter") from None
 
         last_evaluated_key_user_id = None
         last_evaluated_key_media_id = None
@@ -98,14 +102,13 @@ class GetUploadRecordsRequest:
             try:
                 exclusive_start_key = json.loads(last_key)
             except (json.JSONDecodeError, TypeError):
-                raise ValidationError("Invalid lastEvaluatedKey parameter")
+                raise ValidationError("Invalid lastEvaluatedKey parameter") from None
 
             if not isinstance(exclusive_start_key, dict):
                 raise ValidationError("lastEvaluatedKey must be an object")
 
             if exclusive_start_key.get(FIELD_USER_ID) != identity_id:
-                # Still throwing IDOR validation here
-                raise ValueError("lastEvaluatedKey does not match your identity")
+                raise AuthorizationError("lastEvaluatedKey does not match your identity")
 
             media_id_key = exclusive_start_key.get(FIELD_MEDIA_ID)
             if not isinstance(media_id_key, str) or not media_id_key:
