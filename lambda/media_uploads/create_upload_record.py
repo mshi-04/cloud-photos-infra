@@ -1,9 +1,10 @@
 import json
+import logging
 import time
 from http import HTTPStatus
 from typing import Any, Dict, Optional
 
-from auth import get_identity_id
+from auth import get_identity_id, mask_identity
 from constants import (
     FIELD_CLOUD_STORAGE_PATH,
     FIELD_CONTENT_TYPE,
@@ -17,6 +18,8 @@ from constants import (
 from db import dynamodb_client, serialize_item, table_name
 from models import CreateUploadRecordRequest, ValidationError
 from response import error, success
+
+logger = logging.getLogger(__name__)
 
 
 def _parse_body(event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -69,5 +72,8 @@ def handler(event: Dict[str, Any], _context: Any) -> Dict[str, Any]:
         )
     except dynamodb_client.exceptions.ConditionalCheckFailedException:
         return success(HTTPStatus.OK, {"message": "Record already exists, skipped"})
+    except Exception:
+        logger.exception("Failed to create upload record: userId=%s", mask_identity(identity_id))
+        return error(HTTPStatus.INTERNAL_SERVER_ERROR, "Internal server error")
 
     return success(HTTPStatus.CREATED, {"message": "created"})

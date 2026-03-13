@@ -1,4 +1,5 @@
 import os
+from collections.abc import Mapping, Sequence
 from decimal import Decimal
 from typing import Any, Dict
 
@@ -17,6 +18,10 @@ def serialize_item(item: Dict[str, Any]) -> Dict[str, Any]:
 def _convert_decimals(value: Any) -> Any:
     if isinstance(value, Decimal):
         return int(value) if value == int(value) else float(value)
+    if isinstance(value, Mapping):
+        return {k: _convert_decimals(v) for k, v in value.items()}
+    if isinstance(value, Sequence) and not isinstance(value, str):
+        return [_convert_decimals(v) for v in value]
     return value
 
 

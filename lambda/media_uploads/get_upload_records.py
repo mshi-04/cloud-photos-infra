@@ -1,11 +1,14 @@
+import logging
 from http import HTTPStatus
 from typing import Any, Dict
 
-from auth import get_identity_id
+from auth import get_identity_id, mask_identity
 from constants import FIELD_MEDIA_ID, FIELD_USER_ID
 from db import deserialize_item, dynamodb_client, serialize_item, table_name
 from models import AuthorizationError, GetUploadRecordsRequest, ValidationError
 from response import error, success
+
+logger = logging.getLogger(__name__)
 
 
 def handler(event: Dict[str, Any], _context: Any) -> Dict[str, Any]:
@@ -37,7 +40,11 @@ def handler(event: Dict[str, Any], _context: Any) -> Dict[str, Any]:
             }
         )
 
-    response = dynamodb_client.query(**query_params)
+    try:
+        response = dynamodb_client.query(**query_params)
+    except Exception:
+        logger.exception("Failed to query upload records: userId=%s", mask_identity(identity_id))
+        return error(HTTPStatus.INTERNAL_SERVER_ERROR, "Internal server error")
 
     # Deserialize the items returned by the client API
     items = [deserialize_item(item) for item in response.get("Items", [])]

@@ -22,9 +22,7 @@ data "archive_file" "media_uploads" {
 # ==========================================
 # IAM Role for Lambda
 # ==========================================
-resource "aws_iam_role" "lambda" {
-  name = "${local.function_prefix}-media-api-lambda"
-
+locals {
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
@@ -37,41 +35,100 @@ resource "aws_iam_role" "lambda" {
   })
 }
 
-resource "aws_iam_role_policy" "lambda_dynamodb" {
-  name = "dynamodb-access"
-  role = aws_iam_role.lambda.id
+resource "aws_iam_role" "get_upload_records" {
+  name               = "${local.function_prefix}-get-upload-records-role"
+  assume_role_policy = local.assume_role_policy
+}
 
+resource "aws_iam_role_policy" "get_upload_records_dynamodb" {
+  name = "dynamodb-query"
+  role = aws_iam_role.get_upload_records.id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Sid    = "AllowDynamoDBAccess"
-      Effect = "Allow"
-      Action = [
-        "dynamodb:Query",
-        "dynamodb:PutItem",
-        "dynamodb:DeleteItem"
-      ]
+      Effect   = "Allow"
+      Action   = ["dynamodb:Query"]
       Resource = var.dynamodb_table_arn
     }]
   })
 }
 
-resource "aws_iam_role_policy" "lambda_logs" {
+resource "aws_iam_role_policy" "get_upload_records_logs" {
   name = "cloudwatch-logs"
-  role = aws_iam_role.lambda.id
-
+  role = aws_iam_role.get_upload_records.id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "AllowCloudWatchLogsWrite"
-        Effect = "Allow"
-        Action = [
-          "logs:CreateLogGroup",
-          "logs:CreateLogStream",
-          "logs:PutLogEvents"
-        ]
-        Resource = [for k, _ in local.lambda_functions : "${aws_cloudwatch_log_group.lambda[k].arn}:*"]
+        Effect   = "Allow"
+        Action   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"]
+        Resource = "${aws_cloudwatch_log_group.lambda["get_upload_records"].arn}:*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role" "create_upload_record" {
+  name               = "${local.function_prefix}-create-upload-record-role"
+  assume_role_policy = local.assume_role_policy
+}
+
+resource "aws_iam_role_policy" "create_upload_record_dynamodb" {
+  name = "dynamodb-put"
+  role = aws_iam_role.create_upload_record.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["dynamodb:PutItem"]
+      Resource = var.dynamodb_table_arn
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "create_upload_record_logs" {
+  name = "cloudwatch-logs"
+  role = aws_iam_role.create_upload_record.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"]
+        Resource = "${aws_cloudwatch_log_group.lambda["create_upload_record"].arn}:*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role" "delete_upload_record" {
+  name               = "${local.function_prefix}-delete-upload-record-role"
+  assume_role_policy = local.assume_role_policy
+}
+
+resource "aws_iam_role_policy" "delete_upload_record_dynamodb" {
+  name = "dynamodb-delete"
+  role = aws_iam_role.delete_upload_record.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["dynamodb:DeleteItem"]
+      Resource = var.dynamodb_table_arn
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "delete_upload_record_logs" {
+  name = "cloudwatch-logs"
+  role = aws_iam_role.delete_upload_record.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"]
+        Resource = "${aws_cloudwatch_log_group.lambda["delete_upload_record"].arn}:*"
       }
     ]
   })
@@ -91,7 +148,7 @@ resource "aws_cloudwatch_log_group" "lambda" {
 # ==========================================
 resource "aws_lambda_function" "get_upload_records" {
   function_name    = "${local.function_prefix}-get-upload-records"
-  role             = aws_iam_role.lambda.arn
+  role             = aws_iam_role.get_upload_records.arn
   handler          = "get_upload_records.handler"
   runtime          = "python3.12"
   memory_size      = var.lambda_memory_size
@@ -110,7 +167,7 @@ resource "aws_lambda_function" "get_upload_records" {
 
 resource "aws_lambda_function" "create_upload_record" {
   function_name    = "${local.function_prefix}-create-upload-record"
-  role             = aws_iam_role.lambda.arn
+  role             = aws_iam_role.create_upload_record.arn
   handler          = "create_upload_record.handler"
   runtime          = "python3.12"
   memory_size      = var.lambda_memory_size
@@ -129,7 +186,7 @@ resource "aws_lambda_function" "create_upload_record" {
 
 resource "aws_lambda_function" "delete_upload_record" {
   function_name    = "${local.function_prefix}-delete-upload-record"
-  role             = aws_iam_role.lambda.arn
+  role             = aws_iam_role.delete_upload_record.arn
   handler          = "delete_upload_record.handler"
   runtime          = "python3.12"
   memory_size      = var.lambda_memory_size
@@ -260,6 +317,123 @@ resource "aws_lambda_permission" "delete_upload" {
 }
 
 # ==========================================
+# CORS Preflight for /media/uploads
+# ==========================================
+resource "aws_api_gateway_method" "options_uploads" {
+  rest_api_id   = aws_api_gateway_rest_api.media.id
+  resource_id   = aws_api_gateway_resource.uploads.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "options_uploads" {
+  rest_api_id = aws_api_gateway_rest_api.media.id
+  resource_id = aws_api_gateway_resource.uploads.id
+  http_method = aws_api_gateway_method.options_uploads.http_method
+  type        = "MOCK"
+
+  request_templates = {
+    "application/json" = "{\"statusCode\": 200}"
+  }
+}
+
+resource "aws_api_gateway_method_response" "options_uploads" {
+  rest_api_id = aws_api_gateway_rest_api.media.id
+  resource_id = aws_api_gateway_resource.uploads.id
+  http_method = aws_api_gateway_method.options_uploads.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+}
+
+resource "aws_api_gateway_integration_response" "options_uploads" {
+  rest_api_id = aws_api_gateway_rest_api.media.id
+  resource_id = aws_api_gateway_resource.uploads.id
+  http_method = aws_api_gateway_method.options_uploads.http_method
+  status_code = aws_api_gateway_method_response.options_uploads.status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
+    "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+  }
+}
+
+# ==========================================
+# CORS Preflight for /media/uploads/{mediaId}
+# ==========================================
+resource "aws_api_gateway_method" "options_upload_item" {
+  rest_api_id   = aws_api_gateway_rest_api.media.id
+  resource_id   = aws_api_gateway_resource.upload_item.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "options_upload_item" {
+  rest_api_id = aws_api_gateway_rest_api.media.id
+  resource_id = aws_api_gateway_resource.upload_item.id
+  http_method = aws_api_gateway_method.options_upload_item.http_method
+  type        = "MOCK"
+
+  request_templates = {
+    "application/json" = "{\"statusCode\": 200}"
+  }
+}
+
+resource "aws_api_gateway_method_response" "options_upload_item" {
+  rest_api_id = aws_api_gateway_rest_api.media.id
+  resource_id = aws_api_gateway_resource.upload_item.id
+  http_method = aws_api_gateway_method.options_upload_item.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+}
+
+resource "aws_api_gateway_integration_response" "options_upload_item" {
+  rest_api_id = aws_api_gateway_rest_api.media.id
+  resource_id = aws_api_gateway_resource.upload_item.id
+  http_method = aws_api_gateway_method.options_upload_item.http_method
+  status_code = aws_api_gateway_method_response.options_upload_item.status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
+    "method.response.header.Access-Control-Allow-Methods" = "'DELETE,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+  }
+}
+
+# ==========================================
+# Gateway Responses for CORS
+# ==========================================
+resource "aws_api_gateway_gateway_response" "default_4xx" {
+  rest_api_id   = aws_api_gateway_rest_api.media.id
+  response_type = "DEFAULT_4XX"
+
+  response_parameters = {
+    "gatewayresponse.header.Access-Control-Allow-Origin"  = "'*'"
+    "gatewayresponse.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
+  }
+}
+
+resource "aws_api_gateway_gateway_response" "default_5xx" {
+  rest_api_id   = aws_api_gateway_rest_api.media.id
+  response_type = "DEFAULT_5XX"
+
+  response_parameters = {
+    "gatewayresponse.header.Access-Control-Allow-Origin"  = "'*'"
+    "gatewayresponse.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
+  }
+}
+
+# ==========================================
 # Deployment & Stage
 # ==========================================
 resource "aws_api_gateway_deployment" "media" {
@@ -273,6 +447,16 @@ resource "aws_api_gateway_deployment" "media" {
       aws_api_gateway_integration.post_uploads,
       aws_api_gateway_method.delete_upload,
       aws_api_gateway_integration.delete_upload,
+      aws_api_gateway_method.options_uploads,
+      aws_api_gateway_integration.options_uploads,
+      aws_api_gateway_method_response.options_uploads,
+      aws_api_gateway_integration_response.options_uploads,
+      aws_api_gateway_method.options_upload_item,
+      aws_api_gateway_integration.options_upload_item,
+      aws_api_gateway_method_response.options_upload_item,
+      aws_api_gateway_integration_response.options_upload_item,
+      aws_api_gateway_gateway_response.default_4xx,
+      aws_api_gateway_gateway_response.default_5xx,
     ]))
   }
 
