@@ -89,6 +89,7 @@ jobs:
           name: tfplan-${{ inputs.env_name }}
           path: |
             ${{ inputs.tf_working_dir }}/tfplan
+            .build/
           retention-days: 90
           include-hidden-files: true
 
@@ -125,7 +126,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: tfplan-${{ inputs.env_name }}
-          path: ${{ github.workspace }}/${{ inputs.tf_working_dir }}
+          path: ${{ github.workspace }}
 
       - name: Configure AWS (OIDC) - apply role
         uses: aws-actions/configure-aws-credentials@v4
