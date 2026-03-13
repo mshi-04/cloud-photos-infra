@@ -47,4 +47,23 @@ module "identity_pool" {
   user_pool_id        = module.cognito.user_pool_id
   user_pool_client_id = module.cognito.user_pool_client_id
   media_bucket_arn    = module.media_storage.bucket_arn
+  api_execution_arn   = module.media_api.api_execution_arn
+}
+
+module "media_db" {
+  source = "../../modules/media_db"
+
+  env                         = "prod"
+  project_name                = "cloud-photos"
+  deletion_protection_enabled = true
+}
+
+module "media_api" {
+  source = "../../modules/media_api"
+
+  env                   = "prod"
+  project_name          = "cloud-photos"
+  dynamodb_table_name   = module.media_db.table_name
+  dynamodb_table_arn    = module.media_db.table_arn
+  log_retention_in_days = 90
 }

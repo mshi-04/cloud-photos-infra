@@ -9,9 +9,14 @@ on:
     paths:
       - 'envs/**'
       - 'modules/**'
+      - 'lambda/**'
       - 'bootstrap/**'
       - '.github/workflows/**'
       - '.terraform-version'
+
+concurrency:
+  group: terraform-ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 permissions:
   id-token: write

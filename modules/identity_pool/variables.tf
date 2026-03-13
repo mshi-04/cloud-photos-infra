@@ -23,3 +23,8 @@ variable "media_bucket_arn" {
   description = "メディアストレージバケットの ARN"
   type        = string
 }
+
+variable "api_execution_arn" {
+  description = "API Gateway の実行 ARN（認証済みユーザーに invoke 権限を付与）"
+  type        = string
+}
