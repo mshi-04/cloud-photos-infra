@@ -17,6 +17,7 @@ def handler(event, _context):
     if not identity_id:
         return {
             "statusCode": 403,
+            "headers": {"Content-Type": "application/json"},
             "body": json.dumps({"message": "Unauthorized"}),
         }
 
@@ -28,6 +29,7 @@ def handler(event, _context):
     except (ValueError, TypeError):
         return {
             "statusCode": 400,
+            "headers": {"Content-Type": "application/json"},
             "body": json.dumps({"message": "Invalid limit parameter"}),
         }
 
@@ -43,18 +45,21 @@ def handler(event, _context):
         except json.JSONDecodeError:
             return {
                 "statusCode": 400,
+                "headers": {"Content-Type": "application/json"},
                 "body": json.dumps({"message": "Invalid lastEvaluatedKey parameter"}),
             }
 
         if not isinstance(exclusive_start_key, dict):
             return {
                 "statusCode": 400,
+                "headers": {"Content-Type": "application/json"},
                 "body": json.dumps({"message": "lastEvaluatedKey must be an object"}),
             }
 
         if exclusive_start_key.get("userId") != identity_id:
             return {
                 "statusCode": 403,
+                "headers": {"Content-Type": "application/json"},
                 "body": json.dumps({"message": "lastEvaluatedKey does not match your identity"}),
             }
 
@@ -62,6 +67,7 @@ def handler(event, _context):
         if not isinstance(media_id_key, str) or not media_id_key:
             return {
                 "statusCode": 400,
+                "headers": {"Content-Type": "application/json"},
                 "body": json.dumps({"message": "lastEvaluatedKey.mediaId must be a non-empty string"}),
             }
 

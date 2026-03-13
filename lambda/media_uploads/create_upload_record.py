@@ -36,6 +36,18 @@ def handler(event, _context):
                 "body": json.dumps({"message": f"Missing required field: {field}"}),
             }
 
+    if not isinstance(body["mediaId"], str):
+        return {
+            "statusCode": 400,
+            "body": json.dumps({"message": "mediaId must be a string"}),
+        }
+
+    if not isinstance(body["contentType"], str):
+        return {
+            "statusCode": 400,
+            "body": json.dumps({"message": "contentType must be a string"}),
+        }
+
     # IDOR prevention: verify cloudStoragePath belongs to the requester
     cloud_path = body["cloudStoragePath"]
     if not isinstance(cloud_path, str) or not cloud_path.startswith(f"private/{identity_id}/"):
@@ -60,7 +72,12 @@ def handler(event, _context):
     }
 
     if "fileSize" in body:
-        item["fileSize"] = body["fileSize"]
+        if not isinstance(body["fileSize"], (int, float)):
+            return {
+                "statusCode": 400,
+                "body": json.dumps({"message": "fileSize must be a number"}),
+            }
+        item["fileSize"] = int(body["fileSize"])
 
     try:
         table.put_item(
