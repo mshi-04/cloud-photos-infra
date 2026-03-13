@@ -73,8 +73,8 @@ class CreateUploadRecordRequest:
 
         return cls(
             media_id=media_id.strip(),
-            cloud_storage_path=cloud_storage_path,
-            content_type=content_type,
+            cloud_storage_path=cloud_storage_path.strip(),
+            content_type=content_type.strip(),
             media_type=media_type,
             file_size=file_size,
         )
