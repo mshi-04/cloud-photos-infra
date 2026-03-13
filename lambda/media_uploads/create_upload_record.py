@@ -1,4 +1,5 @@
 import json
+import logging
 import time
 from http import HTTPStatus
 from typing import Any, Dict, Optional
@@ -17,6 +18,8 @@ from constants import (
 from db import dynamodb_client, serialize_item, table_name
 from models import CreateUploadRecordRequest, ValidationError
 from response import error, success
+
+logger = logging.getLogger(__name__)
 
 
 def _parse_body(event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
