@@ -59,6 +59,9 @@ class CreateUploadRecordRequest:
 
         if media_type is None:
             raise ValidationError(f"Missing required field: {FIELD_MEDIA_TYPE}")
+        if not isinstance(media_type, str):
+            raise ValidationError(f"{FIELD_MEDIA_TYPE} must be IMAGE or VIDEO")
+        media_type = media_type.strip()
         if media_type not in VALID_MEDIA_TYPES:
             raise ValidationError(f"{FIELD_MEDIA_TYPE} must be IMAGE or VIDEO")
 
