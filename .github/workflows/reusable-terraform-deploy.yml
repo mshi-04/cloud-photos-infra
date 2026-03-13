@@ -89,7 +89,6 @@ jobs:
           name: tfplan-${{ inputs.env_name }}
           path: |
             ${{ inputs.tf_working_dir }}/tfplan
-            .build/
           retention-days: 90
           include-hidden-files: true
 

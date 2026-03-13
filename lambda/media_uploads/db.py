@@ -1,4 +1,5 @@
 import os
+from collections.abc import Mapping, Sequence
 from decimal import Decimal
 from typing import Any, Dict
 
