@@ -58,10 +58,11 @@ def handler(event, _context):
                 "body": json.dumps({"message": "lastEvaluatedKey does not match your identity"}),
             }
 
-        if not exclusive_start_key.get("mediaId"):
+        media_id_key = exclusive_start_key.get("mediaId")
+        if not isinstance(media_id_key, str) or not media_id_key:
             return {
                 "statusCode": 400,
-                "body": json.dumps({"message": "lastEvaluatedKey.mediaId is required"}),
+                "body": json.dumps({"message": "lastEvaluatedKey.mediaId must be a non-empty string"}),
             }
 
         query_params["ExclusiveStartKey"] = exclusive_start_key

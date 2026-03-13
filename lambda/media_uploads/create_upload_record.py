@@ -38,7 +38,7 @@ def handler(event, _context):
 
     # IDOR prevention: verify cloudStoragePath belongs to the requester
     cloud_path = body["cloudStoragePath"]
-    if not cloud_path.startswith(f"private/{identity_id}/"):
+    if not isinstance(cloud_path, str) or not cloud_path.startswith(f"private/{identity_id}/"):
         return {
             "statusCode": 403,
             "body": json.dumps({"message": "cloudStoragePath does not match your identity"}),
