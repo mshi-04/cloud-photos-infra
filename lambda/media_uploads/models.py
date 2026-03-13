@@ -69,6 +69,8 @@ class CreateUploadRecordRequest:
                 file_size = int(file_size)
             except (ValueError, TypeError):
                 raise ValidationError(f"{FIELD_FILE_SIZE} must be a number") from None
+            if file_size < 0:
+                raise ValidationError(f"{FIELD_FILE_SIZE} must be non-negative")
 
         return cls(
             media_id=media_id.strip(),
@@ -87,7 +89,10 @@ class GetUploadRecordsRequest:
 
     @classmethod
     def from_dict(cls, params: Dict[str, Any], identity_id: str) -> "GetUploadRecordsRequest":
-        params = params or {}
+        if params is None:
+            params = {}
+        elif not isinstance(params, dict):
+            raise ValidationError("params must be a dict")
         try:
             limit = int(params.get("limit", DEFAULT_LIMIT))
             limit = max(1, min(limit, MAX_LIMIT))
@@ -111,11 +116,11 @@ class GetUploadRecordsRequest:
                 raise AuthorizationError("lastEvaluatedKey does not match your identity")
 
             media_id_key = exclusive_start_key.get(FIELD_MEDIA_ID)
-            if not isinstance(media_id_key, str) or not media_id_key:
+            if not isinstance(media_id_key, str) or not media_id_key.strip():
                 raise ValidationError("lastEvaluatedKey.mediaId must be a non-empty string")
 
             last_evaluated_key_user_id = identity_id
-            last_evaluated_key_media_id = media_id_key
+            last_evaluated_key_media_id = media_id_key.strip()
 
         return cls(
             limit=limit,
