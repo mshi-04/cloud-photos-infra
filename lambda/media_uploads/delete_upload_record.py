@@ -30,7 +30,8 @@ def handler(event: Dict[str, Any], _context: Any) -> Dict[str, Any]:
             Key=serialize_item(key),
         )
     except Exception:
-        logger.exception("Failed to delete item: userId=%s, mediaId=%s", identity_id, media_id)
+        masked_user = f"{identity_id[:4]}***{identity_id[-4:]}" if len(identity_id) > 8 else "***"
+        logger.exception("Failed to delete item: userId=%s, mediaId=%s", masked_user, media_id)
         return error(HTTPStatus.INTERNAL_SERVER_ERROR, "Internal server error")
 
     return success(HTTPStatus.OK, {"message": "deleted"})

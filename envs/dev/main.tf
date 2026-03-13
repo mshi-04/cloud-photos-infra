@@ -45,7 +45,7 @@ module "identity_pool" {
   user_pool_id        = module.cognito.user_pool_id
   user_pool_client_id = module.cognito.user_pool_client_id
   media_bucket_arn    = module.media_storage.bucket_arn
-  api_execution_arn   = module.media_api.api_execution_arn
+  api_execution_arns  = module.media_api.api_execution_arns
 }
 
 module "media_db" {

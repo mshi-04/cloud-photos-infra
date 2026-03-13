@@ -49,8 +49,16 @@ locals {
   lambda_function_arn_prefix_dev  = "arn:aws:lambda:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:function:${local.project_name}-dev-*"
   lambda_function_arn_prefix_prod = "arn:aws:lambda:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:function:${local.project_name}-prod-*"
 
-  lambda_role_arn_dev  = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-dev-media-api-lambda"
-  lambda_role_arn_prod = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-prod-media-api-lambda"
+  lambda_role_arns_dev = [
+    "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-dev-get-upload-records-role",
+    "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-dev-create-upload-record-role",
+    "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-dev-delete-upload-record-role"
+  ]
+  lambda_role_arns_prod = [
+    "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-prod-get-upload-records-role",
+    "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-prod-create-upload-record-role",
+    "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-prod-delete-upload-record-role"
+  ]
 
   log_group_arn_dev  = "arn:aws:logs:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${local.project_name}-dev-*"
   log_group_arn_prod = "arn:aws:logs:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${local.project_name}-prod-*"
@@ -155,10 +163,7 @@ resource "aws_iam_role_policy" "plan_dev" {
           "iam:ListRolePolicies",
           "iam:ListAttachedRolePolicies"
         ]
-        Resource = [
-          local.cognito_authenticated_role_arn_dev,
-          local.lambda_role_arn_dev
-        ]
+        Resource = concat([local.cognito_authenticated_role_arn_dev], local.lambda_role_arns_dev)
       },
       local.dynamodb_read_policy_dev,
       {
@@ -333,19 +338,13 @@ resource "aws_iam_role_policy" "apply_dev" {
           "iam:ListInstanceProfilesForRole",
           "iam:UpdateAssumeRolePolicy"
         ]
-        Resource = [
-          local.cognito_authenticated_role_arn_dev,
-          local.lambda_role_arn_dev
-        ]
+        Resource = concat([local.cognito_authenticated_role_arn_dev], local.lambda_role_arns_dev)
       },
       {
         Sid    = "AllowPassRole"
         Effect = "Allow"
         Action = ["iam:PassRole"]
-        Resource = [
-          local.cognito_authenticated_role_arn_dev,
-          local.lambda_role_arn_dev
-        ]
+        Resource = concat([local.cognito_authenticated_role_arn_dev], local.lambda_role_arns_dev)
         Condition = {
           StringEquals = {
             "iam:PassedToService" = [
@@ -501,10 +500,7 @@ resource "aws_iam_role_policy" "plan_prod" {
           "iam:ListRolePolicies",
           "iam:ListAttachedRolePolicies"
         ]
-        Resource = [
-          local.cognito_authenticated_role_arn_prod,
-          local.lambda_role_arn_prod
-        ]
+        Resource = concat([local.cognito_authenticated_role_arn_prod], local.lambda_role_arns_prod)
       },
       local.dynamodb_read_policy_prod,
       {
@@ -679,19 +675,13 @@ resource "aws_iam_role_policy" "apply_prod" {
           "iam:ListInstanceProfilesForRole",
           "iam:UpdateAssumeRolePolicy"
         ]
-        Resource = [
-          local.cognito_authenticated_role_arn_prod,
-          local.lambda_role_arn_prod
-        ]
+        Resource = concat([local.cognito_authenticated_role_arn_prod], local.lambda_role_arns_prod)
       },
       {
         Sid    = "AllowPassRole"
         Effect = "Allow"
         Action = ["iam:PassRole"]
-        Resource = [
-          local.cognito_authenticated_role_arn_prod,
-          local.lambda_role_arn_prod
-        ]
+        Resource = concat([local.cognito_authenticated_role_arn_prod], local.lambda_role_arns_prod)
         Condition = {
           StringEquals = {
             "iam:PassedToService" = [

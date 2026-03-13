@@ -69,5 +69,10 @@ def handler(event: Dict[str, Any], _context: Any) -> Dict[str, Any]:
         )
     except dynamodb_client.exceptions.ConditionalCheckFailedException:
         return success(HTTPStatus.OK, {"message": "Record already exists, skipped"})
+    except Exception:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.exception("Failed to create upload record")
+        return error(HTTPStatus.INTERNAL_SERVER_ERROR, "Internal server error")
 
     return success(HTTPStatus.CREATED, {"message": "created"})

@@ -85,7 +85,7 @@ resource "aws_iam_role_policy" "authenticated_api" {
       Sid      = "AllowAPIGatewayInvoke"
       Effect   = "Allow"
       Action   = "execute-api:Invoke"
-      Resource = "${var.api_execution_arn}/*"
+      Resource = var.api_execution_arns
     }]
   })
 }
