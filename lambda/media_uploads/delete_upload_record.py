@@ -2,7 +2,7 @@ import logging
 from http import HTTPStatus
 from typing import Any, Dict
 
-from auth import get_identity_id
+from auth import get_identity_id, mask_identity
 from constants import FIELD_MEDIA_ID, FIELD_USER_ID
 from db import dynamodb_client, serialize_item, table_name
 from response import error, success
@@ -30,8 +30,7 @@ def handler(event: Dict[str, Any], _context: Any) -> Dict[str, Any]:
             Key=serialize_item(key),
         )
     except Exception:
-        masked_user = f"{identity_id[:4]}***{identity_id[-4:]}" if len(identity_id) > 8 else "***"
-        logger.exception("Failed to delete item: userId=%s, mediaId=%s", masked_user, media_id)
+        logger.exception("Failed to delete item: userId=%s, mediaId=%s", mask_identity(identity_id), media_id)
         return error(HTTPStatus.INTERNAL_SERVER_ERROR, "Internal server error")
 
     return success(HTTPStatus.OK, {"message": "deleted"})

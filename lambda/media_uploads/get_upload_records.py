@@ -40,9 +40,7 @@ def handler(event: Dict[str, Any], _context: Any) -> Dict[str, Any]:
     try:
         response = dynamodb_client.query(**query_params)
     except Exception:
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.exception("Failed to query upload records")
+        logger.exception("Failed to query upload records: userId=%s", mask_identity(identity_id))
         return error(HTTPStatus.INTERNAL_SERVER_ERROR, "Internal server error")
 
     # Deserialize the items returned by the client API

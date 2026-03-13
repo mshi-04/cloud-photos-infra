@@ -14,8 +14,6 @@ deserializer = TypeDeserializer()
 def serialize_item(item: Dict[str, Any]) -> Dict[str, Any]:
     return {k: serializer.serialize(v) for k, v in item.items()}
 
-from collections.abc import Mapping, Sequence
-
 def _convert_decimals(value: Any) -> Any:
     if isinstance(value, Decimal):
         return int(value) if value == int(value) else float(value)
