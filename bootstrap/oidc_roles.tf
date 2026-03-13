@@ -41,6 +41,52 @@ locals {
 
   cognito_authenticated_role_arn_dev  = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-cognito-authenticated-dev"
   cognito_authenticated_role_arn_prod = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-cognito-authenticated-prod"
+
+  # Media API (DynamoDB, Lambda, API Gateway, CloudWatch Logs)
+  dynamodb_table_arn_dev  = "arn:aws:dynamodb:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:table/${local.project_name}-upload-records-dev"
+  dynamodb_table_arn_prod = "arn:aws:dynamodb:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:table/${local.project_name}-upload-records-prod"
+
+  lambda_function_arn_prefix_dev  = "arn:aws:lambda:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:function:${local.project_name}-dev-*"
+  lambda_function_arn_prefix_prod = "arn:aws:lambda:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:function:${local.project_name}-prod-*"
+
+  lambda_role_arns_dev = [
+    "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-dev-get-upload-records-role",
+    "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-dev-create-upload-record-role",
+    "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-dev-delete-upload-record-role"
+  ]
+  lambda_role_arns_prod = [
+    "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-prod-get-upload-records-role",
+    "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-prod-create-upload-record-role",
+    "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-prod-delete-upload-record-role"
+  ]
+
+  log_group_arn_dev  = "arn:aws:logs:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${local.project_name}-dev-*"
+  log_group_arn_prod = "arn:aws:logs:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${local.project_name}-prod-*"
+
+  # Shared read policies for new resources
+  dynamodb_read_policy_dev = {
+    Sid    = "AllowDynamoDBRead"
+    Effect = "Allow"
+    Action = [
+      "dynamodb:DescribeTable",
+      "dynamodb:DescribeContinuousBackups",
+      "dynamodb:DescribeTimeToLive",
+      "dynamodb:ListTagsOfResource"
+    ]
+    Resource = local.dynamodb_table_arn_dev
+  }
+
+  dynamodb_read_policy_prod = {
+    Sid    = "AllowDynamoDBRead"
+    Effect = "Allow"
+    Action = [
+      "dynamodb:DescribeTable",
+      "dynamodb:DescribeContinuousBackups",
+      "dynamodb:DescribeTimeToLive",
+      "dynamodb:ListTagsOfResource"
+    ]
+    Resource = local.dynamodb_table_arn_prod
+  }
 }
 
 # ==========================================
@@ -117,7 +163,43 @@ resource "aws_iam_role_policy" "plan_dev" {
           "iam:ListRolePolicies",
           "iam:ListAttachedRolePolicies"
         ]
-        Resource = local.cognito_authenticated_role_arn_dev
+        Resource = concat([local.cognito_authenticated_role_arn_dev], local.lambda_role_arns_dev)
+      },
+      local.dynamodb_read_policy_dev,
+      {
+        Sid    = "AllowLambdaReadForPlan"
+        Effect = "Allow"
+        Action = [
+          "lambda:GetFunction",
+          "lambda:GetFunctionCodeSigningConfig",
+          "lambda:ListVersionsByFunction",
+          "lambda:GetPolicy"
+        ]
+        Resource = local.lambda_function_arn_prefix_dev
+      },
+      {
+        Sid    = "AllowAPIGatewayReadForPlan"
+        Effect = "Allow"
+        Action = [
+          "apigateway:GET"
+        ]
+        Resource = "arn:aws:apigateway:${data.aws_region.current.id}::/*"
+      },
+      {
+        Sid    = "AllowCloudWatchLogsDescribeAll"
+        Effect = "Allow"
+        Action = [
+          "logs:DescribeLogGroups"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "AllowCloudWatchLogsReadForPlan"
+        Effect = "Allow"
+        Action = [
+          "logs:ListTagsForResource"
+        ]
+        Resource = local.log_group_arn_dev
       }
     ]
   })
@@ -256,18 +338,90 @@ resource "aws_iam_role_policy" "apply_dev" {
           "iam:ListInstanceProfilesForRole",
           "iam:UpdateAssumeRolePolicy"
         ]
-        Resource = local.cognito_authenticated_role_arn_dev
+        Resource = concat([local.cognito_authenticated_role_arn_dev], local.lambda_role_arns_dev)
       },
       {
-        Sid      = "AllowPassRoleToCognitoIdentity"
+        Sid      = "AllowPassRole"
         Effect   = "Allow"
         Action   = ["iam:PassRole"]
-        Resource = local.cognito_authenticated_role_arn_dev
+        Resource = concat([local.cognito_authenticated_role_arn_dev], local.lambda_role_arns_dev)
         Condition = {
           StringEquals = {
-            "iam:PassedToService" = "cognito-identity.amazonaws.com"
+            "iam:PassedToService" = [
+              "cognito-identity.amazonaws.com",
+              "lambda.amazonaws.com"
+            ]
           }
         }
+      },
+      {
+        Sid    = "AllowDynamoDBManagement"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:CreateTable",
+          "dynamodb:DeleteTable",
+          "dynamodb:UpdateTable",
+          "dynamodb:DescribeTable",
+          "dynamodb:DescribeContinuousBackups",
+          "dynamodb:UpdateContinuousBackups",
+          "dynamodb:DescribeTimeToLive",
+          "dynamodb:TagResource",
+          "dynamodb:UntagResource",
+          "dynamodb:ListTagsOfResource"
+        ]
+        Resource = local.dynamodb_table_arn_dev
+      },
+      {
+        Sid    = "AllowLambdaManagement"
+        Effect = "Allow"
+        Action = [
+          "lambda:CreateFunction",
+          "lambda:DeleteFunction",
+          "lambda:GetFunction",
+          "lambda:GetFunctionCodeSigningConfig",
+          "lambda:UpdateFunctionCode",
+          "lambda:UpdateFunctionConfiguration",
+          "lambda:ListVersionsByFunction",
+          "lambda:GetPolicy",
+          "lambda:AddPermission",
+          "lambda:RemovePermission",
+          "lambda:TagResource",
+          "lambda:UntagResource"
+        ]
+        Resource = local.lambda_function_arn_prefix_dev
+      },
+      {
+        Sid    = "AllowAPIGatewayManagement"
+        Effect = "Allow"
+        Action = [
+          "apigateway:GET",
+          "apigateway:POST",
+          "apigateway:PUT",
+          "apigateway:DELETE",
+          "apigateway:PATCH"
+        ]
+        Resource = "arn:aws:apigateway:${data.aws_region.current.id}::/*"
+      },
+      {
+        Sid    = "AllowCloudWatchLogsDescribeAll"
+        Effect = "Allow"
+        Action = [
+          "logs:DescribeLogGroups"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "AllowCloudWatchLogsManagement"
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:DeleteLogGroup",
+          "logs:PutRetentionPolicy",
+          "logs:TagResource",
+          "logs:UntagResource",
+          "logs:ListTagsForResource"
+        ]
+        Resource = local.log_group_arn_dev
       }
     ]
   })
@@ -346,7 +500,43 @@ resource "aws_iam_role_policy" "plan_prod" {
           "iam:ListRolePolicies",
           "iam:ListAttachedRolePolicies"
         ]
-        Resource = local.cognito_authenticated_role_arn_prod
+        Resource = concat([local.cognito_authenticated_role_arn_prod], local.lambda_role_arns_prod)
+      },
+      local.dynamodb_read_policy_prod,
+      {
+        Sid    = "AllowLambdaReadForPlan"
+        Effect = "Allow"
+        Action = [
+          "lambda:GetFunction",
+          "lambda:GetFunctionCodeSigningConfig",
+          "lambda:ListVersionsByFunction",
+          "lambda:GetPolicy"
+        ]
+        Resource = local.lambda_function_arn_prefix_prod
+      },
+      {
+        Sid    = "AllowAPIGatewayReadForPlan"
+        Effect = "Allow"
+        Action = [
+          "apigateway:GET"
+        ]
+        Resource = "arn:aws:apigateway:${data.aws_region.current.id}::/*"
+      },
+      {
+        Sid    = "AllowCloudWatchLogsDescribeAll"
+        Effect = "Allow"
+        Action = [
+          "logs:DescribeLogGroups"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "AllowCloudWatchLogsReadForPlan"
+        Effect = "Allow"
+        Action = [
+          "logs:ListTagsForResource"
+        ]
+        Resource = local.log_group_arn_prod
       }
     ]
   })
@@ -485,18 +675,90 @@ resource "aws_iam_role_policy" "apply_prod" {
           "iam:ListInstanceProfilesForRole",
           "iam:UpdateAssumeRolePolicy"
         ]
-        Resource = local.cognito_authenticated_role_arn_prod
+        Resource = concat([local.cognito_authenticated_role_arn_prod], local.lambda_role_arns_prod)
       },
       {
-        Sid      = "AllowPassRoleToCognitoIdentity"
+        Sid      = "AllowPassRole"
         Effect   = "Allow"
         Action   = ["iam:PassRole"]
-        Resource = local.cognito_authenticated_role_arn_prod
+        Resource = concat([local.cognito_authenticated_role_arn_prod], local.lambda_role_arns_prod)
         Condition = {
           StringEquals = {
-            "iam:PassedToService" = "cognito-identity.amazonaws.com"
+            "iam:PassedToService" = [
+              "cognito-identity.amazonaws.com",
+              "lambda.amazonaws.com"
+            ]
           }
         }
+      },
+      {
+        Sid    = "AllowDynamoDBManagement"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:CreateTable",
+          "dynamodb:DeleteTable",
+          "dynamodb:UpdateTable",
+          "dynamodb:DescribeTable",
+          "dynamodb:DescribeContinuousBackups",
+          "dynamodb:UpdateContinuousBackups",
+          "dynamodb:DescribeTimeToLive",
+          "dynamodb:TagResource",
+          "dynamodb:UntagResource",
+          "dynamodb:ListTagsOfResource"
+        ]
+        Resource = local.dynamodb_table_arn_prod
+      },
+      {
+        Sid    = "AllowLambdaManagement"
+        Effect = "Allow"
+        Action = [
+          "lambda:CreateFunction",
+          "lambda:DeleteFunction",
+          "lambda:GetFunction",
+          "lambda:GetFunctionCodeSigningConfig",
+          "lambda:UpdateFunctionCode",
+          "lambda:UpdateFunctionConfiguration",
+          "lambda:ListVersionsByFunction",
+          "lambda:GetPolicy",
+          "lambda:AddPermission",
+          "lambda:RemovePermission",
+          "lambda:TagResource",
+          "lambda:UntagResource"
+        ]
+        Resource = local.lambda_function_arn_prefix_prod
+      },
+      {
+        Sid    = "AllowAPIGatewayManagement"
+        Effect = "Allow"
+        Action = [
+          "apigateway:GET",
+          "apigateway:POST",
+          "apigateway:PUT",
+          "apigateway:DELETE",
+          "apigateway:PATCH"
+        ]
+        Resource = "arn:aws:apigateway:${data.aws_region.current.id}::/*"
+      },
+      {
+        Sid    = "AllowCloudWatchLogsDescribeAll"
+        Effect = "Allow"
+        Action = [
+          "logs:DescribeLogGroups"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "AllowCloudWatchLogsManagement"
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:DeleteLogGroup",
+          "logs:PutRetentionPolicy",
+          "logs:TagResource",
+          "logs:UntagResource",
+          "logs:ListTagsForResource"
+        ]
+        Resource = local.log_group_arn_prod
       }
     ]
   })

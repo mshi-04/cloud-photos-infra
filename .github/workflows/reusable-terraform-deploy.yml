@@ -33,6 +33,9 @@ on:
         type: string
         default: ""
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 permissions:
   id-token: write
   contents: read
@@ -84,8 +87,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: tfplan-${{ inputs.env_name }}
-          path: ${{ inputs.tf_working_dir }}/tfplan
+          path: |
+            ${{ inputs.tf_working_dir }}/tfplan
           retention-days: 90
+          include-hidden-files: true
 
   apply:
     runs-on: ubuntu-latest
@@ -120,7 +125,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: tfplan-${{ inputs.env_name }}
-          path: ${{ inputs.tf_working_dir }}
+          path: ${{ github.workspace }}/${{ inputs.tf_working_dir }}
 
       - name: Configure AWS (OIDC) - apply role
         uses: aws-actions/configure-aws-credentials@v4
@@ -132,4 +137,4 @@ jobs:
         run: terraform init -backend-config="bucket=${{ inputs.tf_state_bucket }}"
 
       - name: Terraform apply (from saved plan)
-        run: terraform apply tfplan
+        run: terraform apply ${{ github.workspace }}/${{ inputs.tf_working_dir }}/tfplan

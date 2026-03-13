@@ -17,3 +17,13 @@ output "media_bucket_name" {
   description = "Media storage bucket name"
   value       = module.media_storage.bucket_name
 }
+
+output "media_api_endpoint" {
+  description = "Media API Gateway endpoint URL"
+  value       = module.media_api.api_endpoint
+}
+
+output "upload_records_table_name" {
+  description = "DynamoDB upload_records table name"
+  value       = module.media_db.table_name
+}
