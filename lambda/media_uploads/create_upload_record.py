@@ -1,98 +1,73 @@
 import json
-import os
 import time
+from http import HTTPStatus
+from typing import Any, Dict, Optional
 
-import boto3
+from auth import get_identity_id
+from constants import (
+    FIELD_CLOUD_STORAGE_PATH,
+    FIELD_CONTENT_TYPE,
+    FIELD_FILE_SIZE,
+    FIELD_MEDIA_ID,
+    FIELD_MEDIA_TYPE,
+    FIELD_UPLOADED_AT,
+    FIELD_USER_ID,
+    PRIVATE_PATH_PREFIX,
+)
+from db import dynamodb_client, serialize_item, table_name
+from models import CreateUploadRecordRequest, ValidationError
+from response import error, success
 
-dynamodb = boto3.resource("dynamodb")
-table = dynamodb.Table(os.environ["TABLE_NAME"])
 
-
-def handler(event, _context):
-    identity_id = (
-        event.get("requestContext", {})
-        .get("identity", {})
-        .get("cognitoIdentityId")
-    )
-    if not identity_id:
-        return {
-            "statusCode": 403,
-            "body": json.dumps({"message": "Unauthorized"}),
-        }
-
+def _parse_body(event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     try:
         body = json.loads(event.get("body") or "{}")
-    except json.JSONDecodeError:
-        return {
-            "statusCode": 400,
-            "body": json.dumps({"message": "Invalid JSON body"}),
-        }
+    except (json.JSONDecodeError, TypeError):
+        return None
+    if not isinstance(body, dict):
+        return None
+    return body
 
-    required_fields = ["mediaId", "cloudStoragePath", "contentType", "mediaType"]
-    for field in required_fields:
-        if field not in body:
-            return {
-                "statusCode": 400,
-                "body": json.dumps({"message": f"Missing required field: {field}"}),
-            }
 
-    if not isinstance(body["mediaId"], str):
-        return {
-            "statusCode": 400,
-            "body": json.dumps({"message": "mediaId must be a string"}),
-        }
+def handler(event: Dict[str, Any], _context: Any) -> Dict[str, Any]:
+    identity_id = get_identity_id(event)
+    if not identity_id:
+        return error(HTTPStatus.FORBIDDEN, "Unauthorized")
 
-    if not isinstance(body["contentType"], str):
-        return {
-            "statusCode": 400,
-            "body": json.dumps({"message": "contentType must be a string"}),
-        }
-
-    # IDOR prevention: verify cloudStoragePath belongs to the requester
-    cloud_path = body["cloudStoragePath"]
-    if not isinstance(cloud_path, str) or not cloud_path.startswith(f"private/{identity_id}/"):
-        return {
-            "statusCode": 403,
-            "body": json.dumps({"message": "cloudStoragePath does not match your identity"}),
-        }
-
-    if body["mediaType"] not in ("IMAGE", "VIDEO"):
-        return {
-            "statusCode": 400,
-            "body": json.dumps({"message": "mediaType must be IMAGE or VIDEO"}),
-        }
-
-    item = {
-        "userId": identity_id,
-        "mediaId": body["mediaId"],
-        "cloudStoragePath": cloud_path,
-        "contentType": body["contentType"],
-        "mediaType": body["mediaType"],
-        "uploadedAt": int(time.time() * 1000),
-    }
-
-    if "fileSize" in body:
-        if not isinstance(body["fileSize"], (int, float)):
-            return {
-                "statusCode": 400,
-                "body": json.dumps({"message": "fileSize must be a number"}),
-            }
-        item["fileSize"] = int(body["fileSize"])
+    body_dict = _parse_body(event)
+    if body_dict is None:
+        return error(HTTPStatus.BAD_REQUEST, "Invalid JSON body")
 
     try:
-        table.put_item(
-            Item=item,
-            ConditionExpression="attribute_not_exists(userId) AND attribute_not_exists(mediaId)",
-        )
-    except dynamodb.meta.client.exceptions.ConditionalCheckFailedException:
-        return {
-            "statusCode": 200,
-            "headers": {"Content-Type": "application/json"},
-            "body": json.dumps({"message": "Record already exists, skipped"}),
-        }
+        request_data = CreateUploadRecordRequest.from_dict(body_dict)
+    except ValidationError as e:
+        return error(HTTPStatus.BAD_REQUEST, str(e))
 
-    return {
-        "statusCode": 201,
-        "headers": {"Content-Type": "application/json"},
-        "body": json.dumps({"message": "created"}),
+    # IDOR prevention: verify cloudStoragePath belongs to the requester
+    expected_prefix = f"{PRIVATE_PATH_PREFIX}{identity_id}/"
+    if not request_data.cloud_storage_path.startswith(expected_prefix):
+        return error(HTTPStatus.FORBIDDEN, "cloudStoragePath does not match your identity")
+
+    item = {
+        FIELD_USER_ID: identity_id,
+        FIELD_MEDIA_ID: request_data.media_id,
+        FIELD_CLOUD_STORAGE_PATH: request_data.cloud_storage_path,
+        FIELD_CONTENT_TYPE: request_data.content_type,
+        FIELD_MEDIA_TYPE: request_data.media_type,
+        FIELD_UPLOADED_AT: int(time.time() * 1000),
     }
+
+    if request_data.file_size is not None:
+        item[FIELD_FILE_SIZE] = request_data.file_size
+
+    condition = f"attribute_not_exists({FIELD_USER_ID}) AND attribute_not_exists({FIELD_MEDIA_ID})"
+    try:
+        dynamodb_client.put_item(
+            TableName=table_name,
+            Item=serialize_item(item),
+            ConditionExpression=condition,
+        )
+    except dynamodb_client.exceptions.ConditionalCheckFailedException:
+        return success(HTTPStatus.OK, {"message": "Record already exists, skipped"})
+
+    return success(HTTPStatus.CREATED, {"message": "created"})

@@ -1,40 +1,36 @@
-import json
-import os
+import logging
+from http import HTTPStatus
+from typing import Any, Dict
 
-import boto3
+from auth import get_identity_id
+from constants import FIELD_MEDIA_ID, FIELD_USER_ID
+from db import dynamodb_client, serialize_item, table_name
+from response import error, success
 
-dynamodb = boto3.resource("dynamodb")
-table = dynamodb.Table(os.environ["TABLE_NAME"])
+logger = logging.getLogger(__name__)
 
 
-def handler(event, _context):
-    identity_id = (
-        event.get("requestContext", {})
-        .get("identity", {})
-        .get("cognitoIdentityId")
-    )
+def handler(event: Dict[str, Any], _context: Any) -> Dict[str, Any]:
+    identity_id = get_identity_id(event)
     if not identity_id:
-        return {
-            "statusCode": 403,
-            "body": json.dumps({"message": "Unauthorized"}),
-        }
+        return error(HTTPStatus.FORBIDDEN, "Unauthorized")
 
-    media_id = (event.get("pathParameters") or {}).get("mediaId")
+    media_id = (event.get("pathParameters") or {}).get(FIELD_MEDIA_ID)
     if not media_id:
-        return {
-            "statusCode": 400,
-            "body": json.dumps({"message": "Missing mediaId"}),
-        }
+        return error(HTTPStatus.BAD_REQUEST, "Missing mediaId")
 
-    table.delete_item(
-        Key={
-            "userId": identity_id,
-            "mediaId": media_id,
-        }
-    )
-
-    return {
-        "statusCode": 200,
-        "headers": {"Content-Type": "application/json"},
-        "body": json.dumps({"message": "deleted"}),
+    key = {
+        FIELD_USER_ID: identity_id,
+        FIELD_MEDIA_ID: media_id,
     }
+
+    try:
+        dynamodb_client.delete_item(
+            TableName=table_name,
+            Key=serialize_item(key),
+        )
+    except Exception:
+        logger.exception("Failed to delete item: userId=%s, mediaId=%s", identity_id, media_id)
+        return error(HTTPStatus.INTERNAL_SERVER_ERROR, "Internal server error")
+
+    return success(HTTPStatus.OK, {"message": "deleted"})

@@ -7,12 +7,14 @@
       "Edit(bootstrap/**)",
       "Edit(envs/**)",
       "Edit(modules/**)",
+      "Edit(lambda/**)",
       "Edit(.github/workflows/**)",
       "Edit(CLAUDE.md)",
       "Edit(SKILLS.md)",
       "Write(bootstrap/**)",
       "Write(envs/**)",
       "Write(modules/**)",
+      "Write(lambda/**)",
       "Write(.github/workflows/**)"
     ]
   }

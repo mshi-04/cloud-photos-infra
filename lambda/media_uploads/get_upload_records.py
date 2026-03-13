@@ -1,88 +1,53 @@
-import json
-import os
+from http import HTTPStatus
+from typing import Any, Dict
 
-import boto3
-from boto3.dynamodb.conditions import Key
+from auth import get_identity_id
+from constants import FIELD_MEDIA_ID, FIELD_USER_ID
+from db import deserialize_item, dynamodb_client, serialize_item, table_name
+from models import GetUploadRecordsRequest, ValidationError
+from response import error, success
 
-dynamodb = boto3.resource("dynamodb")
-table = dynamodb.Table(os.environ["TABLE_NAME"])
 
-
-def handler(event, _context):
-    identity_id = (
-        event.get("requestContext", {})
-        .get("identity", {})
-        .get("cognitoIdentityId")
-    )
+def handler(event: Dict[str, Any], _context: Any) -> Dict[str, Any]:
+    identity_id = get_identity_id(event)
     if not identity_id:
-        return {
-            "statusCode": 403,
-            "headers": {"Content-Type": "application/json"},
-            "body": json.dumps({"message": "Unauthorized"}),
-        }
+        return error(HTTPStatus.FORBIDDEN, "Unauthorized")
 
     params = event.get("queryStringParameters") or {}
 
     try:
-        limit = int(params.get("limit", 100))
-        limit = max(1, min(limit, 500))
-    except (ValueError, TypeError):
-        return {
-            "statusCode": 400,
-            "headers": {"Content-Type": "application/json"},
-            "body": json.dumps({"message": "Invalid limit parameter"}),
-        }
+        request_data = GetUploadRecordsRequest.from_dict(params, identity_id)
+    except ValidationError as e:
+        return error(HTTPStatus.BAD_REQUEST, str(e))
+    except ValueError as e:
+        return error(HTTPStatus.FORBIDDEN, str(e))
 
-    query_params = {
-        "KeyConditionExpression": Key("userId").eq(identity_id),
-        "Limit": limit,
+    query_params: Dict[str, Any] = {
+        "TableName": table_name,
+        "KeyConditionExpression": f"{FIELD_USER_ID} = :user_id",
+        "ExpressionAttributeValues": serialize_item({":user_id": identity_id}),
+        "Limit": request_data.limit,
     }
 
-    last_key = params.get("lastEvaluatedKey")
-    if last_key:
-        try:
-            exclusive_start_key = json.loads(last_key)
-        except json.JSONDecodeError:
-            return {
-                "statusCode": 400,
-                "headers": {"Content-Type": "application/json"},
-                "body": json.dumps({"message": "Invalid lastEvaluatedKey parameter"}),
+    if request_data.last_evaluated_key_user_id and request_data.last_evaluated_key_media_id:
+        query_params["ExclusiveStartKey"] = serialize_item(
+            {
+                FIELD_USER_ID: request_data.last_evaluated_key_user_id,
+                FIELD_MEDIA_ID: request_data.last_evaluated_key_media_id,
             }
+        )
 
-        if not isinstance(exclusive_start_key, dict):
-            return {
-                "statusCode": 400,
-                "headers": {"Content-Type": "application/json"},
-                "body": json.dumps({"message": "lastEvaluatedKey must be an object"}),
-            }
+    response = dynamodb_client.query(**query_params)
 
-        if exclusive_start_key.get("userId") != identity_id:
-            return {
-                "statusCode": 403,
-                "headers": {"Content-Type": "application/json"},
-                "body": json.dumps({"message": "lastEvaluatedKey does not match your identity"}),
-            }
+    # Deserialize the items returned by the client API
+    items = [deserialize_item(item) for item in response.get("Items", [])]
 
-        media_id_key = exclusive_start_key.get("mediaId")
-        if not isinstance(media_id_key, str) or not media_id_key:
-            return {
-                "statusCode": 400,
-                "headers": {"Content-Type": "application/json"},
-                "body": json.dumps({"message": "lastEvaluatedKey.mediaId must be a non-empty string"}),
-            }
-
-        query_params["ExclusiveStartKey"] = exclusive_start_key
-
-    response = table.query(**query_params)
-
-    body = {
-        "records": response["Items"],
+    body: Dict[str, Any] = {
+        "records": items,
     }
+
     if "LastEvaluatedKey" in response:
-        body["lastEvaluatedKey"] = response["LastEvaluatedKey"]
+        # Deserialize the LastEvaluatedKey to return standard JSON types to the client
+        body["lastEvaluatedKey"] = deserialize_item(response["LastEvaluatedKey"])
 
-    return {
-        "statusCode": 200,
-        "headers": {"Content-Type": "application/json"},
-        "body": json.dumps(body, default=str),
-    }
+    return success(HTTPStatus.OK, body)
