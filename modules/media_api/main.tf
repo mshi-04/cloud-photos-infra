@@ -441,22 +441,20 @@ resource "aws_api_gateway_deployment" "media" {
 
   triggers = {
     redeployment = sha1(jsonencode([
-      aws_api_gateway_method.get_uploads,
-      aws_api_gateway_integration.get_uploads,
-      aws_api_gateway_method.post_uploads,
-      aws_api_gateway_integration.post_uploads,
-      aws_api_gateway_method.delete_upload,
-      aws_api_gateway_integration.delete_upload,
-      aws_api_gateway_method.options_uploads,
-      aws_api_gateway_integration.options_uploads,
-      aws_api_gateway_method_response.options_uploads,
-      aws_api_gateway_integration_response.options_uploads,
-      aws_api_gateway_method.options_upload_item,
-      aws_api_gateway_integration.options_upload_item,
-      aws_api_gateway_method_response.options_upload_item,
-      aws_api_gateway_integration_response.options_upload_item,
-      aws_api_gateway_gateway_response.default_4xx,
-      aws_api_gateway_gateway_response.default_5xx,
+      aws_api_gateway_method.get_uploads.id,
+      aws_api_gateway_integration.get_uploads.id,
+      aws_api_gateway_method.post_uploads.id,
+      aws_api_gateway_integration.post_uploads.id,
+      aws_api_gateway_method.delete_upload.id,
+      aws_api_gateway_integration.delete_upload.id,
+      aws_api_gateway_method.options_uploads.id,
+      aws_api_gateway_integration.options_uploads.id,
+      aws_api_gateway_method_response.options_uploads.id,
+      aws_api_gateway_integration_response.options_uploads.id,
+      aws_api_gateway_method.options_upload_item.id,
+      aws_api_gateway_integration.options_upload_item.id,
+      aws_api_gateway_method_response.options_upload_item.id,
+      aws_api_gateway_integration_response.options_upload_item.id,
     ]))
   }
 
