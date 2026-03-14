@@ -4,7 +4,7 @@ from http import HTTPStatus
 from typing import Any, Dict
 
 from auth import get_identity_id, mask_identity
-from constants import FIELD_MEDIA_ID, FIELD_USER_ID
+from constants import FIELD_IS_DELETED, FIELD_MEDIA_ID, FIELD_UPDATED_AT, FIELD_USER_ID
 from db import dynamodb_client, serialize_item, table_name
 from response import error, success
 
@@ -35,7 +35,8 @@ def handler(event: Dict[str, Any], _context: Any) -> Dict[str, Any]:
             ExpressionAttributeValues={
                 ":val": {"BOOL": True},
                 ":time": {"N": str(updated_at)}
-            }
+            },
+            ConditionExpression="attribute_exists(userId)"
         )
     except Exception:
         logger.exception("Failed to logically delete item: userId=%s, mediaId=%s", mask_identity(identity_id), media_id)
