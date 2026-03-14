@@ -113,7 +113,7 @@ resource "aws_iam_role_policy" "delete_upload_record_dynamodb" {
     Version = "2012-10-17"
     Statement = [{
       Effect   = "Allow"
-      Action   = ["dynamodb:DeleteItem"]
+      Action   = ["dynamodb:UpdateItem"]
       Resource = var.dynamodb_table_arn
     }]
   })

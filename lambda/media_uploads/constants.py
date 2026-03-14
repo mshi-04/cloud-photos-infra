@@ -6,6 +6,8 @@ FIELD_CONTENT_TYPE = "contentType"
 FIELD_MEDIA_TYPE = "mediaType"
 FIELD_FILE_SIZE = "fileSize"
 FIELD_UPLOADED_AT = "uploadedAt"
+FIELD_UPDATED_AT = "updatedAt"
+FIELD_IS_DELETED = "isDeleted"
 
 # Media type values
 MEDIA_TYPE_IMAGE = "IMAGE"
