@@ -25,8 +25,44 @@ permissions:
   id-token: write
   contents: read
   pull-requests: write
+  security-events: write
 
 jobs:
+  tfsec:
+    name: "Terraform Security Scan"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run tfsec
+        uses: aquasecurity/tfsec-action@v1
+        with:
+          sarif_file: tfsec.sarif
+          soft_fail: true
+
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: tfsec.sarif
+
+  lint-lambda:
+    name: "Lambda Lint (ruff)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run ruff check
+        uses: astral-sh/ruff-action@v3
+        with:
+          src: lambda
+
+      - name: Run ruff format check
+        uses: astral-sh/ruff-action@v3
+        with:
+          src: lambda
+          args: format --check
+
   test-lambda:
     name: "Lambda Unit Tests"
     runs-on: ubuntu-latest
@@ -71,7 +107,7 @@ jobs:
 
   plan:
     name: "Plan ${{ matrix.env }}"
-    needs: [fmt, test-lambda]
+    needs: [fmt, test-lambda, tfsec, lint-lambda]
     runs-on: ubuntu-latest
     strategy:
       matrix:
