@@ -43,9 +43,13 @@ jobs:
         working-directory: lambda
         run: pip install -r requirements-dev.txt
 
-      - name: Run tests
+      - name: Run media_uploads tests
         working-directory: lambda
-        run: pytest
+        run: pytest media_uploads/tests
+
+      - name: Run device_tokens tests
+        working-directory: lambda
+        run: pytest device_tokens/tests
 
   fmt:
     name: "Format Check"
