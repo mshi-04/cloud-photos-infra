@@ -15,7 +15,8 @@ output "api_execution_arns" {
     "${aws_api_gateway_rest_api.media.execution_arn}/*/POST/media/uploads",
     "${aws_api_gateway_rest_api.media.execution_arn}/*/DELETE/media/uploads/*",
     "${aws_api_gateway_rest_api.media.execution_arn}/*/PUT/devices/token",
-    "${aws_api_gateway_rest_api.media.execution_arn}/*/DELETE/devices/token"
+    "${aws_api_gateway_rest_api.media.execution_arn}/*/DELETE/devices/token",
+    "${aws_api_gateway_rest_api.media.execution_arn}/*/POST/media/uploads/complete"
   ]
 }
 
@@ -26,7 +27,8 @@ output "lambda_role_arns" {
     aws_iam_role.create_upload_record.arn,
     aws_iam_role.delete_upload_record.arn,
     aws_iam_role.register_device_token.arn,
-    aws_iam_role.unregister_device_token.arn
+    aws_iam_role.unregister_device_token.arn,
+    aws_iam_role.notify_upload_complete.arn
   ]
 }
 
@@ -37,6 +39,7 @@ output "lambda_role_names" {
     aws_iam_role.create_upload_record.name,
     aws_iam_role.delete_upload_record.name,
     aws_iam_role.register_device_token.name,
-    aws_iam_role.unregister_device_token.name
+    aws_iam_role.unregister_device_token.name,
+    aws_iam_role.notify_upload_complete.name
   ]
 }
