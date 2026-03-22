@@ -70,6 +70,16 @@ jobs:
           role-to-assume: ${{ inputs.role_plan }}
           aws-region: ${{ inputs.aws_region }}
 
+      - name: Build Firebase Admin Lambda Layer
+        working-directory: ${{ github.workspace }}
+        run: |
+          mkdir -p .build
+          docker run --rm \
+            -v "${{ github.workspace }}/.build:/out" \
+            -v "${{ github.workspace }}/lambda/layers/firebase_admin:/requirements" \
+            public.ecr.aws/sam/build-python3.12:latest-x86_64 \
+            bash -c "pip install -r /requirements/requirements.txt -t /tmp/python --quiet && cd /tmp && zip -r9 /out/firebase_admin_layer.zip python"
+
       - name: Terraform init
         run: terraform init -backend-config="bucket=${{ inputs.tf_state_bucket }}"
 
