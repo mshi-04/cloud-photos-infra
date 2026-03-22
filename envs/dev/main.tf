@@ -59,11 +59,13 @@ module "media_db" {
 module "media_api" {
   source = "../../modules/media_api"
 
-  env                   = "dev"
-  project_name          = "cloud-photos"
-  dynamodb_table_name   = module.media_db.table_name
-  dynamodb_table_arn    = module.media_db.table_arn
-  log_retention_in_days = 14
+  env                      = "dev"
+  project_name             = "cloud-photos"
+  dynamodb_table_name      = module.media_db.table_name
+  dynamodb_table_arn       = module.media_db.table_arn
+  device_tokens_table_name = module.device_token_db.table_name
+  device_tokens_table_arn  = module.device_token_db.table_arn
+  log_retention_in_days    = 14
 }
 
 module "device_token_db" {

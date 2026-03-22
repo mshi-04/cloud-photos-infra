@@ -39,3 +39,13 @@ variable "log_retention_in_days" {
   description = "CloudWatch Logs の保持期間 (日)"
   type        = number
 }
+
+variable "device_tokens_table_name" {
+  description = "デバイストークン DynamoDB テーブル名"
+  type        = string
+}
+
+variable "device_tokens_table_arn" {
+  description = "デバイストークン DynamoDB テーブル ARN"
+  type        = string
+}
