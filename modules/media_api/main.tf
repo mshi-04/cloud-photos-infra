@@ -148,13 +148,13 @@ resource "aws_iam_role" "register_device_token" {
 }
 
 resource "aws_iam_role_policy" "register_device_token_dynamodb" {
-  name = "dynamodb-put"
+  name = "dynamodb-update"
   role = aws_iam_role.register_device_token.id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
       Effect   = "Allow"
-      Action   = ["dynamodb:PutItem"]
+      Action   = ["dynamodb:UpdateItem"]
       Resource = var.device_tokens_table_arn
     }]
   })
