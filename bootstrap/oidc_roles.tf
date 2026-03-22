@@ -51,9 +51,10 @@ locals {
   device_tokens_table_arn_prod = "arn:aws:dynamodb:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:table/${local.project_name}-device-tokens-prod"
 
   # Push Notification (Secrets Manager, Lambda Layer)
-  firebase_secret_arn_dev  = "arn:aws:secretsmanager:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:secret:${local.project_name}-firebase-credentials-dev-*"
-  firebase_secret_arn_prod = "arn:aws:secretsmanager:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:secret:${local.project_name}-firebase-credentials-prod-*"
-  lambda_layer_arn_prefix  = "arn:aws:lambda:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:layer:${local.project_name}-*"
+  firebase_secret_arn_dev      = "arn:aws:secretsmanager:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:secret:${local.project_name}-firebase-credentials-dev-*"
+  firebase_secret_arn_prod     = "arn:aws:secretsmanager:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:secret:${local.project_name}-firebase-credentials-prod-*"
+  lambda_layer_arn_prefix_dev  = "arn:aws:lambda:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:layer:${local.project_name}-*-dev"
+  lambda_layer_arn_prefix_prod = "arn:aws:lambda:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:layer:${local.project_name}-*-prod"
 
   lambda_function_arn_prefix_dev  = "arn:aws:lambda:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:function:${local.project_name}-dev-*"
   lambda_function_arn_prefix_prod = "arn:aws:lambda:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:function:${local.project_name}-prod-*"
@@ -231,7 +232,7 @@ resource "aws_iam_role_policy" "plan_dev" {
         Action = [
           "lambda:GetLayerVersion"
         ]
-        Resource = local.lambda_layer_arn_prefix
+        Resource = local.lambda_layer_arn_prefix_dev
       }
     ]
   })
@@ -430,7 +431,7 @@ resource "aws_iam_role_policy" "apply_dev" {
           "lambda:GetLayerVersion",
           "lambda:DeleteLayerVersion"
         ]
-        Resource = local.lambda_layer_arn_prefix
+        Resource = local.lambda_layer_arn_prefix_dev
       },
       {
         Sid    = "AllowAPIGatewayManagement"
@@ -452,7 +453,6 @@ resource "aws_iam_role_policy" "apply_dev" {
           "secretsmanager:DeleteSecret",
           "secretsmanager:DescribeSecret",
           "secretsmanager:GetResourcePolicy",
-          "secretsmanager:PutSecretValue",
           "secretsmanager:TagResource",
           "secretsmanager:UntagResource"
         ]
@@ -609,7 +609,7 @@ resource "aws_iam_role_policy" "plan_prod" {
         Action = [
           "lambda:GetLayerVersion"
         ]
-        Resource = local.lambda_layer_arn_prefix
+        Resource = local.lambda_layer_arn_prefix_prod
       }
     ]
   })
@@ -808,7 +808,7 @@ resource "aws_iam_role_policy" "apply_prod" {
           "lambda:GetLayerVersion",
           "lambda:DeleteLayerVersion"
         ]
-        Resource = local.lambda_layer_arn_prefix
+        Resource = local.lambda_layer_arn_prefix_prod
       },
       {
         Sid    = "AllowAPIGatewayManagement"
@@ -830,7 +830,6 @@ resource "aws_iam_role_policy" "apply_prod" {
           "secretsmanager:DeleteSecret",
           "secretsmanager:DescribeSecret",
           "secretsmanager:GetResourcePolicy",
-          "secretsmanager:PutSecretValue",
           "secretsmanager:TagResource",
           "secretsmanager:UntagResource"
         ]
