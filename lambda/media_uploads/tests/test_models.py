@@ -93,6 +93,12 @@ class TestGetUploadRecordsRequest:
         assert req.last_evaluated_key_user_id is None
         assert req.last_evaluated_key_media_id is None
 
+    def test_defaults_with_none_params(self):
+        req = GetUploadRecordsRequest.from_dict(None, IDENTITY_ID)
+        assert req.limit == 100
+        assert req.last_evaluated_key_user_id is None
+        assert req.last_evaluated_key_media_id is None
+
     def test_custom_limit(self):
         req = GetUploadRecordsRequest.from_dict({"limit": "50"}, IDENTITY_ID)
         assert req.limit == 50

@@ -1,6 +1,5 @@
 from decimal import Decimal
 
-import pytest
 from db import _convert_decimals, deserialize_item, serialize_item
 
 

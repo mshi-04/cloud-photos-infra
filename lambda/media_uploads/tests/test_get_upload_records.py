@@ -59,11 +59,15 @@ class TestGetUploadRecords:
     def test_pagination_next_page(self, dynamodb_table):
         _seed_records(dynamodb_table, IDENTITY_ID, 5)
         resp1 = handler(_make_event({"limit": "2"}), None)
-        last_key = json.dumps(json.loads(resp1["body"])["lastEvaluatedKey"])
+        body1 = json.loads(resp1["body"])
+        last_key = json.dumps(body1["lastEvaluatedKey"])
         resp2 = handler(_make_event({"limit": "2", "lastEvaluatedKey": last_key}), None)
         assert resp2["statusCode"] == 200
         body2 = json.loads(resp2["body"])
         assert len(body2["records"]) == 2
+        ids1 = {r["mediaId"] for r in body1["records"]}
+        ids2 = {r["mediaId"] for r in body2["records"]}
+        assert ids1.isdisjoint(ids2), "Page 2 must not overlap with page 1"
 
     def test_unauthorized(self, dynamodb_table):
         event = {"requestContext": {"identity": {}}, "queryStringParameters": {}}
