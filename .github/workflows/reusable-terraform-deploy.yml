@@ -84,7 +84,7 @@ jobs:
         run: terraform init -backend-config="bucket=${{ inputs.tf_state_bucket }}"
 
       - name: Terraform plan (save)
-        run: terraform plan -no-color -out=tfplan
+        run: terraform plan -no-color -lock-timeout=5m -out=tfplan
 
       - name: Terraform show (summary)
         run: |
@@ -148,4 +148,4 @@ jobs:
         run: terraform init -backend-config="bucket=${{ inputs.tf_state_bucket }}"
 
       - name: Terraform apply (from saved plan)
-        run: terraform apply ${{ github.workspace }}/${{ inputs.tf_working_dir }}/tfplan
+        run: terraform apply -lock-timeout=5m ${{ github.workspace }}/${{ inputs.tf_working_dir }}/tfplan
