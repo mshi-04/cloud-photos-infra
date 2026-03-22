@@ -41,7 +41,7 @@ jobs:
           scan-ref: .
           format: sarif
           output: trivy-results.sarif
-          exit-code: 0
+          exit-code: '1'
 
       - name: Upload SARIF
         if: always()
