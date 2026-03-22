@@ -4,7 +4,7 @@ from typing import Any, Dict
 
 from auth import get_identity_id, mask_identity
 from constants import FIELD_DEVICE_TOKEN, FIELD_USER_ID
-from db import dynamodb_client, serialize_item, table_name
+from db import get_dynamodb_client, get_table_name, serialize_item
 from request_utils import parse_body
 from response import error, success
 
@@ -25,8 +25,8 @@ def handler(event: Dict[str, Any], _context: Any) -> Dict[str, Any]:
         return error(HTTPStatus.BAD_REQUEST, "deviceToken is required")
 
     try:
-        dynamodb_client.delete_item(
-            TableName=table_name,
+        get_dynamodb_client().delete_item(
+            TableName=get_table_name(),
             Key=serialize_item({
                 FIELD_USER_ID: identity_id,
                 FIELD_DEVICE_TOKEN: device_token,

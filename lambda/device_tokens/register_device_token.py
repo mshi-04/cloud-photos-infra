@@ -12,7 +12,7 @@ from constants import (
     FIELD_USER_ID,
     VALID_PLATFORMS,
 )
-from db import dynamodb_client, serialize_item, table_name
+from db import get_dynamodb_client, get_table_name, serialize_item
 from request_utils import parse_body
 from response import error, success
 
@@ -38,8 +38,8 @@ def handler(event: Dict[str, Any], _context: Any) -> Dict[str, Any]:
 
     now = int(time.time() * 1000)
     try:
-        dynamodb_client.update_item(
-            TableName=table_name,
+        get_dynamodb_client().update_item(
+            TableName=get_table_name(),
             Key=serialize_item({
                 FIELD_USER_ID: identity_id,
                 FIELD_DEVICE_TOKEN: device_token,
