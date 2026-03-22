@@ -9,9 +9,10 @@
 
 - **Amazon Cognito (User Pool / Identity Pool)**: ユーザー認証およびクレデンシャルの発行。
 - **Amazon API Gateway**: クライアントからのリクエストを受け付けるREST API。CORSにも完全対応。
-- **AWS Lambda (Python 3.12)**: 写真のメタデータ（アップロード記録）を管理するビジネスロジック。
-- **Amazon DynamoDB**: メタデータを保持するNoSQLデータベース。
+- **AWS Lambda (Python 3.12)**: 写真のメタデータ管理およびプッシュ通知を処理するビジネスロジック。
+- **Amazon DynamoDB**: メタデータおよびデバイストークンを保持するNoSQLデータベース。
 - **Amazon S3**: 実際のメディア（写真・動画）ファイルを保存するストレージ（Cognito Identity ID単位のプレフィックスでアクセス制御）。
+- **AWS Secrets Manager**: Firebase 認証情報の安全な管理。
 
 ## API エンドポイント
 
@@ -19,13 +20,19 @@ API Gateway によって以下のエンドポイントが提供されます。�
 
 - `GET /media/uploads`: 自身のアップロード済みメディア一覧を取得
 - `POST /media/uploads`: 新しいメディアのアップロード記録を作成
+- `POST /media/uploads/complete`: アップロード完了通知（プッシュ通知をトリガー）
 - `DELETE /media/uploads/{mediaId}`: 指定したメディアのアップロード記録を削除
+- `PUT /devices/token`: デバイストークンの登録
+- `DELETE /devices/token`: デバイストークンの削除
 
 ## セキュリティと権限管理 (Least Privilege)
 
-- 各 Lambda 関数には単一の共有ロールではなく、**関数ごとに最小権限を持つ個別の IAM ロール**（`get_upload_records-role`, `create_upload_record-role`, `delete_upload_record-role`）が割り当てられています。
-- 各ロールは、DynamoDB テーブルに対する必要なアクション（`dynamodb:Query`, `dynamodb:PutItem`, `dynamodb:DeleteItem`）のみが特別に許可されています。
+- 各 Lambda 関数には単一の共有ロールではなく、**関数ごとに最小権限を持つ個別の IAM ロール**が割り当てられています。
+- 各ロールは、DynamoDB テーブルに対する必要なアクション（`dynamodb:Query`, `dynamodb:PutItem`, `dynamodb:DeleteItem` 等）のみが許可されています。
+- プッシュ通知用 Lambda には Secrets Manager の `GetSecretValue` 権限のみを追加で付与しています。
 - フロントエンドクライアント（認証済みユーザー）のロールは、S3 の `/private/${cognito-identity.amazonaws.com:sub}/` プレフィックスに対する読み書き権限と、API Gateway の特定のエンドポイントに対する `execute-api:Invoke` 権限のみを持っています。
+
+詳細は [SECURITY.md](SECURITY.md) を参照してください。
 
 ## ディレクトリ構成
 
@@ -33,8 +40,8 @@ API Gateway によって以下のエンドポイントが提供されます。�
   - `dev/`: 開発環境の Terraform コード（State は S3 の dev/ キーを使用）
   - `prod/`: 本番環境の Terraform コード（State は S3 の prod/ キーを使用）
 - `bootstrap/`: 最初に1回だけ手動適用する S3 バケット、DynamoDB テーブル、OIDC 用 IAM ロールの定義
-- `modules/`: 各リソースの定義モジュール（`cognito`, `identity_pool`, `media_api`, `media_db`, `media_storage`）
-- `lambda/media_uploads/`: API のバックエンドを処理する Python スクリプトおよび依存関係
+- `modules/`: 各リソースの定義モジュール（`cognito`, `identity_pool`, `media_api`, `media_db`, `media_storage`, `device_token_db`, `push_notification`）
+- `lambda/`: API のバックエンドを処理する Python スクリプトおよび依存関係
 - `.github/workflows/`: CI (PR検証) および CD (マージ時デプロイ) の定義
 
 ## 重要な運用ルール
