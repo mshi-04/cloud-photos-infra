@@ -27,10 +27,12 @@ def handler(event: Dict[str, Any], _context: Any) -> Dict[str, Any]:
     try:
         get_dynamodb_client().delete_item(
             TableName=get_table_name(),
-            Key=serialize_item({
-                FIELD_USER_ID: identity_id,
-                FIELD_DEVICE_TOKEN: device_token,
-            }),
+            Key=serialize_item(
+                {
+                    FIELD_USER_ID: identity_id,
+                    FIELD_DEVICE_TOKEN: device_token,
+                }
+            ),
         )
     except Exception:
         logger.exception("Failed to unregister device token: userId=%s", mask_identity(identity_id))

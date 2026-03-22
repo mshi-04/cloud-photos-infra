@@ -25,7 +25,7 @@ def handler(event: Dict[str, Any], _context: Any) -> Dict[str, Any]:
         FIELD_USER_ID: identity_id,
         FIELD_MEDIA_ID: media_id,
     }
-    
+
     updated_at = int(time.time() * 1000)
 
     try:
@@ -33,11 +33,8 @@ def handler(event: Dict[str, Any], _context: Any) -> Dict[str, Any]:
             TableName=get_table_name(),
             Key=serialize_item(key),
             UpdateExpression=f"SET {FIELD_IS_DELETED} = :val, {FIELD_UPDATED_AT} = :time",
-            ExpressionAttributeValues={
-                ":val": {"BOOL": True},
-                ":time": {"N": str(updated_at)}
-            },
-            ConditionExpression=f"attribute_exists({FIELD_USER_ID})"
+            ExpressionAttributeValues={":val": {"BOOL": True}, ":time": {"N": str(updated_at)}},
+            ConditionExpression=f"attribute_exists({FIELD_USER_ID})",
         )
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code")

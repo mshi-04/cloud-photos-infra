@@ -77,7 +77,4 @@ def handler(event: Dict[str, Any], _context: Any) -> Dict[str, Any]:
         logger.exception("Failed to create upload record: userId=%s", mask_identity(identity_id))
         return error(HTTPStatus.INTERNAL_SERVER_ERROR, "Internal server error")
 
-    return success(HTTPStatus.CREATED, {
-        "message": "created",
-        "uploadedAt": item[FIELD_UPLOADED_AT]
-    })
+    return success(HTTPStatus.CREATED, {"message": "created", "uploadedAt": item[FIELD_UPLOADED_AT]})
