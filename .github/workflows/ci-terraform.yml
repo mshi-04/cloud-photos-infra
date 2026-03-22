@@ -71,7 +71,7 @@ jobs:
 
   plan:
     name: "Plan ${{ matrix.env }}"
-    needs: fmt
+    needs: [fmt, test-lambda]
     runs-on: ubuntu-latest
     strategy:
       matrix:

@@ -40,3 +40,4 @@ def dynamodb_table():
 
         db._reset_for_testing()
         del os.environ["TABLE_NAME"]
+        del os.environ["AWS_DEFAULT_REGION"]
