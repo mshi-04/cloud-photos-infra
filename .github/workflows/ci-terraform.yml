@@ -34,17 +34,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run tfsec
-        uses: aquasecurity/tfsec-action@v1.0.3
+      - name: Run Trivy IaC scan
+        uses: aquasecurity/trivy-action@v0.35.0
         with:
-          sarif_file: tfsec.sarif
-          soft_fail: true
+          scan-type: config
+          scan-ref: .
+          format: sarif
+          output: trivy-results.sarif
+          exit-code: 0
 
       - name: Upload SARIF
         if: always()
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: tfsec.sarif
+          sarif_file: trivy-results.sarif
 
   lint-lambda:
     name: "Lambda Lint (ruff)"
