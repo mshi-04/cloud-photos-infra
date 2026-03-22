@@ -8,7 +8,7 @@ def success(status_code: int, body: Any = None, default: Any = str) -> Dict[str,
     return {
         "statusCode": status_code,
         "headers": JSON_HEADERS,
-        "body": json.dumps(body, default=default),
+        "body": json.dumps(body, default=default) if body is not None else "",
     }
 
 

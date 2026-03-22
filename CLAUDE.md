@@ -31,7 +31,7 @@ modules/
 - Bootstrap resources are applied manually once, not through CI/CD
 
 ## Terraform Rules
-- Run `terraform fmt` before committing
+- After editing any `.tf` file, always run `terraform fmt <edited-directory>` immediately
 - Module variables defined in `variables.tf`, outputs in `outputs.tf`
 - Environment-specific values passed via `envs/<env>/main.tf` module arguments
 - Do not hardcode AWS account IDs or secrets in .tf files
