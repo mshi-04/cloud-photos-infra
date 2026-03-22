@@ -1,8 +1,6 @@
 import json
 import os
 
-import boto3
-import pytest
 from moto import mock_aws
 
 from get_upload_records import handler

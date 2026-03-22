@@ -1,7 +1,6 @@
 import json
 import os
 
-import pytest
 from moto import mock_aws
 
 from delete_upload_record import handler

@@ -40,24 +40,24 @@ def handler(event: Dict[str, Any], _context: Any) -> Dict[str, Any]:
     try:
         get_dynamodb_client().update_item(
             TableName=get_table_name(),
-            Key=serialize_item({
-                FIELD_USER_ID: identity_id,
-                FIELD_DEVICE_TOKEN: device_token,
-            }),
-            UpdateExpression=(
-                "SET #platform = :platform, "
-                "#registeredAt = if_not_exists(#registeredAt, :now), "
-                "#updatedAt = :now"
+            Key=serialize_item(
+                {
+                    FIELD_USER_ID: identity_id,
+                    FIELD_DEVICE_TOKEN: device_token,
+                }
             ),
+            UpdateExpression=("SET #platform = :platform, #registeredAt = if_not_exists(#registeredAt, :now), #updatedAt = :now"),
             ExpressionAttributeNames={
                 "#platform": FIELD_PLATFORM,
                 "#registeredAt": FIELD_REGISTERED_AT,
                 "#updatedAt": FIELD_UPDATED_AT,
             },
-            ExpressionAttributeValues=serialize_item({
-                ":platform": platform,
-                ":now": now,
-            }),
+            ExpressionAttributeValues=serialize_item(
+                {
+                    ":platform": platform,
+                    ":now": now,
+                }
+            ),
         )
     except Exception:
         logger.exception("Failed to register device token: userId=%s", mask_identity(identity_id))

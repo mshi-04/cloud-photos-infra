@@ -1,7 +1,6 @@
 import json
 import os
 
-import pytest
 from moto import mock_aws
 
 from register_device_token import handler
