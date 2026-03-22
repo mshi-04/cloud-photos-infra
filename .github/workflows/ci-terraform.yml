@@ -25,8 +25,71 @@ permissions:
   id-token: write
   contents: read
   pull-requests: write
+  security-events: write
 
 jobs:
+  trivy:
+    name: "Terraform Security Scan"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Trivy IaC scan
+        uses: aquasecurity/trivy-action@v0.35.0
+        with:
+          scan-type: config
+          scan-ref: .
+          format: sarif
+          output: trivy-results.sarif
+          exit-code: '1'
+
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
+
+  lint-lambda:
+    name: "Lambda Lint (ruff)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run ruff check
+        uses: astral-sh/ruff-action@v3
+        with:
+          src: lambda
+
+      - name: Run ruff format check
+        uses: astral-sh/ruff-action@v3
+        with:
+          src: lambda
+          args: format --check
+
+  test-lambda:
+    name: "Lambda Unit Tests"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: lambda/requirements-dev.txt
+
+      - name: Install dependencies
+        working-directory: lambda
+        run: pip install -r requirements-dev.txt
+
+      - name: Run media_uploads tests
+        working-directory: lambda
+        run: pytest media_uploads/tests
+
+      - name: Run device_tokens tests
+        working-directory: lambda
+        run: pytest device_tokens/tests
+
   fmt:
     name: "Format Check"
     runs-on: ubuntu-latest
@@ -47,7 +110,7 @@ jobs:
 
   plan:
     name: "Plan ${{ matrix.env }}"
-    needs: fmt
+    needs: [fmt, test-lambda, trivy, lint-lambda]
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -80,6 +143,16 @@ jobs:
           terraform_wrapper: true
           terraform_version: ${{ steps.tf_version.outputs.version }}
 
+      - name: Build Firebase Admin Lambda Layer
+        working-directory: ${{ github.workspace }}
+        run: |
+          mkdir -p .build
+          docker run --rm \
+            -v "${{ github.workspace }}/.build:/out" \
+            -v "${{ github.workspace }}/lambda/layers/firebase_admin:/requirements" \
+            public.ecr.aws/sam/build-python3.12:latest-x86_64 \
+            bash -c "pip install -r /requirements/requirements.txt -t /tmp/python --quiet && cd /tmp && zip -r9 /out/firebase_admin_layer.zip python"
+
       - name: Terraform Init
         id: init
         run: terraform init -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}"
@@ -90,7 +163,7 @@ jobs:
 
       - name: Terraform Plan
         id: plan
-        run: terraform plan -no-color -out=tfplan
+        run: terraform plan -no-color -lock-timeout=5m -out=tfplan
         continue-on-error: true
 
       - name: Comment PR (${{ matrix.env }})

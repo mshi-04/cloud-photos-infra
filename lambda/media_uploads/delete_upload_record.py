@@ -6,7 +6,7 @@ from botocore.exceptions import ClientError
 
 from auth import get_identity_id, mask_identity
 from constants import FIELD_IS_DELETED, FIELD_MEDIA_ID, FIELD_UPDATED_AT, FIELD_USER_ID
-from db import dynamodb_client, serialize_item, table_name
+from db import get_dynamodb_client, get_table_name, serialize_item
 from response import error, success
 
 logger = logging.getLogger(__name__)
@@ -25,19 +25,16 @@ def handler(event: Dict[str, Any], _context: Any) -> Dict[str, Any]:
         FIELD_USER_ID: identity_id,
         FIELD_MEDIA_ID: media_id,
     }
-    
+
     updated_at = int(time.time() * 1000)
 
     try:
-        dynamodb_client.update_item(
-            TableName=table_name,
+        get_dynamodb_client().update_item(
+            TableName=get_table_name(),
             Key=serialize_item(key),
             UpdateExpression=f"SET {FIELD_IS_DELETED} = :val, {FIELD_UPDATED_AT} = :time",
-            ExpressionAttributeValues={
-                ":val": {"BOOL": True},
-                ":time": {"N": str(updated_at)}
-            },
-            ConditionExpression=f"attribute_exists({FIELD_USER_ID})"
+            ExpressionAttributeValues={":val": {"BOOL": True}, ":time": {"N": str(updated_at)}},
+            ConditionExpression=f"attribute_exists({FIELD_USER_ID})",
         )
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code")

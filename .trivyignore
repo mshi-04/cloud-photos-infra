@@ -1,0 +1,24 @@
+# S3 encryption should use Customer Managed Keys (SSE-S3 AES256 is sufficient for this project)
+AWS-0132
+
+# API Gateway stages for V1 and V2 should have access logging enabled (Costs extra)
+AWS-0001
+
+# API Gateway should have X-Ray tracing enabled (Costs extra)
+AWS-0003
+
+# API Gateway authorization (OPTIONS method missing auth is intentional for CORS)
+AWS-0004
+
+# API Gateway REST API endpoint type should be regional/private instead of edge? (Depends on use case)
+AWS-0017
+
+# Lambda functions should have Dead Letter Queues (Not strictly needed for all async)
+AWS-0025
+
+# ElastiCache/Redis/etc encryption features missing
+AWS-0066
+AWS-0089
+
+# Secrets manager uses default kms key (AWS managed key is usually fine unless regulatory requirement)
+AWS-0098

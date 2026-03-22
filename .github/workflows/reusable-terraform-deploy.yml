@@ -70,11 +70,21 @@ jobs:
           role-to-assume: ${{ inputs.role_plan }}
           aws-region: ${{ inputs.aws_region }}
 
+      - name: Build Firebase Admin Lambda Layer
+        working-directory: ${{ github.workspace }}
+        run: |
+          mkdir -p .build
+          docker run --rm \
+            -v "${{ github.workspace }}/.build:/out" \
+            -v "${{ github.workspace }}/lambda/layers/firebase_admin:/requirements" \
+            public.ecr.aws/sam/build-python3.12:latest-x86_64 \
+            bash -c "pip install -r /requirements/requirements.txt -t /tmp/python --quiet && cd /tmp && zip -r9 /out/firebase_admin_layer.zip python"
+
       - name: Terraform init
         run: terraform init -backend-config="bucket=${{ inputs.tf_state_bucket }}"
 
       - name: Terraform plan (save)
-        run: terraform plan -no-color -out=tfplan
+        run: terraform plan -no-color -lock-timeout=5m -out=tfplan
 
       - name: Terraform show (summary)
         run: |
@@ -138,4 +148,4 @@ jobs:
         run: terraform init -backend-config="bucket=${{ inputs.tf_state_bucket }}"
 
       - name: Terraform apply (from saved plan)
-        run: terraform apply ${{ github.workspace }}/${{ inputs.tf_working_dir }}/tfplan
+        run: terraform apply -lock-timeout=5m ${{ github.workspace }}/${{ inputs.tf_working_dir }}/tfplan

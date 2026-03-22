@@ -4,19 +4,34 @@ data "aws_caller_identity" "current" {}
 locals {
   function_prefix = "${var.project_name}-${var.env}"
   lambda_functions = {
-    get_upload_records   = "get-upload-records"
-    create_upload_record = "create-upload-record"
-    delete_upload_record = "delete-upload-record"
+    get_upload_records      = "get-upload-records"
+    create_upload_record    = "create-upload-record"
+    delete_upload_record    = "delete-upload-record"
+    register_device_token   = "register-device-token"
+    unregister_device_token = "unregister-device-token"
+    notify_upload_complete  = "notify-upload-complete"
   }
 }
 
 # ==========================================
-# Lambda Source Archive
+# Lambda Source Archives
 # ==========================================
 data "archive_file" "media_uploads" {
   type        = "zip"
   source_dir  = "${path.module}/../../lambda/media_uploads"
   output_path = "${path.module}/../../.build/media_uploads.zip"
+}
+
+data "archive_file" "device_tokens" {
+  type        = "zip"
+  source_dir  = "${path.module}/../../lambda/device_tokens"
+  output_path = "${path.module}/../../.build/device_tokens.zip"
+}
+
+data "archive_file" "push_notification" {
+  type        = "zip"
+  source_dir  = "${path.module}/../../lambda/push_notification"
+  output_path = "${path.module}/../../.build/push_notification.zip"
 }
 
 # ==========================================
@@ -134,6 +149,125 @@ resource "aws_iam_role_policy" "delete_upload_record_logs" {
   })
 }
 
+resource "aws_iam_role" "register_device_token" {
+  name               = "${local.function_prefix}-register-device-token-role"
+  assume_role_policy = local.assume_role_policy
+}
+
+resource "aws_iam_role_policy" "register_device_token_dynamodb" {
+  name = "dynamodb-update"
+  role = aws_iam_role.register_device_token.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["dynamodb:UpdateItem"]
+      Resource = var.device_tokens_table_arn
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "register_device_token_logs" {
+  name = "cloudwatch-logs"
+  role = aws_iam_role.register_device_token.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"]
+        Resource = "${aws_cloudwatch_log_group.lambda["register_device_token"].arn}:*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role" "unregister_device_token" {
+  name               = "${local.function_prefix}-unregister-device-token-role"
+  assume_role_policy = local.assume_role_policy
+}
+
+resource "aws_iam_role_policy" "unregister_device_token_dynamodb" {
+  name = "dynamodb-delete"
+  role = aws_iam_role.unregister_device_token.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["dynamodb:DeleteItem"]
+      Resource = var.device_tokens_table_arn
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "unregister_device_token_logs" {
+  name = "cloudwatch-logs"
+  role = aws_iam_role.unregister_device_token.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"]
+        Resource = "${aws_cloudwatch_log_group.lambda["unregister_device_token"].arn}:*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role" "notify_upload_complete" {
+  name               = "${local.function_prefix}-notify-upload-complete-role"
+  assume_role_policy = local.assume_role_policy
+}
+
+resource "aws_iam_role_policy" "notify_upload_complete_dynamodb" {
+  name = "dynamodb-query-delete"
+  role = aws_iam_role.notify_upload_complete.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["dynamodb:Query"]
+        Resource = var.device_tokens_table_arn
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["dynamodb:DeleteItem"]
+        Resource = var.device_tokens_table_arn
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "notify_upload_complete_secrets" {
+  name = "secretsmanager-get"
+  role = aws_iam_role.notify_upload_complete.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["secretsmanager:GetSecretValue"]
+      Resource = var.firebase_credentials_secret_arn
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "notify_upload_complete_logs" {
+  name = "cloudwatch-logs"
+  role = aws_iam_role.notify_upload_complete.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"]
+        Resource = "${aws_cloudwatch_log_group.lambda["notify_upload_complete"].arn}:*"
+      }
+    ]
+  })
+}
+
 # ==========================================
 # CloudWatch Log Groups
 # ==========================================
@@ -203,6 +337,65 @@ resource "aws_lambda_function" "delete_upload_record" {
   depends_on = [aws_cloudwatch_log_group.lambda["delete_upload_record"]]
 }
 
+resource "aws_lambda_function" "register_device_token" {
+  function_name    = "${local.function_prefix}-register-device-token"
+  role             = aws_iam_role.register_device_token.arn
+  handler          = "register_device_token.handler"
+  runtime          = "python3.12"
+  memory_size      = var.lambda_memory_size
+  timeout          = var.lambda_timeout
+  filename         = data.archive_file.device_tokens.output_path
+  source_code_hash = data.archive_file.device_tokens.output_base64sha256
+
+  environment {
+    variables = {
+      TABLE_NAME = var.device_tokens_table_name
+    }
+  }
+
+  depends_on = [aws_cloudwatch_log_group.lambda["register_device_token"]]
+}
+
+resource "aws_lambda_function" "unregister_device_token" {
+  function_name    = "${local.function_prefix}-unregister-device-token"
+  role             = aws_iam_role.unregister_device_token.arn
+  handler          = "unregister_device_token.handler"
+  runtime          = "python3.12"
+  memory_size      = var.lambda_memory_size
+  timeout          = var.lambda_timeout
+  filename         = data.archive_file.device_tokens.output_path
+  source_code_hash = data.archive_file.device_tokens.output_base64sha256
+
+  environment {
+    variables = {
+      TABLE_NAME = var.device_tokens_table_name
+    }
+  }
+
+  depends_on = [aws_cloudwatch_log_group.lambda["unregister_device_token"]]
+}
+
+resource "aws_lambda_function" "notify_upload_complete" {
+  function_name    = "${local.function_prefix}-notify-upload-complete"
+  role             = aws_iam_role.notify_upload_complete.arn
+  handler          = "notify_upload_complete.handler"
+  runtime          = "python3.12"
+  memory_size      = var.lambda_memory_size
+  timeout          = 30
+  filename         = data.archive_file.push_notification.output_path
+  source_code_hash = data.archive_file.push_notification.output_base64sha256
+  layers           = [var.firebase_layer_arn]
+
+  environment {
+    variables = {
+      TABLE_NAME                      = var.device_tokens_table_name
+      FIREBASE_CREDENTIALS_SECRET_ARN = var.firebase_credentials_secret_arn
+    }
+  }
+
+  depends_on = [aws_cloudwatch_log_group.lambda["notify_upload_complete"]]
+}
+
 # ==========================================
 # API Gateway REST API
 # ==========================================
@@ -233,6 +426,27 @@ resource "aws_api_gateway_resource" "upload_item" {
   rest_api_id = aws_api_gateway_rest_api.media.id
   parent_id   = aws_api_gateway_resource.uploads.id
   path_part   = "{mediaId}"
+}
+
+# /media/uploads/complete
+resource "aws_api_gateway_resource" "uploads_complete" {
+  rest_api_id = aws_api_gateway_rest_api.media.id
+  parent_id   = aws_api_gateway_resource.uploads.id
+  path_part   = "complete"
+}
+
+# /devices
+resource "aws_api_gateway_resource" "devices" {
+  rest_api_id = aws_api_gateway_rest_api.media.id
+  parent_id   = aws_api_gateway_rest_api.media.root_resource_id
+  path_part   = "devices"
+}
+
+# /devices/token
+resource "aws_api_gateway_resource" "devices_token" {
+  rest_api_id = aws_api_gateway_rest_api.media.id
+  parent_id   = aws_api_gateway_resource.devices.id
+  path_part   = "token"
 }
 
 # ==========================================
@@ -411,6 +625,181 @@ resource "aws_api_gateway_integration_response" "options_upload_item" {
 }
 
 # ==========================================
+# POST /media/uploads/complete
+# ==========================================
+resource "aws_api_gateway_method" "post_uploads_complete" {
+  rest_api_id   = aws_api_gateway_rest_api.media.id
+  resource_id   = aws_api_gateway_resource.uploads_complete.id
+  http_method   = "POST"
+  authorization = "AWS_IAM"
+}
+
+resource "aws_api_gateway_integration" "post_uploads_complete" {
+  rest_api_id             = aws_api_gateway_rest_api.media.id
+  resource_id             = aws_api_gateway_resource.uploads_complete.id
+  http_method             = aws_api_gateway_method.post_uploads_complete.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.notify_upload_complete.invoke_arn
+}
+
+resource "aws_lambda_permission" "post_uploads_complete" {
+  statement_id  = "AllowAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.notify_upload_complete.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.media.execution_arn}/*/POST/media/uploads/complete"
+}
+
+# ==========================================
+# CORS Preflight for /media/uploads/complete
+# ==========================================
+resource "aws_api_gateway_method" "options_uploads_complete" {
+  rest_api_id   = aws_api_gateway_rest_api.media.id
+  resource_id   = aws_api_gateway_resource.uploads_complete.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "options_uploads_complete" {
+  rest_api_id = aws_api_gateway_rest_api.media.id
+  resource_id = aws_api_gateway_resource.uploads_complete.id
+  http_method = aws_api_gateway_method.options_uploads_complete.http_method
+  type        = "MOCK"
+
+  request_templates = {
+    "application/json" = "{\"statusCode\": 200}"
+  }
+}
+
+resource "aws_api_gateway_method_response" "options_uploads_complete" {
+  rest_api_id = aws_api_gateway_rest_api.media.id
+  resource_id = aws_api_gateway_resource.uploads_complete.id
+  http_method = aws_api_gateway_method.options_uploads_complete.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+}
+
+resource "aws_api_gateway_integration_response" "options_uploads_complete" {
+  rest_api_id = aws_api_gateway_rest_api.media.id
+  resource_id = aws_api_gateway_resource.uploads_complete.id
+  http_method = aws_api_gateway_method.options_uploads_complete.http_method
+  status_code = aws_api_gateway_method_response.options_uploads_complete.status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
+    "method.response.header.Access-Control-Allow-Methods" = "'POST,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+  }
+}
+
+# ==========================================
+# PUT /devices/token
+# ==========================================
+resource "aws_api_gateway_method" "put_devices_token" {
+  rest_api_id   = aws_api_gateway_rest_api.media.id
+  resource_id   = aws_api_gateway_resource.devices_token.id
+  http_method   = "PUT"
+  authorization = "AWS_IAM"
+}
+
+resource "aws_api_gateway_integration" "put_devices_token" {
+  rest_api_id             = aws_api_gateway_rest_api.media.id
+  resource_id             = aws_api_gateway_resource.devices_token.id
+  http_method             = aws_api_gateway_method.put_devices_token.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.register_device_token.invoke_arn
+}
+
+resource "aws_lambda_permission" "put_devices_token" {
+  statement_id  = "AllowAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.register_device_token.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.media.execution_arn}/*/PUT/devices/token"
+}
+
+# ==========================================
+# DELETE /devices/token
+# ==========================================
+resource "aws_api_gateway_method" "delete_devices_token" {
+  rest_api_id   = aws_api_gateway_rest_api.media.id
+  resource_id   = aws_api_gateway_resource.devices_token.id
+  http_method   = "DELETE"
+  authorization = "AWS_IAM"
+}
+
+resource "aws_api_gateway_integration" "delete_devices_token" {
+  rest_api_id             = aws_api_gateway_rest_api.media.id
+  resource_id             = aws_api_gateway_resource.devices_token.id
+  http_method             = aws_api_gateway_method.delete_devices_token.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.unregister_device_token.invoke_arn
+}
+
+resource "aws_lambda_permission" "delete_devices_token" {
+  statement_id  = "AllowAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.unregister_device_token.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.media.execution_arn}/*/DELETE/devices/token"
+}
+
+# ==========================================
+# CORS Preflight for /devices/token
+# ==========================================
+resource "aws_api_gateway_method" "options_devices_token" {
+  rest_api_id   = aws_api_gateway_rest_api.media.id
+  resource_id   = aws_api_gateway_resource.devices_token.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "options_devices_token" {
+  rest_api_id = aws_api_gateway_rest_api.media.id
+  resource_id = aws_api_gateway_resource.devices_token.id
+  http_method = aws_api_gateway_method.options_devices_token.http_method
+  type        = "MOCK"
+
+  request_templates = {
+    "application/json" = "{\"statusCode\": 200}"
+  }
+}
+
+resource "aws_api_gateway_method_response" "options_devices_token" {
+  rest_api_id = aws_api_gateway_rest_api.media.id
+  resource_id = aws_api_gateway_resource.devices_token.id
+  http_method = aws_api_gateway_method.options_devices_token.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+}
+
+resource "aws_api_gateway_integration_response" "options_devices_token" {
+  rest_api_id = aws_api_gateway_rest_api.media.id
+  resource_id = aws_api_gateway_resource.devices_token.id
+  http_method = aws_api_gateway_method.options_devices_token.http_method
+  status_code = aws_api_gateway_method_response.options_devices_token.status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
+    "method.response.header.Access-Control-Allow-Methods" = "'PUT,DELETE,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+  }
+}
+
+# ==========================================
 # Gateway Responses for CORS
 # ==========================================
 resource "aws_api_gateway_gateway_response" "default_4xx" {
@@ -455,6 +844,20 @@ resource "aws_api_gateway_deployment" "media" {
       aws_api_gateway_integration.options_upload_item.id,
       aws_api_gateway_method_response.options_upload_item.id,
       aws_api_gateway_integration_response.options_upload_item.id,
+      aws_api_gateway_method.post_uploads_complete.id,
+      aws_api_gateway_integration.post_uploads_complete.id,
+      aws_api_gateway_method.options_uploads_complete.id,
+      aws_api_gateway_integration.options_uploads_complete.id,
+      aws_api_gateway_method_response.options_uploads_complete.id,
+      aws_api_gateway_integration_response.options_uploads_complete.id,
+      aws_api_gateway_method.put_devices_token.id,
+      aws_api_gateway_integration.put_devices_token.id,
+      aws_api_gateway_method.delete_devices_token.id,
+      aws_api_gateway_integration.delete_devices_token.id,
+      aws_api_gateway_method.options_devices_token.id,
+      aws_api_gateway_integration.options_devices_token.id,
+      aws_api_gateway_method_response.options_devices_token.id,
+      aws_api_gateway_integration_response.options_devices_token.id,
     ]))
   }
 

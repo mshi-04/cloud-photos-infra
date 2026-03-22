@@ -4,7 +4,7 @@ from typing import Any, Dict
 
 from auth import get_identity_id, mask_identity
 from constants import FIELD_MEDIA_ID, FIELD_USER_ID
-from db import deserialize_item, dynamodb_client, serialize_item, table_name
+from db import deserialize_item, get_dynamodb_client, get_table_name, serialize_item
 from models import AuthorizationError, GetUploadRecordsRequest, ValidationError
 from response import error, success
 
@@ -26,7 +26,7 @@ def handler(event: Dict[str, Any], _context: Any) -> Dict[str, Any]:
         return error(HTTPStatus.FORBIDDEN, str(e))
 
     query_params: Dict[str, Any] = {
-        "TableName": table_name,
+        "TableName": get_table_name(),
         "KeyConditionExpression": f"{FIELD_USER_ID} = :user_id",
         "ExpressionAttributeValues": serialize_item({":user_id": identity_id}),
         "Limit": request_data.limit,
@@ -41,7 +41,7 @@ def handler(event: Dict[str, Any], _context: Any) -> Dict[str, Any]:
         )
 
     try:
-        response = dynamodb_client.query(**query_params)
+        response = get_dynamodb_client().query(**query_params)
     except Exception:
         logger.exception("Failed to query upload records: userId=%s", mask_identity(identity_id))
         return error(HTTPStatus.INTERNAL_SERVER_ERROR, "Internal server error")

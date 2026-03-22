@@ -39,3 +39,23 @@ variable "log_retention_in_days" {
   description = "CloudWatch Logs の保持期間 (日)"
   type        = number
 }
+
+variable "device_tokens_table_name" {
+  description = "デバイストークン DynamoDB テーブル名"
+  type        = string
+}
+
+variable "device_tokens_table_arn" {
+  description = "デバイストークン DynamoDB テーブル ARN"
+  type        = string
+}
+
+variable "firebase_credentials_secret_arn" {
+  description = "Firebase クレデンシャル Secrets Manager ARN"
+  type        = string
+}
+
+variable "firebase_layer_arn" {
+  description = "Firebase Admin SDK Lambda Layer ARN"
+  type        = string
+}

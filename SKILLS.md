@@ -67,7 +67,7 @@ Workflow files are in `.github/workflows/`.
 - Terraform version must match `.terraform-version` (see `.terraform-version` for the current version)
 - IAM role ARN format: `arn:aws:iam::<account_id>:role/gh-terraform-<plan|apply>-<env>`
 - Account ID is stored in `vars.AWS_ACCOUNT_ID` (GitHub Actions variable, not a secret)
-- CI triggers on changes to `envs/**`, `modules/**`, or `.github/workflows/**`; CD triggers on `envs/**` and `modules/**` only (workflow changes do not trigger auto-apply)
+- CI triggers on changes to `envs/**`, `modules/**`, `lambda/**`, `bootstrap/**`, `.github/workflows/**`, or `.terraform-version`; CD triggers on `envs/**`, `modules/**`, and `lambda/**` only (workflow changes do not trigger auto-apply)
 - Prod apply runs only on `main` branch and requires manual approval
 
 ## Skill: Add a New Environment

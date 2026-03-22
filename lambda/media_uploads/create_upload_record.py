@@ -15,7 +15,7 @@ from constants import (
     FIELD_USER_ID,
     PRIVATE_PATH_PREFIX,
 )
-from db import dynamodb_client, serialize_item, table_name
+from db import get_dynamodb_client, get_table_name, serialize_item
 from models import CreateUploadRecordRequest, ValidationError
 from response import error, success
 
@@ -64,19 +64,17 @@ def handler(event: Dict[str, Any], _context: Any) -> Dict[str, Any]:
         item[FIELD_FILE_SIZE] = request_data.file_size
 
     condition = f"attribute_not_exists({FIELD_USER_ID}) AND attribute_not_exists({FIELD_MEDIA_ID})"
+    client = get_dynamodb_client()
     try:
-        dynamodb_client.put_item(
-            TableName=table_name,
+        client.put_item(
+            TableName=get_table_name(),
             Item=serialize_item(item),
             ConditionExpression=condition,
         )
-    except dynamodb_client.exceptions.ConditionalCheckFailedException:
+    except client.exceptions.ConditionalCheckFailedException:
         return success(HTTPStatus.OK, {"message": "Record already exists, skipped"})
     except Exception:
         logger.exception("Failed to create upload record: userId=%s", mask_identity(identity_id))
         return error(HTTPStatus.INTERNAL_SERVER_ERROR, "Internal server error")
 
-    return success(HTTPStatus.CREATED, {
-        "message": "created",
-        "uploadedAt": item[FIELD_UPLOADED_AT]
-    })
+    return success(HTTPStatus.CREATED, {"message": "created", "uploadedAt": item[FIELD_UPLOADED_AT]})
