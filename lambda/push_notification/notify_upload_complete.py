@@ -86,7 +86,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     tokens = _query_device_tokens(dynamodb, table_name, user_id)
     if not tokens:
         logger.info("No device tokens registered for user=%s", masked)
-        return response.success(204, "")
+        return response.success(204)
 
     _get_firebase_app()
 
@@ -107,7 +107,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             logger.info("Deleting unregistered token: user=%s token=***%s", masked, token[-4:])
             _delete_device_token(dynamodb, table_name, user_id, token)
         except Exception as e:
-            logger.error("FCM send failed: user=%s token=***%s error=%s", masked, token[-4:], e)
+            logger.error("FCM send failed: user=%s token=***%s error=%s", masked, token[-4:], e, exc_info=True)
 
     logger.info("Notification done: user=%s sent=%d total=%d", masked, sent_count, len(tokens))
     return response.success(201, {"sentCount": sent_count})
