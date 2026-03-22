@@ -65,3 +65,18 @@ module "media_api" {
   dynamodb_table_arn    = module.media_db.table_arn
   log_retention_in_days = 14
 }
+
+module "device_token_db" {
+  source = "../../modules/device_token_db"
+
+  env                         = "dev"
+  project_name                = "cloud-photos"
+  deletion_protection_enabled = false
+}
+
+module "push_notification" {
+  source = "../../modules/push_notification"
+
+  env          = "dev"
+  project_name = "cloud-photos"
+}
