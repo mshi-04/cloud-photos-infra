@@ -1,8 +1,8 @@
 import json
+import os
 
 import pytest
 from moto import mock_aws
-from conftest import TABLE_NAME
 
 from delete_upload_record import handler
 
@@ -19,7 +19,7 @@ def _make_event(media_id=MEDIA_ID, identity_id=IDENTITY_ID):
 
 def _seed_record(client, identity_id=IDENTITY_ID, media_id=MEDIA_ID):
     client.put_item(
-        TableName=TABLE_NAME,
+        TableName=os.environ["TABLE_NAME"],
         Item={
             "userId": {"S": identity_id},
             "mediaId": {"S": media_id},
@@ -44,7 +44,7 @@ class TestDeleteUploadRecord:
         _seed_record(dynamodb_table)
         handler(_make_event(), None)
         item = dynamodb_table.get_item(
-            TableName=TABLE_NAME,
+            TableName=os.environ["TABLE_NAME"],
             Key={"userId": {"S": IDENTITY_ID}, "mediaId": {"S": MEDIA_ID}},
         )["Item"]
         assert item["isDeleted"] == {"BOOL": True}

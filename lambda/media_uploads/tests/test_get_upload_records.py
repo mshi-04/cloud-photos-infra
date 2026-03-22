@@ -1,9 +1,9 @@
 import json
+import os
 
 import boto3
 import pytest
 from moto import mock_aws
-from conftest import TABLE_NAME, REGION
 
 from get_upload_records import handler
 
@@ -20,7 +20,7 @@ def _make_event(params=None, identity_id=IDENTITY_ID):
 def _seed_records(client, identity_id, count):
     for i in range(count):
         client.put_item(
-            TableName=TABLE_NAME,
+            TableName=os.environ["TABLE_NAME"],
             Item={
                 "userId": {"S": identity_id},
                 "mediaId": {"S": f"media-{i:03d}"},

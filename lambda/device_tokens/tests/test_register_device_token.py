@@ -1,8 +1,8 @@
 import json
+import os
 
 import pytest
 from moto import mock_aws
-from conftest import TABLE_NAME
 
 from register_device_token import handler
 
@@ -32,14 +32,14 @@ class TestRegisterDeviceToken:
     def test_upsert_preserves_registered_at(self, dynamodb_table):
         handler(_make_event({"deviceToken": DEVICE_TOKEN, "platform": "ios"}), None)
         item1 = dynamodb_table.get_item(
-            TableName=TABLE_NAME,
+            TableName=os.environ["TABLE_NAME"],
             Key={"userId": {"S": IDENTITY_ID}, "deviceToken": {"S": DEVICE_TOKEN}},
         )["Item"]
         registered_at1 = item1["registeredAt"]["N"]
 
         handler(_make_event({"deviceToken": DEVICE_TOKEN, "platform": "android"}), None)
         item2 = dynamodb_table.get_item(
-            TableName=TABLE_NAME,
+            TableName=os.environ["TABLE_NAME"],
             Key={"userId": {"S": IDENTITY_ID}, "deviceToken": {"S": DEVICE_TOKEN}},
         )["Item"]
         assert item2["registeredAt"]["N"] == registered_at1

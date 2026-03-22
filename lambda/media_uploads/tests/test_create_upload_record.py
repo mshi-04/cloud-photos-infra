@@ -2,7 +2,6 @@ import json
 
 import pytest
 from moto import mock_aws
-from conftest import TABLE_NAME
 
 from create_upload_record import handler
 

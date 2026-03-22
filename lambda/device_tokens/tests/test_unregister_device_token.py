@@ -1,8 +1,8 @@
 import json
+import os
 
 import pytest
 from moto import mock_aws
-from conftest import TABLE_NAME
 
 from unregister_device_token import handler
 
@@ -19,7 +19,7 @@ def _make_event(body=None, identity_id=IDENTITY_ID):
 
 def _seed_token(client):
     client.put_item(
-        TableName=TABLE_NAME,
+        TableName=os.environ["TABLE_NAME"],
         Item={
             "userId": {"S": IDENTITY_ID},
             "deviceToken": {"S": DEVICE_TOKEN},
@@ -43,7 +43,7 @@ class TestUnregisterDeviceToken:
         _seed_token(dynamodb_table)
         handler(_make_event({"deviceToken": DEVICE_TOKEN}), None)
         result = dynamodb_table.get_item(
-            TableName=TABLE_NAME,
+            TableName=os.environ["TABLE_NAME"],
             Key={"userId": {"S": IDENTITY_ID}, "deviceToken": {"S": DEVICE_TOKEN}},
         )
         assert "Item" not in result
