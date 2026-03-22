@@ -19,7 +19,7 @@ env:
 
 concurrency:
   group: terraform-ci-${{ github.event.pull_request.number }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 permissions:
   id-token: write
@@ -28,7 +28,7 @@ permissions:
   security-events: write
 
 jobs:
-  tfsec:
+  trivy:
     name: "Terraform Security Scan"
     runs-on: ubuntu-latest
     steps:
@@ -110,7 +110,7 @@ jobs:
 
   plan:
     name: "Plan ${{ matrix.env }}"
-    needs: [fmt, test-lambda, tfsec, lint-lambda]
+    needs: [fmt, test-lambda, trivy, lint-lambda]
     runs-on: ubuntu-latest
     strategy:
       matrix:
