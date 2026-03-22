@@ -46,18 +46,33 @@ locals {
   dynamodb_table_arn_dev  = "arn:aws:dynamodb:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:table/${local.project_name}-upload-records-dev"
   dynamodb_table_arn_prod = "arn:aws:dynamodb:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:table/${local.project_name}-upload-records-prod"
 
+  # Device Token DB (DynamoDB)
+  device_tokens_table_arn_dev  = "arn:aws:dynamodb:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:table/${local.project_name}-device-tokens-dev"
+  device_tokens_table_arn_prod = "arn:aws:dynamodb:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:table/${local.project_name}-device-tokens-prod"
+
+  # Push Notification (Secrets Manager, Lambda Layer)
+  firebase_secret_arn_dev  = "arn:aws:secretsmanager:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:secret:${local.project_name}-firebase-credentials-dev-*"
+  firebase_secret_arn_prod = "arn:aws:secretsmanager:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:secret:${local.project_name}-firebase-credentials-prod-*"
+  lambda_layer_arn_prefix  = "arn:aws:lambda:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:layer:${local.project_name}-*"
+
   lambda_function_arn_prefix_dev  = "arn:aws:lambda:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:function:${local.project_name}-dev-*"
   lambda_function_arn_prefix_prod = "arn:aws:lambda:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:function:${local.project_name}-prod-*"
 
   lambda_role_arns_dev = [
     "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-dev-get-upload-records-role",
     "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-dev-create-upload-record-role",
-    "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-dev-delete-upload-record-role"
+    "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-dev-delete-upload-record-role",
+    "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-dev-register-device-token-role",
+    "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-dev-unregister-device-token-role",
+    "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-dev-notify-upload-complete-role"
   ]
   lambda_role_arns_prod = [
     "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-prod-get-upload-records-role",
     "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-prod-create-upload-record-role",
-    "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-prod-delete-upload-record-role"
+    "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-prod-delete-upload-record-role",
+    "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-prod-register-device-token-role",
+    "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-prod-unregister-device-token-role",
+    "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-prod-notify-upload-complete-role"
   ]
 
   log_group_arn_dev  = "arn:aws:logs:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${local.project_name}-dev-*"
@@ -73,7 +88,7 @@ locals {
       "dynamodb:DescribeTimeToLive",
       "dynamodb:ListTagsOfResource"
     ]
-    Resource = local.dynamodb_table_arn_dev
+    Resource = [local.dynamodb_table_arn_dev, local.device_tokens_table_arn_dev]
   }
 
   dynamodb_read_policy_prod = {
@@ -85,7 +100,7 @@ locals {
       "dynamodb:DescribeTimeToLive",
       "dynamodb:ListTagsOfResource"
     ]
-    Resource = local.dynamodb_table_arn_prod
+    Resource = [local.dynamodb_table_arn_prod, local.device_tokens_table_arn_prod]
   }
 }
 
@@ -200,6 +215,23 @@ resource "aws_iam_role_policy" "plan_dev" {
           "logs:ListTagsForResource"
         ]
         Resource = local.log_group_arn_dev
+      },
+      {
+        Sid    = "AllowSecretsManagerReadForPlan"
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:DescribeSecret",
+          "secretsmanager:GetResourcePolicy"
+        ]
+        Resource = local.firebase_secret_arn_dev
+      },
+      {
+        Sid    = "AllowLambdaLayerReadForPlan"
+        Effect = "Allow"
+        Action = [
+          "lambda:GetLayerVersion"
+        ]
+        Resource = local.lambda_layer_arn_prefix
       }
     ]
   })
@@ -369,7 +401,7 @@ resource "aws_iam_role_policy" "apply_dev" {
           "dynamodb:UntagResource",
           "dynamodb:ListTagsOfResource"
         ]
-        Resource = local.dynamodb_table_arn_dev
+        Resource = [local.dynamodb_table_arn_dev, local.device_tokens_table_arn_dev]
       },
       {
         Sid    = "AllowLambdaManagement"
@@ -391,6 +423,16 @@ resource "aws_iam_role_policy" "apply_dev" {
         Resource = local.lambda_function_arn_prefix_dev
       },
       {
+        Sid    = "AllowLambdaLayerManagement"
+        Effect = "Allow"
+        Action = [
+          "lambda:PublishLayerVersion",
+          "lambda:GetLayerVersion",
+          "lambda:DeleteLayerVersion"
+        ]
+        Resource = local.lambda_layer_arn_prefix
+      },
+      {
         Sid    = "AllowAPIGatewayManagement"
         Effect = "Allow"
         Action = [
@@ -401,6 +443,20 @@ resource "aws_iam_role_policy" "apply_dev" {
           "apigateway:PATCH"
         ]
         Resource = "arn:aws:apigateway:${data.aws_region.current.id}::/*"
+      },
+      {
+        Sid    = "AllowSecretsManagerManagement"
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:CreateSecret",
+          "secretsmanager:DeleteSecret",
+          "secretsmanager:DescribeSecret",
+          "secretsmanager:GetResourcePolicy",
+          "secretsmanager:PutSecretValue",
+          "secretsmanager:TagResource",
+          "secretsmanager:UntagResource"
+        ]
+        Resource = local.firebase_secret_arn_dev
       },
       {
         Sid    = "AllowCloudWatchLogsDescribeAll"
@@ -537,6 +593,23 @@ resource "aws_iam_role_policy" "plan_prod" {
           "logs:ListTagsForResource"
         ]
         Resource = local.log_group_arn_prod
+      },
+      {
+        Sid    = "AllowSecretsManagerReadForPlan"
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:DescribeSecret",
+          "secretsmanager:GetResourcePolicy"
+        ]
+        Resource = local.firebase_secret_arn_prod
+      },
+      {
+        Sid    = "AllowLambdaLayerReadForPlan"
+        Effect = "Allow"
+        Action = [
+          "lambda:GetLayerVersion"
+        ]
+        Resource = local.lambda_layer_arn_prefix
       }
     ]
   })
@@ -706,7 +779,7 @@ resource "aws_iam_role_policy" "apply_prod" {
           "dynamodb:UntagResource",
           "dynamodb:ListTagsOfResource"
         ]
-        Resource = local.dynamodb_table_arn_prod
+        Resource = [local.dynamodb_table_arn_prod, local.device_tokens_table_arn_prod]
       },
       {
         Sid    = "AllowLambdaManagement"
@@ -728,6 +801,16 @@ resource "aws_iam_role_policy" "apply_prod" {
         Resource = local.lambda_function_arn_prefix_prod
       },
       {
+        Sid    = "AllowLambdaLayerManagement"
+        Effect = "Allow"
+        Action = [
+          "lambda:PublishLayerVersion",
+          "lambda:GetLayerVersion",
+          "lambda:DeleteLayerVersion"
+        ]
+        Resource = local.lambda_layer_arn_prefix
+      },
+      {
         Sid    = "AllowAPIGatewayManagement"
         Effect = "Allow"
         Action = [
@@ -738,6 +821,20 @@ resource "aws_iam_role_policy" "apply_prod" {
           "apigateway:PATCH"
         ]
         Resource = "arn:aws:apigateway:${data.aws_region.current.id}::/*"
+      },
+      {
+        Sid    = "AllowSecretsManagerManagement"
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:CreateSecret",
+          "secretsmanager:DeleteSecret",
+          "secretsmanager:DescribeSecret",
+          "secretsmanager:GetResourcePolicy",
+          "secretsmanager:PutSecretValue",
+          "secretsmanager:TagResource",
+          "secretsmanager:UntagResource"
+        ]
+        Resource = local.firebase_secret_arn_prod
       },
       {
         Sid    = "AllowCloudWatchLogsDescribeAll"
