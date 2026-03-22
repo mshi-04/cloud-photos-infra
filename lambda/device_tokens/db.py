@@ -7,7 +7,10 @@ import boto3
 from boto3.dynamodb.types import TypeDeserializer, TypeSerializer
 
 dynamodb_client = boto3.client("dynamodb")
-table_name = os.environ["TABLE_NAME"]
+_table_name = os.getenv("TABLE_NAME")
+if not _table_name:
+    raise RuntimeError("TABLE_NAME environment variable is not set")
+table_name = _table_name
 
 serializer = TypeSerializer()
 deserializer = TypeDeserializer()

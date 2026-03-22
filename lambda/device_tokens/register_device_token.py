@@ -1,8 +1,7 @@
-import json
 import logging
 import time
 from http import HTTPStatus
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from auth import get_identity_id, mask_identity
 from constants import (
@@ -14,19 +13,10 @@ from constants import (
     VALID_PLATFORMS,
 )
 from db import dynamodb_client, serialize_item, table_name
+from request_utils import parse_body
 from response import error, success
 
 logger = logging.getLogger(__name__)
-
-
-def _parse_body(event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    try:
-        body = json.loads(event.get("body") or "{}")
-    except (json.JSONDecodeError, TypeError):
-        return None
-    if not isinstance(body, dict):
-        return None
-    return body
 
 
 def handler(event: Dict[str, Any], _context: Any) -> Dict[str, Any]:
@@ -34,7 +24,7 @@ def handler(event: Dict[str, Any], _context: Any) -> Dict[str, Any]:
     if not identity_id:
         return error(HTTPStatus.FORBIDDEN, "Unauthorized")
 
-    body_dict = _parse_body(event)
+    body_dict = parse_body(event)
     if body_dict is None:
         return error(HTTPStatus.BAD_REQUEST, "Invalid JSON body")
 
@@ -48,14 +38,25 @@ def handler(event: Dict[str, Any], _context: Any) -> Dict[str, Any]:
 
     now = int(time.time() * 1000)
     try:
-        dynamodb_client.put_item(
+        dynamodb_client.update_item(
             TableName=table_name,
-            Item=serialize_item({
+            Key=serialize_item({
                 FIELD_USER_ID: identity_id,
                 FIELD_DEVICE_TOKEN: device_token,
-                FIELD_PLATFORM: platform,
-                FIELD_REGISTERED_AT: now,
-                FIELD_UPDATED_AT: now,
+            }),
+            UpdateExpression=(
+                "SET #platform = :platform, "
+                "#registeredAt = if_not_exists(#registeredAt, :now), "
+                "#updatedAt = :now"
+            ),
+            ExpressionAttributeNames={
+                "#platform": FIELD_PLATFORM,
+                "#registeredAt": FIELD_REGISTERED_AT,
+                "#updatedAt": FIELD_UPDATED_AT,
+            },
+            ExpressionAttributeValues=serialize_item({
+                ":platform": platform,
+                ":now": now,
             }),
         )
     except Exception:

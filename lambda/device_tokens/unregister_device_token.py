@@ -1,24 +1,14 @@
-import json
 import logging
 from http import HTTPStatus
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from auth import get_identity_id, mask_identity
 from constants import FIELD_DEVICE_TOKEN, FIELD_USER_ID
 from db import dynamodb_client, serialize_item, table_name
+from request_utils import parse_body
 from response import error, success
 
 logger = logging.getLogger(__name__)
-
-
-def _parse_body(event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    try:
-        body = json.loads(event.get("body") or "{}")
-    except (json.JSONDecodeError, TypeError):
-        return None
-    if not isinstance(body, dict):
-        return None
-    return body
 
 
 def handler(event: Dict[str, Any], _context: Any) -> Dict[str, Any]:
@@ -26,7 +16,7 @@ def handler(event: Dict[str, Any], _context: Any) -> Dict[str, Any]:
     if not identity_id:
         return error(HTTPStatus.FORBIDDEN, "Unauthorized")
 
-    body_dict = _parse_body(event)
+    body_dict = parse_body(event)
     if body_dict is None:
         return error(HTTPStatus.BAD_REQUEST, "Invalid JSON body")
 
