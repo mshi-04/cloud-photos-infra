@@ -6,14 +6,31 @@ from typing import Any, Dict
 import boto3
 from boto3.dynamodb.types import TypeDeserializer, TypeSerializer
 
-dynamodb_client = boto3.client("dynamodb")
-_table_name = os.getenv("TABLE_NAME")
-if not _table_name:
-    raise RuntimeError("TABLE_NAME environment variable is not set")
-table_name = _table_name
+_dynamodb_client = None
+_table_name = None
 
 serializer = TypeSerializer()
 deserializer = TypeDeserializer()
+
+
+def get_dynamodb_client():
+    global _dynamodb_client
+    if _dynamodb_client is None:
+        _dynamodb_client = boto3.client("dynamodb")
+    return _dynamodb_client
+
+
+def get_table_name() -> str:
+    global _table_name
+    if _table_name is None:
+        _table_name = os.environ["TABLE_NAME"]
+    return _table_name
+
+
+def _reset_for_testing():
+    global _dynamodb_client, _table_name
+    _dynamodb_client = None
+    _table_name = None
 
 
 def serialize_item(item: Dict[str, Any]) -> Dict[str, Any]:
