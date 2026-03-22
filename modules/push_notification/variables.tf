@@ -12,8 +12,3 @@ variable "project_name" {
   type        = string
   default     = "cloud-photos"
 }
-
-variable "firebase_layer_zip_path" {
-  description = "firebase-admin Lambda Layer の ZIP ファイルパス"
-  type        = string
-}

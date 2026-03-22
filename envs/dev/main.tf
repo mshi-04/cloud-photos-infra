@@ -77,7 +77,6 @@ module "device_token_db" {
 module "push_notification" {
   source = "../../modules/push_notification"
 
-  env                     = "dev"
-  project_name            = "cloud-photos"
-  firebase_layer_zip_path = "${path.module}/../../.build/firebase_admin_layer.zip"
+  env          = "dev"
+  project_name = "cloud-photos"
 }
