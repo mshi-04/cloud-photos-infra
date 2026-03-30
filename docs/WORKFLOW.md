@@ -35,7 +35,7 @@ Follow the guidelines in [CLAUDE.md](../CLAUDE.md) and [SKILLS.md](./SKILLS.md).
 ## Phase 4: Verification
 
 Mandatory self-verification as defined in [VERIFICATION_POLICY.md](./VERIFICATION_POLICY.md).
-1. **Static Analysis**: Run `terraform fmt` and `terraform validate`.
+1. **Static Analysis**: Run `terraform fmt`/`terraform validate` for infrastructure. Run `ruff format` and `ruff check` for Python code.
 2. **Testing**: Run `pytest` for any modified Lambda functions.
 3. **Review Plan**: Execute `terraform plan` and ensure the output matches expectations. **Never proceed with unintended resource destructions.**
 4. **Final Check**: Complete the "Completion Reporting Requirements" in `VERIFICATION_POLICY.md`.

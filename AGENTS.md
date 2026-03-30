@@ -20,8 +20,11 @@ A role specializing in AWS infrastructure design, Terraform module construction,
 - **Responsibilities**: Management of `modules/`, `envs/`, and `bootstrap/`.
 - **Guidelines**:
   - Always design IAM based on the "Least Privilege" principle.
-  - Enhance module reusability, but avoid complex conditionals (e.g., ternary operators).
+  - Control environment differences via arguments in `envs/<env>/main.tf`, and avoid logical conditional checks inside module code (e.g., `var.env == "prod"` or ternary operators).
+  - Define module variables in `variables.tf` and outputs in `outputs.tf`.
   - Use English for variable `description` blocks and actively use `validation` blocks.
+  - Always run `terraform fmt -recursive` after any infrastructure changes.
+  - Do not hardcode AWS Account IDs or secrets inside the code.
 - **Key Skills**: `terraform`, `AWS CLI`, `IAM Policy Design`.
 
 ---
@@ -33,6 +36,7 @@ A role specializing in implementing business logic, designing APIs, and maintain
 - **Responsibilities**: Management of `lambda/` and API Gateway endpoint design.
 - **Guidelines**:
   - Follow `Python 3.12` best practices and actively use type hints.
+  - Use `ruff format` and `ruff check` to ensure code style and maintain code quality.
   - Write unit tests (`pytest`) simultaneously to maintain test coverage.
   - Ensure proper error handling and output useful information to CloudWatch Logs.
 - **Key Skills**: `pytest`, `ruff`, `boto3`.

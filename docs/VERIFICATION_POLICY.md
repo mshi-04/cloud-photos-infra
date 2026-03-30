@@ -7,7 +7,7 @@ This document defines the standard verification process that AI agents and devel
 When changing infrastructure (under `envs/` or `modules/`), the following steps **must** be executed.
 
 ### Step 1: Formatting and Validation
-1. Run `terraform fmt -recursive` at the root directory to format code.
+1. Run `terraform fmt -recursive` at the root directory to format code, or `terraform fmt -check -recursive` to verify it passes CI.
 2. Run `terraform validate` in both `envs/dev/` and `envs/prod/` where changes were made to verify there are no syntax errors.
 
 ### Step 2: Change Preview
@@ -26,8 +26,9 @@ When modifying code (Python 3.12) or adding new functions under `lambda/`, perfo
    ```
 2. When adding new features, always add corresponding test cases under the `tests/` directory.
 
-### Step 2: Static Analysis
-1. Use `ruff` (or `flake8`) to check for Linter errors (if configured).
+### Step 2: Formatting and Static Analysis
+1. Use `ruff format` to auto-format the code, or `ruff format --check` to verify it passes CI format checks.
+2. Use `ruff check` (or `flake8`) to check for Linter errors.
 
 ## 3. Security and Permissions Verification
 
@@ -44,8 +45,9 @@ When modifying code (Python 3.12) or adding new functions under `lambda/`, perfo
 ## 4. Completion Reporting Requirements
 
 When reporting task completion, the AI must explicitly state that the following checks were made, or provide the execution results of each command:
-- [ ] `terraform fmt` executed
+- [ ] `terraform fmt -recursive` executed (or `-check` passed)
 - [ ] `terraform validate` passed
+- [ ] `ruff format` and `ruff check` passed (if Lambda was modified)
 - [ ] `pytest` passed for all cases (if Lambda was modified)
 - [ ] Confirmed that no unintended destructive changes were included
 - [ ] `trivy conf .` run and no new HIGH/CRITICAL findings introduced (if infrastructure was modified)

@@ -50,11 +50,8 @@ All changes must undergo self-verification based on [VERIFICATION_POLICY.md](doc
 
 ## Key Conventions & Rules
 
-### Terraform Rules
-- Always run `terraform fmt -recursive` after any infrastructure changes.
-- Define module variables in `variables.tf` and outputs in `outputs.tf`.
-- Control environment differences via arguments in `envs/<env>/main.tf`, and avoid logical conditional checks inside module code (e.g., `var.env == "prod"`).
-- Do not hardcode AWS Account IDs or secrets inside the code.
+### Role-Specific Rules
+- Coding standards, formatting requirements (`terraform fmt`, `ruff format`), and best practices are defined per agent role. **You must refer to [AGENTS.md](AGENTS.md) for these specific guidelines.**
 
 ### CI/CD Pipeline
 - **CI**: When a PR is created, `plan` is executed for both `dev`/`prod` environments, and the results are commented on the PR.
