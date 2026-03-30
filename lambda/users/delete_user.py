@@ -108,8 +108,7 @@ def _delete_dynamodb_records(table_name: str, identity_id: str, sort_key_name: s
                 time.sleep(wait)
             else:
                 raise RuntimeError(
-                    f"batch_write_item still had UnprocessedItems after {max_retries} retries"
-                    f" for table {table_name}"
+                    f"batch_write_item still had UnprocessedItems after {max_retries} retries for table {table_name}"
                 )
 
 
