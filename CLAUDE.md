@@ -26,13 +26,27 @@ modules/
   device_token_db/  # DynamoDB table for push notification device tokens
   media_api/        # API Gateway + Lambda integration for media operations
   push_notification/ # SNS-based push notification dispatch
-docs/               # AI workflow documents (WORKFLOW.md, SKILLS.md, VERIFICATION_POLICY.md)
+docs/               # AI workflow documents
 .github/workflows/  # CI (plan on PR) / CD (apply on merge)
 ```
 
+## Read This First
+Before making any change, read the following files in this order:
+1. `AGENTS.md`
+2. `docs/WORKFLOW.md`
+3. `docs/VERIFICATION_POLICY.md`
+4. `docs/SKILLS.md`
+
+Additional supporting guides:
+- `docs/new_GUARDRAILS.md`
+- `docs/new_COMPLETION_TEMPLATE.md`
+- `docs/new_COMMANDS.md`
+- `bootstrap/new_AGENTS.md`
+- `lambda/new_AGENTS.md`
+
 ## Agentic Workflow (Harness Engineering)
 
-This repository employs **Harness Engineering** to ensure that AI can perform tasks "without hesitation, deviation, or destruction."
+This repository employs **Harness Engineering** to help AI perform tasks consistently and safely.
 
 ### 1. Agent Roles ([AGENTS.md](AGENTS.md))
 Before starting work, select and declare an appropriate role based on the task context. Refer to [AGENTS.md](AGENTS.md) for details.
@@ -60,3 +74,4 @@ All changes must undergo self-verification based on [VERIFICATION_POLICY.md](doc
 ### Working with This Repo
 - Create new resources inside `modules/` and reference them from `main.tf` for each environment.
 - Security-sensitive variables (such as `force_destroy`) must not have a default value and must be explicitly set in each environment configuration.
+- If verification steps cannot be executed because prerequisites are missing, report that clearly instead of assuming success.
