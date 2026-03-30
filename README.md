@@ -43,6 +43,7 @@ API Gateway によって以下のエンドポイントが提供されます。�
 - `modules/`: 各リソースの定義モジュール（`cognito`, `identity_pool`, `media_api`, `media_db`, `media_storage`, `device_token_db`, `push_notification`）
 - `lambda/`: API のバックエンドを処理する Python スクリプトおよび依存関係
 - `.github/workflows/`: CI (PR検証) および CD (マージ時デプロイ) の定義
+- `docs/`: AIワークフロー (`WORKFLOW.md`)、スキルセット (`SKILLS.md`)、および検証ポリシー (`VERIFICATION_POLICY.md`) の定義
 
 ## 重要な運用ルール
 

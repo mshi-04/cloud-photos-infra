@@ -90,6 +90,10 @@ jobs:
         working-directory: lambda
         run: pytest device_tokens/tests
 
+      - name: Run push_notification tests
+        working-directory: lambda
+        run: pytest push_notification/tests
+
   fmt:
     name: "Format Check"
     runs-on: ubuntu-latest
