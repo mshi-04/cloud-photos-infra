@@ -25,7 +25,7 @@ def dynamodb_table():
     with mock_aws():
         orig_region = os.environ.get("AWS_DEFAULT_REGION")
         orig_table = os.environ.get("TABLE_NAME")
-        
+
         os.environ["AWS_DEFAULT_REGION"] = REGION
         os.environ["TABLE_NAME"] = TABLE_NAME
 
@@ -49,7 +49,7 @@ def dynamodb_table():
             os.environ.pop("TABLE_NAME", None)
         else:
             os.environ["TABLE_NAME"] = orig_table
-            
+
         if orig_region is None:
             os.environ.pop("AWS_DEFAULT_REGION", None)
         else:
