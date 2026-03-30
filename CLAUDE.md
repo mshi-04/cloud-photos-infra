@@ -17,31 +17,49 @@ envs/
   dev/              # Dev environment Terraform root
   prod/             # Prod environment Terraform root
 environments/       # .tfvars files per environment
+lambda/             # Python 3.12 Lambda function code
 modules/
   cognito/          # Cognito User Pool (authentication)
   identity_pool/    # Cognito Identity Pool (temporary AWS credentials for app users)
   media_storage/    # S3 bucket for user media (photos/videos)
+  media_db/         # DynamoDB table for media upload records
+  device_token_db/  # DynamoDB table for push notification device tokens
+  media_api/        # API Gateway + Lambda integration for media operations
+  push_notification/ # SNS-based push notification dispatch
+docs/               # AI workflow documents (WORKFLOW.md, SKILLS.md, VERIFICATION_POLICY.md)
 .github/workflows/  # CI (plan on PR) / CD (apply on merge)
 ```
 
-## Key Conventions
-- All changes go through Pull Requests — local `terraform apply` is prohibited
-- Dev environment: auto-deploy on merge to develop/main
-- Prod environment: deploy only from main, requires manual approval via GitHub Environment
-- Bootstrap resources are applied manually once, not through CI/CD
+## Agentic Workflow (Harness Engineering)
 
-## Terraform Rules
-- After editing any `.tf` file, always run `terraform fmt <edited-directory>` immediately
-- Module variables defined in `variables.tf`, outputs in `outputs.tf`
-- Environment-specific values passed via `envs/<env>/main.tf` module arguments
-- Do not hardcode AWS account IDs or secrets in .tf files
+This repository employs **Harness Engineering** to ensure that AI can perform tasks "without hesitation, deviation, or destruction."
 
-## CI/CD Pipeline
-- **CI** (`ci-terraform.yml`): On PR — format check, validate, plan (dev + prod), comment results on PR
-- **CD** (`cd-terraform.yml` + `reusable-terraform-deploy.yml`): On push — apply dev first, then prod (main only, with approval gate)
-- Concurrency groups prevent parallel deploys to the same environment
+### 1. Agent Roles ([AGENTS.md](AGENTS.md))
+Before starting work, select and declare an appropriate role based on the task context. Refer to [AGENTS.md](AGENTS.md) for details.
+- **InfraArchitect**: Responsible for infrastructure design and Terraform management.
+- **LambdaDeveloper**: Responsible for Python 3.12 implementation and quality control.
+- **SecurityAuditor**: Responsible for security audits and sensitive information management.
 
-## Working with This Repo
-- When adding new AWS resources, create a new module under `modules/` and reference it from `envs/dev/main.tf` and `envs/prod/main.tf`
-- Environment differences (deletion protection, MFA, password policy, force_destroy) are controlled via module variables
-- Security-sensitive variables (e.g., force_destroy) must be set explicitly in all environments, not rely on module defaults
+### 2. Development Workflow ([WORKFLOW.md](docs/WORKFLOW.md))
+Follow the standard development cycle (Planning, Role Selection, Implementation, Verification, Release) defined in [WORKFLOW.md](docs/WORKFLOW.md).
+
+### 3. Verification Loop ([VERIFICATION_POLICY.md](docs/VERIFICATION_POLICY.md))
+All changes must undergo self-verification based on [VERIFICATION_POLICY.md](docs/VERIFICATION_POLICY.md) before reporting completion.
+
+---
+
+## Key Conventions & Rules
+
+### Terraform Rules
+- Always run `terraform fmt -recursive` after any infrastructure changes.
+- Define module variables in `variables.tf` and outputs in `outputs.tf`.
+- Control environment differences via arguments in `envs/<env>/main.tf`, and avoid logical conditional checks inside module code (e.g., `var.env == "prod"`).
+- Do not hardcode AWS Account IDs or secrets inside the code.
+
+### CI/CD Pipeline
+- **CI**: When a PR is created, `plan` is executed for both `dev`/`prod` environments, and the results are commented on the PR.
+- **CD**: Upon merge, changes are applied to `dev` first. `prod` runs require manual approval via the GitHub Environment before deploying.
+
+### Working with This Repo
+- Create new resources inside `modules/` and reference them from `main.tf` for each environment.
+- Security-sensitive variables (such as `force_destroy`) must not have a default value and must be explicitly set in each environment configuration.

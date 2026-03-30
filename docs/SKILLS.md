@@ -2,7 +2,11 @@
 
 This file describes common tasks and how to execute them in this repository.
 
-## Skill: Add a New AWS Resource
+## Role-Based Skills
+
+Each skill is based on the specialty areas of the roles defined in [AGENTS.md](../AGENTS.md).
+
+## Skill: Add a New AWS Resource [InfraArchitect]
 
 When asked to add a new AWS resource (e.g., S3 bucket, Lambda, API Gateway):
 
@@ -23,7 +27,7 @@ When asked to add a new AWS resource (e.g., S3 bucket, Lambda, API Gateway):
 ### Naming conventions
 - Resource names: `${var.project_name}-<resource>-${var.env}` (e.g., `cloud-photos-user-pool-dev`). S3 buckets use `${account_id}-${var.project_name}-<resource>-${var.env}` for global uniqueness
 - IAM policy Sids: `Allow<Service><Action>` (e.g., `AllowCognitoManagementUserPool`)
-- Module variable descriptions: written in Japanese
+- Module variable descriptions: written in English
 
 ### Environment differences pattern
 
@@ -35,7 +39,7 @@ When asked to add a new AWS resource (e.g., S3 bucket, Lambda, API Gateway):
 
 Apply the same pattern for new resources: dev is permissive, prod is strict.
 
-## Skill: Modify an Existing Module
+## Skill: Modify an Existing Module [InfraArchitect]
 
 1. Edit files under `modules/<name>/`
 2. If adding a new variable, provide a sensible `default` so existing environments don't break — but if the value differs between environments, always set it explicitly in both `envs/dev/main.tf` and `envs/prod/main.tf` regardless of whether a default exists
@@ -46,16 +50,16 @@ Apply the same pattern for new resources: dev is permissive, prod is strict.
 ### Variable validation style
 ```hcl
 variable "env" {
-  description = "環境名"
+  description = "Environment name"
   type        = string
   validation {
     condition     = contains(["dev", "prod"], var.env)
-    error_message = "env は dev または prod を指定してください。"
+    error_message = "env must be dev or prod."
   }
 }
 ```
 
-## Skill: Update CI/CD Workflows
+## Skill: Update CI/CD Workflows [InfraArchitect]
 
 Workflow files are in `.github/workflows/`.
 
@@ -70,7 +74,7 @@ Workflow files are in `.github/workflows/`.
 - CI triggers on changes to `envs/**`, `modules/**`, `lambda/**`, `bootstrap/**`, `.github/workflows/**`, or `.terraform-version`; CD triggers on `envs/**`, `modules/**`, and `lambda/**` only (workflow changes do not trigger auto-apply)
 - Prod apply runs only on `main` branch and requires manual approval
 
-## Skill: Add a New Environment
+## Skill: Add a New Environment [InfraArchitect]
 
 If a new environment (e.g., staging) is needed:
 
@@ -82,7 +86,7 @@ If a new environment (e.g., staging) is needed:
 5. Add matrix entries in CI/CD workflows
 6. Create the GitHub Environment with appropriate protection rules
 
-## Skill: Bootstrap / Initial Setup
+## Skill: Bootstrap / Initial Setup [InfraArchitect]
 
 The `bootstrap/` directory is applied manually (not via CI/CD). It contains:
 - **S3 bucket** for Terraform state (`backend_resources.tf`)
@@ -92,7 +96,66 @@ The `bootstrap/` directory is applied manually (not via CI/CD). It contains:
 
 To modify bootstrap resources, edit files in `bootstrap/` and apply locally with appropriate AWS credentials. These changes do NOT go through the CI/CD pipeline.
 
-## Terraform Style Rules
+## Skill: Add a New Lambda Function [LambdaDeveloper]
+
+When asked to implement a new Lambda function:
+
+1. **Create a directory** under `lambda/<function_name>/`
+   - Follow the existing structure in `lambda/device_tokens/` or `lambda/media_uploads/` as a reference
+   - Required files: handler entry point (e.g., `<function_name>.py`), `auth.py`, `constants.py`, `response.py`
+   - Create `tests/` with `conftest.py` and at minimum one `test_<function_name>.py`
+2. **Create a Terraform module** under `modules/<name>/` for the supporting infrastructure (Lambda resource, IAM role, CloudWatch log group)
+3. **Wire it into environments** — add the module in both `envs/dev/main.tf` and `envs/prod/main.tf`
+4. **Update bootstrap IAM** in `bootstrap/oidc_roles.tf` if the new Lambda requires new AWS service permissions
+5. **Update `pyproject.toml`** at repo root if new dependencies are required
+
+### Lambda conventions
+- Python 3.12; use type hints throughout
+- All handler functions must validate the Cognito JWT from the request (`auth.py` pattern)
+- Return values use the `response.py` helper for consistent HTTP response format
+- Log errors to CloudWatch using `print()` or `logging` — include enough context to debug without exposing PII
+
+## Skill: Run Lambda Tests [LambdaDeveloper]
+
+Whenever you modify code under the `lambda/` directory, you must run unit tests. See [VERIFICATION_POLICY.md](VERIFICATION_POLICY.md) for details.
+
+1. Navigate to the modified Lambda function's directory
+   ```bash
+   cd lambda/<function_name>
+   ```
+2. Run `pytest`
+   ```bash
+   pytest tests/
+   ```
+
+## Skill: Security Audit [SecurityAuditor]
+
+### Run Trivy Scan
+
+```bash
+trivy conf .
+```
+
+Review the output and address any HIGH or CRITICAL findings before committing. Informational/LOW findings should be documented in [SECURITY.md](../SECURITY.md) if accepted as known risks.
+
+### IAM Policy Review Checklist
+
+When reviewing or writing IAM policies:
+1. **No wildcard Actions** — avoid `"Action": "*"`; list only required actions explicitly
+2. **Scoped Resources** — use ARNs instead of `"Resource": "*"` wherever the service allows it
+3. **No hardcoded Account IDs or secrets** — use variables or data sources (`data "aws_caller_identity"`)
+4. **Least Privilege per environment** — plan-role gets read-only, apply-role gets CRUD; prod roles are separate from dev
+
+### Update SECURITY.md
+
+When a security-relevant change is made (new IAM policy, new resource, encryption setting, etc.), update [SECURITY.md](../SECURITY.md) to reflect:
+- What was changed
+- Why it is considered safe or what risk it introduces
+- Any accepted known issues and their rationale
+
+---
+
+## Terraform Style Rules [InfraArchitect]
 
 - Always run `terraform fmt -recursive` before committing
 - Use `jsonencode()` for inline IAM policies (not heredoc)
