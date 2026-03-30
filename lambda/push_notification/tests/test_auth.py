@@ -17,9 +17,7 @@ class TestGetIdentityId:
 class TestMaskIdentity:
     def test_masks_long_identity(self):
         result = mask_identity("ap-northeast-1:abcdefghij")
-        assert result.startswith("ap-n")
-        assert result.endswith("ghij")
-        assert "***" in result
+        assert result == "ap-n***ghij"
 
     def test_masks_short_identity(self):
         assert mask_identity("short") == "***"

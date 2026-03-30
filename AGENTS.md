@@ -6,10 +6,20 @@ This document defines the roles, responsibilities, and behavioral guidelines (Ha
 
 ## The Core Harness
 
-All agents must strictly adhere to the following rules as their "harness":
+All agents must strictly adhere to the following rules as their harness:
 1. **Thorough Self-Verification**: Always perform verification based on [VERIFICATION_POLICY.md](docs/VERIFICATION_POLICY.md) before completing a task.
 2. **Prioritize Non-Destructive Actions**: In infrastructure modifications, carefully interpret the results of `terraform plan` to ensure existing data or resources are not inadvertently destroyed.
-3. **Synchronize Documentation**: Keep not only the code updated, but also related documents like `README.md`, `docs/SKILLS.md`, and `CLAUDE.md`.
+3. **Synchronize Documentation**: Keep not only the code updated, but also related documents like `README.md`, `docs/SKILLS.md`, `CLAUDE.md`, `docs/GUARDRAILS.md`, and local directory guides when relevant.
+4. **Report Unknowns Honestly**: If required verification steps cannot be executed because prerequisites are missing, report that clearly instead of assuming success.
+
+## Global Guardrails
+
+These rules apply regardless of role. See [docs/GUARDRAILS.md](docs/GUARDRAILS.md) for the full repository-wide safety rules.
+- Never hardcode secrets, tokens, passwords, or private keys.
+- Never hardcode environment-specific values that should be supplied through variables, managed configuration, or secrets management.
+- Never place environment branching logic inside reusable Terraform modules.
+- Never claim that a verification step passed unless it was actually executed and passed.
+- Prefer the safer interpretation when a change may affect data, permissions, or deployment behavior.
 
 ---
 
@@ -19,9 +29,12 @@ A role specializing in AWS infrastructure design, Terraform module construction,
 
 - **Responsibilities**: Management of `modules/`, `envs/`, and `bootstrap/`.
 - **Guidelines**:
-  - Always design IAM based on the "Least Privilege" principle.
-  - Enhance module reusability, but avoid complex conditionals (e.g., ternary operators).
+  - Always design IAM based on the Least Privilege principle.
+  - Control environment differences via arguments in `envs/<env>/main.tf`, and avoid logical conditional checks inside module code (for example `var.env == "prod"` or ternary operators).
+  - Define module variables in `variables.tf` and outputs in `outputs.tf`.
   - Use English for variable `description` blocks and actively use `validation` blocks.
+  - Always run `terraform fmt -recursive` after any infrastructure changes.
+  - Do not hardcode AWS Account IDs or secrets inside the code.
 - **Key Skills**: `terraform`, `AWS CLI`, `IAM Policy Design`.
 
 ---
@@ -33,8 +46,9 @@ A role specializing in implementing business logic, designing APIs, and maintain
 - **Responsibilities**: Management of `lambda/` and API Gateway endpoint design.
 - **Guidelines**:
   - Follow `Python 3.12` best practices and actively use type hints.
+  - Use `ruff format` and `ruff check` to ensure code style and maintain code quality.
   - Write unit tests (`pytest`) simultaneously to maintain test coverage.
-  - Ensure proper error handling and output useful information to CloudWatch Logs.
+  - Ensure proper error handling and output useful information to CloudWatch Logs without exposing sensitive data.
 - **Key Skills**: `pytest`, `ruff`, `boto3`.
 
 ---
