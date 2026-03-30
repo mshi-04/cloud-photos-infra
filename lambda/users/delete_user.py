@@ -1,10 +1,12 @@
 import logging
 import os
+import time
 from typing import Any, Dict, List
 
 import boto3
 
 import auth
+import constants
 import response
 
 logger = logging.getLogger(__name__)
@@ -58,18 +60,18 @@ def _delete_dynamodb_records(table_name: str, identity_id: str, sort_key_name: s
 
     result = dynamodb.query(
         TableName=table_name,
-        KeyConditionExpression="userId = :uid",
+        KeyConditionExpression=f"{constants.FIELD_USER_ID} = :uid",
         ExpressionAttributeValues={":uid": {"S": identity_id}},
-        ProjectionExpression=f"userId, {sort_key_name}",
+        ProjectionExpression=f"{constants.FIELD_USER_ID}, {sort_key_name}",
     )
     items = result.get("Items", [])
 
     while "LastEvaluatedKey" in result:
         result = dynamodb.query(
             TableName=table_name,
-            KeyConditionExpression="userId = :uid",
+            KeyConditionExpression=f"{constants.FIELD_USER_ID} = :uid",
             ExpressionAttributeValues={":uid": {"S": identity_id}},
-            ProjectionExpression=f"userId, {sort_key_name}",
+            ProjectionExpression=f"{constants.FIELD_USER_ID}, {sort_key_name}",
             ExclusiveStartKey=result["LastEvaluatedKey"],
         )
         items.extend(result.get("Items", []))
@@ -80,14 +82,35 @@ def _delete_dynamodb_records(table_name: str, identity_id: str, sort_key_name: s
             {
                 "DeleteRequest": {
                     "Key": {
-                        "userId": item["userId"],
+                        constants.FIELD_USER_ID: item[constants.FIELD_USER_ID],
                         sort_key_name: item[sort_key_name],
                     }
                 }
             }
             for item in chunk
         ]
-        dynamodb.batch_write_item(RequestItems={table_name: requests})
+        unprocessed = {table_name: requests}
+        max_retries = 5
+        for attempt in range(max_retries + 1):
+            result = dynamodb.batch_write_item(RequestItems=unprocessed)
+            unprocessed = result.get("UnprocessedItems", {})
+            if not unprocessed:
+                break
+            if attempt < max_retries:
+                wait = 0.1 * (2**attempt)
+                logger.warning(
+                    "UnprocessedItems in %s, retrying in %.1fs (attempt %d/%d)",
+                    table_name,
+                    wait,
+                    attempt + 1,
+                    max_retries,
+                )
+                time.sleep(wait)
+            else:
+                raise RuntimeError(
+                    f"batch_write_item still had UnprocessedItems after {max_retries} retries"
+                    f" for table {table_name}"
+                )
 
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -100,19 +123,27 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     upload_records_table = os.environ["UPLOAD_RECORDS_TABLE_NAME"]
     device_tokens_table = os.environ["DEVICE_TOKENS_TABLE_NAME"]
 
+    failed_subsystems: List[str] = []
+
     try:
         _delete_s3_objects(identity_id)
     except Exception as e:
-        logger.error("Failed to delete S3 objects: %s", e)
+        logger.error("Failed to delete S3 objects for %s: %s", auth.mask_identity(identity_id), e)
+        failed_subsystems.append("S3")
 
     try:
-        _delete_dynamodb_records(upload_records_table, identity_id, "mediaId")
+        _delete_dynamodb_records(upload_records_table, identity_id, constants.FIELD_MEDIA_ID)
     except Exception as e:
-        logger.error("Failed to delete upload records: %s", e)
+        logger.error("Failed to delete upload records for %s: %s", auth.mask_identity(identity_id), e)
+        failed_subsystems.append("DynamoDB/upload_records")
 
     try:
-        _delete_dynamodb_records(device_tokens_table, identity_id, "deviceToken")
+        _delete_dynamodb_records(device_tokens_table, identity_id, constants.FIELD_DEVICE_TOKEN)
     except Exception as e:
-        logger.error("Failed to delete device tokens: %s", e)
+        logger.error("Failed to delete device tokens for %s: %s", auth.mask_identity(identity_id), e)
+        failed_subsystems.append("DynamoDB/device_tokens")
+
+    if failed_subsystems:
+        return response.error(500, f"Failed to delete data from: {', '.join(failed_subsystems)}")
 
     return response.success(200, {"message": "User data deleted"})

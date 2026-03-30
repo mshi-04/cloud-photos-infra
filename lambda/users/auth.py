@@ -2,7 +2,9 @@ from typing import Any, Dict, Optional
 
 
 def get_identity_id(event: Dict[str, Any]) -> Optional[str]:
-    return event.get("requestContext", {}).get("identity", {}).get("cognitoIdentityId")
+    request_context = event.get("requestContext") or {}
+    identity = request_context.get("identity") or {}
+    return identity.get("cognitoIdentityId")
 
 
 def mask_identity(identity_id: str) -> str:

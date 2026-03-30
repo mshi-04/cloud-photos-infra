@@ -37,6 +37,18 @@ terraform.rc
 .build/
 
 # =========================
+# Python specific
+# =========================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+.ruff_cache/
+.pytest_cache/
+
+# =========================
 # OS / Editor specific
 # =========================
 .DS_Store

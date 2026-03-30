@@ -1,7 +1,5 @@
 import os
 
-from moto import mock_aws
-
 from delete_user import handler
 
 IDENTITY_ID = "ap-northeast-1:test-user-id"
@@ -13,7 +11,6 @@ def _make_event(identity_id=IDENTITY_ID):
     }
 
 
-@mock_aws
 class TestDeleteUser:
     def test_returns_401_when_no_identity_id(self, aws_resources):
         event = {"requestContext": {"identity": {}}}
