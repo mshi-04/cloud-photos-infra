@@ -36,6 +36,16 @@ def _reset_for_testing():
     _dynamodb = None
 
 
+def _flush_s3_batch(s3, bucket: str, objects_to_delete: List[Dict[str, str]]) -> None:
+    result = s3.delete_objects(Bucket=bucket, Delete={"Objects": objects_to_delete, "Quiet": True})
+    errors = result.get("Errors")
+    if errors:
+        keys = [e.get("Key") for e in errors]
+        raise RuntimeError(
+            f"s3.delete_objects failed for bucket {bucket}: keys={keys}, errors={errors}"
+        )
+
+
 def _delete_s3_objects(identity_id: str) -> None:
     s3 = _get_s3()
     bucket = os.environ["S3_BUCKET_NAME"]
@@ -47,35 +57,20 @@ def _delete_s3_objects(identity_id: str) -> None:
     for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
         for version in page.get("Versions", []):
             objects_to_delete.append({"Key": version["Key"], "VersionId": version["VersionId"]})
+            if len(objects_to_delete) == 1000:
+                _flush_s3_batch(s3, bucket, objects_to_delete)
+                objects_to_delete = []
         for marker in page.get("DeleteMarkers", []):
             objects_to_delete.append({"Key": marker["Key"], "VersionId": marker["VersionId"]})
+            if len(objects_to_delete) == 1000:
+                _flush_s3_batch(s3, bucket, objects_to_delete)
+                objects_to_delete = []
 
-    for i in range(0, len(objects_to_delete), 1000):
-        chunk = objects_to_delete[i : i + 1000]
-        s3.delete_objects(Bucket=bucket, Delete={"Objects": chunk, "Quiet": True})
+    if objects_to_delete:
+        _flush_s3_batch(s3, bucket, objects_to_delete)
 
 
-def _delete_dynamodb_records(table_name: str, identity_id: str, sort_key_name: str) -> None:
-    dynamodb = _get_dynamodb()
-
-    result = dynamodb.query(
-        TableName=table_name,
-        KeyConditionExpression=f"{constants.FIELD_USER_ID} = :uid",
-        ExpressionAttributeValues={":uid": {"S": identity_id}},
-        ProjectionExpression=f"{constants.FIELD_USER_ID}, {sort_key_name}",
-    )
-    items = result.get("Items", [])
-
-    while "LastEvaluatedKey" in result:
-        result = dynamodb.query(
-            TableName=table_name,
-            KeyConditionExpression=f"{constants.FIELD_USER_ID} = :uid",
-            ExpressionAttributeValues={":uid": {"S": identity_id}},
-            ProjectionExpression=f"{constants.FIELD_USER_ID}, {sort_key_name}",
-            ExclusiveStartKey=result["LastEvaluatedKey"],
-        )
-        items.extend(result.get("Items", []))
-
+def _batch_delete_items(dynamodb, table_name: str, items: List[Dict], sort_key_name: str) -> None:
     for i in range(0, len(items), 25):
         chunk = items[i : i + 25]
         requests = [
@@ -110,6 +105,28 @@ def _delete_dynamodb_records(table_name: str, identity_id: str, sort_key_name: s
                 raise RuntimeError(
                     f"batch_write_item still had UnprocessedItems after {max_retries} retries for table {table_name}"
                 )
+
+
+def _delete_dynamodb_records(table_name: str, identity_id: str, sort_key_name: str) -> None:
+    dynamodb = _get_dynamodb()
+
+    result = dynamodb.query(
+        TableName=table_name,
+        KeyConditionExpression=f"{constants.FIELD_USER_ID} = :uid",
+        ExpressionAttributeValues={":uid": {"S": identity_id}},
+        ProjectionExpression=f"{constants.FIELD_USER_ID}, {sort_key_name}",
+    )
+    _batch_delete_items(dynamodb, table_name, result.get("Items", []), sort_key_name)
+
+    while "LastEvaluatedKey" in result:
+        result = dynamodb.query(
+            TableName=table_name,
+            KeyConditionExpression=f"{constants.FIELD_USER_ID} = :uid",
+            ExpressionAttributeValues={":uid": {"S": identity_id}},
+            ProjectionExpression=f"{constants.FIELD_USER_ID}, {sort_key_name}",
+            ExclusiveStartKey=result["LastEvaluatedKey"],
+        )
+        _batch_delete_items(dynamodb, table_name, result.get("Items", []), sort_key_name)
 
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:

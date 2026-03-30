@@ -67,7 +67,7 @@ jobs:
           args: format --check
 
   test-lambda:
-    name: "Lambda UnitTests"
+    name: "Lambda Unit Tests"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -120,6 +120,9 @@ jobs:
     name: "Plan ${{ matrix.env }}"
     needs: [fmt, test-lambda, trivy, lint-lambda]
     runs-on: ubuntu-latest
+    concurrency:
+      group: terraform-${{ matrix.env }}
+      cancel-in-progress: false
     strategy:
       matrix:
         include:

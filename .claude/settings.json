@@ -5,6 +5,7 @@
       "Bash(terraform plan*)",
       "Bash(terraform fmt*)",
       "Bash(pytest*)",
+      "Bash(python*)",
       "Bash(trivy*)",
       "Edit(bootstrap/**)",
       "Edit(envs/**)",
