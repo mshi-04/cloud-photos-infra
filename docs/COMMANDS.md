@@ -11,14 +11,14 @@ terraform fmt -recursive
 terraform fmt -check -recursive
 ```
 
-Run validation from each environment directory when needed.
+Execute validation from each environment directory when necessary.
 
 ```bash
 cd envs/dev && terraform validate
 cd envs/prod && terraform validate
 ```
 
-Run planning from each environment directory when needed.
+Perform planning from each environment directory prior to applying changes.
 
 ```bash
 cd envs/dev && terraform plan

@@ -47,19 +47,20 @@ Additional supporting guides:
 
 ## Agentic Workflow (Harness Engineering)
 
-This repository employs **Harness Engineering** to help AI perform tasks consistently and safely.
+This repository employs **Harness Engineering** (a project-specific framework establishing boundaries and standardized processes for AI agents) to help AI perform tasks consistently and safely.
 
 ### 1. Agent Roles ([AGENTS.md](AGENTS.md))
 Before starting work, select and declare an appropriate role based on the task context. Refer to [AGENTS.md](AGENTS.md) for details.
 - **InfraArchitect**: Responsible for infrastructure design and Terraform management.
 - **LambdaDeveloper**: Responsible for Python 3.12 implementation and quality control.
 - **SecurityAuditor**: Responsible for security audits and sensitive information management.
+*Note: For tasks outside these specific domains (e.g., CI/CD workflow updates, general repository maintenance), fallback to a general engineering approach while strictly adhering to global guardrails.*
 
 ### 2. Development Workflow ([WORKFLOW.md](docs/WORKFLOW.md))
 Follow the standard development cycle (Planning, Role Selection, Implementation, Verification, Release) defined in [WORKFLOW.md](docs/WORKFLOW.md).
 
 ### 3. Verification Loop ([VERIFICATION_POLICY.md](docs/VERIFICATION_POLICY.md))
-All changes must undergo self-verification based on [VERIFICATION_POLICY.md](docs/VERIFICATION_POLICY.md) before reporting completion.
+All changes must undergo self-verification based on [VERIFICATION_POLICY.md](docs/VERIFICATION_POLICY.md) before reporting completion. If verification cannot be executed due to missing prerequisites, explicitly report the blocked steps and escalate for manual review instead of assuming success.
 
 ---
 

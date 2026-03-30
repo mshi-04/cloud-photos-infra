@@ -23,8 +23,8 @@ This document defines repository-wide safety rules for AI agents.
 
 ## Secrets and Environment Data
 
-- Never hardcode secrets, tokens, private keys, or passwords.
-- Never commit environment-specific values that should be supplied through managed configuration.
+- Avoid hardcoding secrets, tokens, private keys, or passwords.
+- Do not commit environment-specific values — supply them through managed configuration.
 - Never expose sensitive values in logs, examples, comments, or completion reports.
 
 ## Module Design Rules
