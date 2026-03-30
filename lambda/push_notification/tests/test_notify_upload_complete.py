@@ -1,8 +1,6 @@
 import json
 from unittest.mock import patch
 
-from moto import mock_aws
-
 from notify_upload_complete import handler
 
 IDENTITY_ID = "ap-northeast-1:test-user-id"
