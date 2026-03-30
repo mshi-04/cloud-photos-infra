@@ -33,14 +33,16 @@ docs/               # AI workflow documents
 ## Read This First
 Before making any change, read the following files in this order:
 1. `AGENTS.md`
-2. `docs/WORKFLOW.md`
-3. `docs/VERIFICATION_POLICY.md`
-4. `docs/SKILLS.md`
+2. `docs/GUARDRAILS.md`
+3. `docs/WORKFLOW.md`
+4. `docs/VERIFICATION_POLICY.md`
+5. `docs/SKILLS.md`
 
 Additional supporting guides:
 - `docs/COMMANDS.md`
 - `docs/COMPLETION_TEMPLATE.md`
 - `bootstrap/AGENTS.md`
+- `modules/AGENTS.md`
 - `lambda/AGENTS.md`
 
 ## Agentic Workflow (Harness Engineering)

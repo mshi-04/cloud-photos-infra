@@ -9,12 +9,12 @@ This document defines the roles, responsibilities, and behavioral guidelines (Ha
 All agents must strictly adhere to the following rules as their harness:
 1. **Thorough Self-Verification**: Always perform verification based on [VERIFICATION_POLICY.md](docs/VERIFICATION_POLICY.md) before completing a task.
 2. **Prioritize Non-Destructive Actions**: In infrastructure modifications, carefully interpret the results of `terraform plan` to ensure existing data or resources are not inadvertently destroyed.
-3. **Synchronize Documentation**: Keep not only the code updated, but also related documents like `README.md`, `docs/SKILLS.md`, `CLAUDE.md`, and local directory guides when relevant.
+3. **Synchronize Documentation**: Keep not only the code updated, but also related documents like `README.md`, `docs/SKILLS.md`, `CLAUDE.md`, `docs/GUARDRAILS.md`, and local directory guides when relevant.
 4. **Report Unknowns Honestly**: If required verification steps cannot be executed because prerequisites are missing, report that clearly instead of assuming success.
 
 ## Global Guardrails
 
-These rules apply regardless of role:
+These rules apply regardless of role. See [docs/GUARDRAILS.md](docs/GUARDRAILS.md) for the full repository-wide safety rules.
 - Never hardcode secrets, tokens, passwords, or private keys.
 - Never hardcode environment-specific values that should be supplied through variables, managed configuration, or secrets management.
 - Never place environment branching logic inside reusable Terraform modules.
