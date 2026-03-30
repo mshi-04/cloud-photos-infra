@@ -38,11 +38,10 @@ Before making any change, read the following files in this order:
 4. `docs/SKILLS.md`
 
 Additional supporting guides:
-- `docs/new_GUARDRAILS.md`
-- `docs/new_COMPLETION_TEMPLATE.md`
-- `docs/new_COMMANDS.md`
-- `bootstrap/new_AGENTS.md`
-- `lambda/new_AGENTS.md`
+- `docs/COMMANDS.md`
+- `docs/COMPLETION_TEMPLATE.md`
+- `bootstrap/AGENTS.md`
+- `lambda/AGENTS.md`
 
 ## Agentic Workflow (Harness Engineering)
 
