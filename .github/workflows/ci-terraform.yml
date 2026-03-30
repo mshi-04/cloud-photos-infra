@@ -94,6 +94,10 @@ jobs:
         working-directory: lambda
         run: pytest push_notification/tests
 
+      - name: Run users tests
+        working-directory: lambda
+        run: pytest users/tests
+
   fmt:
     name: "Format Check"
     runs-on: ubuntu-latest

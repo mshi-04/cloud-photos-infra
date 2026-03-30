@@ -65,7 +65,8 @@ locals {
     "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-dev-delete-upload-record-role",
     "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-dev-register-device-token-role",
     "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-dev-unregister-device-token-role",
-    "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-dev-notify-upload-complete-role"
+    "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-dev-notify-upload-complete-role",
+    "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-dev-delete-user-role"
   ]
   lambda_role_arns_prod = [
     "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-prod-get-upload-records-role",
@@ -73,7 +74,8 @@ locals {
     "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-prod-delete-upload-record-role",
     "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-prod-register-device-token-role",
     "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-prod-unregister-device-token-role",
-    "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-prod-notify-upload-complete-role"
+    "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-prod-notify-upload-complete-role",
+    "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.project_name}-prod-delete-user-role"
   ]
 
   log_group_arn_dev  = "arn:aws:logs:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${local.project_name}-dev-*"

@@ -59,3 +59,13 @@ variable "firebase_layer_arn" {
   description = "Firebase Admin SDK Lambda Layer ARN"
   type        = string
 }
+
+variable "s3_bucket_name" {
+  description = "メディア S3 バケット名"
+  type        = string
+}
+
+variable "s3_bucket_arn" {
+  description = "メディア S3 バケット ARN"
+  type        = string
+}

@@ -10,6 +10,7 @@ locals {
     register_device_token   = "register-device-token"
     unregister_device_token = "unregister-device-token"
     notify_upload_complete  = "notify-upload-complete"
+    delete_user             = "delete-user"
   }
 }
 
@@ -32,6 +33,12 @@ data "archive_file" "push_notification" {
   type        = "zip"
   source_dir  = "${path.module}/../../lambda/push_notification"
   output_path = "${path.module}/../../.build/push_notification.zip"
+}
+
+data "archive_file" "users" {
+  type        = "zip"
+  source_dir  = "${path.module}/../../lambda/users"
+  output_path = "${path.module}/../../.build/users.zip"
 }
 
 # ==========================================
@@ -268,6 +275,71 @@ resource "aws_iam_role_policy" "notify_upload_complete_logs" {
   })
 }
 
+resource "aws_iam_role" "delete_user" {
+  name               = "${local.function_prefix}-delete-user-role"
+  assume_role_policy = local.assume_role_policy
+}
+
+resource "aws_iam_role_policy" "delete_user_s3" {
+  name = "s3-delete"
+  role = aws_iam_role.delete_user.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["s3:ListBucketVersions"]
+        Resource = var.s3_bucket_arn
+        Condition = {
+          StringLike = {
+            "s3:prefix" = ["private/*"]
+          }
+        }
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["s3:DeleteObjectVersion", "s3:DeleteObject"]
+        Resource = "${var.s3_bucket_arn}/private/*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "delete_user_dynamodb" {
+  name = "dynamodb-query-delete"
+  role = aws_iam_role.delete_user.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["dynamodb:Query", "dynamodb:BatchWriteItem"]
+        Resource = var.dynamodb_table_arn
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["dynamodb:Query", "dynamodb:BatchWriteItem"]
+        Resource = var.device_tokens_table_arn
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "delete_user_logs" {
+  name = "cloudwatch-logs"
+  role = aws_iam_role.delete_user.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"]
+        Resource = "${aws_cloudwatch_log_group.lambda["delete_user"].arn}:*"
+      }
+    ]
+  })
+}
+
 # ==========================================
 # CloudWatch Log Groups
 # ==========================================
@@ -396,6 +468,27 @@ resource "aws_lambda_function" "notify_upload_complete" {
   depends_on = [aws_cloudwatch_log_group.lambda["notify_upload_complete"]]
 }
 
+resource "aws_lambda_function" "delete_user" {
+  function_name    = "${local.function_prefix}-delete-user"
+  role             = aws_iam_role.delete_user.arn
+  handler          = "delete_user.handler"
+  runtime          = "python3.12"
+  memory_size      = var.lambda_memory_size
+  timeout          = 30
+  filename         = data.archive_file.users.output_path
+  source_code_hash = data.archive_file.users.output_base64sha256
+
+  environment {
+    variables = {
+      S3_BUCKET_NAME            = var.s3_bucket_name
+      UPLOAD_RECORDS_TABLE_NAME = var.dynamodb_table_name
+      DEVICE_TOKENS_TABLE_NAME  = var.device_tokens_table_name
+    }
+  }
+
+  depends_on = [aws_cloudwatch_log_group.lambda["delete_user"]]
+}
+
 # ==========================================
 # API Gateway REST API
 # ==========================================
@@ -447,6 +540,13 @@ resource "aws_api_gateway_resource" "devices_token" {
   rest_api_id = aws_api_gateway_rest_api.media.id
   parent_id   = aws_api_gateway_resource.devices.id
   path_part   = "token"
+}
+
+# /users
+resource "aws_api_gateway_resource" "users" {
+  rest_api_id = aws_api_gateway_rest_api.media.id
+  parent_id   = aws_api_gateway_rest_api.media.root_resource_id
+  path_part   = "users"
 }
 
 # ==========================================
@@ -800,6 +900,80 @@ resource "aws_api_gateway_integration_response" "options_devices_token" {
 }
 
 # ==========================================
+# DELETE /users
+# ==========================================
+resource "aws_api_gateway_method" "delete_user" {
+  rest_api_id   = aws_api_gateway_rest_api.media.id
+  resource_id   = aws_api_gateway_resource.users.id
+  http_method   = "DELETE"
+  authorization = "AWS_IAM"
+}
+
+resource "aws_api_gateway_integration" "delete_user" {
+  rest_api_id             = aws_api_gateway_rest_api.media.id
+  resource_id             = aws_api_gateway_resource.users.id
+  http_method             = aws_api_gateway_method.delete_user.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.delete_user.invoke_arn
+}
+
+resource "aws_lambda_permission" "delete_user" {
+  statement_id  = "AllowAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.delete_user.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.media.execution_arn}/*/DELETE/users"
+}
+
+# ==========================================
+# CORS Preflight for /users
+# ==========================================
+resource "aws_api_gateway_method" "options_users" {
+  rest_api_id   = aws_api_gateway_rest_api.media.id
+  resource_id   = aws_api_gateway_resource.users.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "options_users" {
+  rest_api_id = aws_api_gateway_rest_api.media.id
+  resource_id = aws_api_gateway_resource.users.id
+  http_method = aws_api_gateway_method.options_users.http_method
+  type        = "MOCK"
+
+  request_templates = {
+    "application/json" = "{\"statusCode\": 200}"
+  }
+}
+
+resource "aws_api_gateway_method_response" "options_users" {
+  rest_api_id = aws_api_gateway_rest_api.media.id
+  resource_id = aws_api_gateway_resource.users.id
+  http_method = aws_api_gateway_method.options_users.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+}
+
+resource "aws_api_gateway_integration_response" "options_users" {
+  rest_api_id = aws_api_gateway_rest_api.media.id
+  resource_id = aws_api_gateway_resource.users.id
+  http_method = aws_api_gateway_method.options_users.http_method
+  status_code = aws_api_gateway_method_response.options_users.status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
+    "method.response.header.Access-Control-Allow-Methods" = "'DELETE,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+  }
+}
+
+# ==========================================
 # Gateway Responses for CORS
 # ==========================================
 resource "aws_api_gateway_gateway_response" "default_4xx" {
@@ -858,6 +1032,12 @@ resource "aws_api_gateway_deployment" "media" {
       aws_api_gateway_integration.options_devices_token.id,
       aws_api_gateway_method_response.options_devices_token.id,
       aws_api_gateway_integration_response.options_devices_token.id,
+      aws_api_gateway_method.delete_user.id,
+      aws_api_gateway_integration.delete_user.id,
+      aws_api_gateway_method.options_users.id,
+      aws_api_gateway_integration.options_users.id,
+      aws_api_gateway_method_response.options_users.id,
+      aws_api_gateway_integration_response.options_users.id,
     ]))
   }
 
