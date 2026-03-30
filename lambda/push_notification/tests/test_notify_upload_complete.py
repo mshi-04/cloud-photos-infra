@@ -27,7 +27,6 @@ def _seed_token(client, user_id, token):
     )
 
 
-@mock_aws
 class TestNotifyUploadComplete:
     def test_unauthorized(self, dynamodb_table):
         event = {"requestContext": {"identity": {}}, "body": json.dumps({"successCount": 1})}

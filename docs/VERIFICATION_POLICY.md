@@ -10,7 +10,7 @@ When changing infrastructure (under `envs/` or `modules/`), the following steps 
 1. Run `terraform fmt -recursive` at the root directory to format code.
 2. Run `terraform validate` in both `envs/dev/` and `envs/prod/` where changes were made to verify there are no syntax errors.
 
-### Step 2: Change Preview (Optional but Recommended)
+### Step 2: Change Preview
 1. Run `terraform plan` before starting and after finishing work to check for unintended resource deletions or modifications.
 2. Explicitly warn the user if destructive changes (e.g., S3 bucket deletion, DynamoDB table recreation) are involved.
 

@@ -22,7 +22,11 @@ Refer to [AGENTS.md](../AGENTS.md) to choose the appropriate role for the task.
 Follow the guidelines in [CLAUDE.md](../CLAUDE.md) and [SKILLS.md](./SKILLS.md).
 1. **Branching Strategy**:
    - Create a feature branch (e.g., `feature/<task-name>`) for significant changes.
-   - For small documentation fixes, direct changes on `develop` may be acceptable depending on team policy.
+   - **Exception: Direct changes to `develop`**:
+     - **Authorized by**: Requires explicit permission from the Repository Administrator (the User).
+     - **Applicable Changes**: Limited to minor documentation typos, non-functional markup changes, or trivial configuration tweaks. No code logic changes allowed.
+     - **Review Process**: AI must explicitly ask the user for approval before committing directly. Alternatively, if authorized, report the changes immediately after merging.
+     - **Procedure**: When asking for approval, explicitly state that the change meets the criteria for a direct `develop` commit.
 2. **Development**: Implement changes following the project's coding standards.
    - Use English for code and comments.
    - Adhere to the "Least Privilege" principle for IAM changes.

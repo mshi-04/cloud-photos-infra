@@ -119,13 +119,13 @@ When asked to implement a new Lambda function:
 
 Whenever you modify code under the `lambda/` directory, you must run unit tests. See [VERIFICATION_POLICY.md](VERIFICATION_POLICY.md) for details.
 
-1. Navigate to the modified Lambda function's directory
+1. Navigate to the top-level `lambda/` directory, as `conftest.py` modifies `sys.path` based on this location
    ```bash
-   cd lambda/<function_name>
+   cd lambda
    ```
-2. Run `pytest`
+2. Run `pytest` against the specific function's tests
    ```bash
-   pytest tests/
+   pytest <function_name>/tests/
    ```
 
 ## Skill: Security Audit [SecurityAuditor]
