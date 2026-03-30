@@ -7,6 +7,10 @@ IDENTITY_ID = "ap-northeast-1:test-user-id"
 TOKEN_A = "device-token-aaa"
 TOKEN_B = "device-token-bbb"
 
+TABLE_NAME = "test-device-tokens"
+KEY_USER_ID = "userId"
+KEY_DEVICE_TOKEN = "deviceToken"
+
 
 def _make_event(body=None, identity_id=IDENTITY_ID):
     return {
@@ -17,10 +21,10 @@ def _make_event(body=None, identity_id=IDENTITY_ID):
 
 def _seed_token(client, user_id, token):
     client.put_item(
-        TableName="test-device-tokens",
+        TableName=TABLE_NAME,
         Item={
-            "userId": {"S": user_id},
-            "deviceToken": {"S": token},
+            KEY_USER_ID: {"S": user_id},
+            KEY_DEVICE_TOKEN: {"S": token},
         },
     )
 
@@ -89,9 +93,9 @@ class TestNotifyUploadComplete:
         assert json.loads(resp["body"])["sentCount"] == 0
 
         result = dynamodb_table.query(
-            TableName="test-device-tokens",
+            TableName=TABLE_NAME,
             KeyConditionExpression="#uid = :uid",
-            ExpressionAttributeNames={"#uid": "userId"},
+            ExpressionAttributeNames={"#uid": KEY_USER_ID},
             ExpressionAttributeValues={":uid": {"S": IDENTITY_ID}},
         )
         assert len(result["Items"]) == 0
@@ -105,9 +109,9 @@ class TestNotifyUploadComplete:
         assert json.loads(resp["body"])["sentCount"] == 0
 
         result = dynamodb_table.query(
-            TableName="test-device-tokens",
+            TableName=TABLE_NAME,
             KeyConditionExpression="#uid = :uid",
-            ExpressionAttributeNames={"#uid": "userId"},
+            ExpressionAttributeNames={"#uid": KEY_USER_ID},
             ExpressionAttributeValues={":uid": {"S": IDENTITY_ID}},
         )
         assert len(result["Items"]) == 1

@@ -102,12 +102,12 @@ When asked to implement a new Lambda function:
 
 1. **Create a directory** under `lambda/<function_name>/`
    - Follow the existing structure in `lambda/device_tokens/` or `lambda/media_uploads/` as a reference
-   - Required files: handler entry point (e.g., `<function_name>.py`), `auth.py`, `constants.py`, `response.py`
+   - Required files: one or more handler entry points (e.g., `<function_name>.py`, `<other_handler>.py`), `auth.py`, `constants.py`, `response.py`
    - Create `tests/` with `conftest.py` and at minimum one `test_<function_name>.py`
 2. **Create a Terraform module** under `modules/<name>/` for the supporting infrastructure (Lambda resource, IAM role, CloudWatch log group)
 3. **Wire it into environments** — add the module in both `envs/dev/main.tf` and `envs/prod/main.tf`
 4. **Update bootstrap IAM** in `bootstrap/oidc_roles.tf` if the new Lambda requires new AWS service permissions
-5. **Update `pyproject.toml`** at repo root if new dependencies are required
+5. **Update dependencies** if required: when adding dependencies, update both `pyproject.toml` at repo root and `lambda/requirements-dev.txt`, and verify parity (e.g., run `pip install -r lambda/requirements-dev.txt`)
 
 ### Lambda conventions
 - Python 3.12; use type hints throughout
