@@ -70,6 +70,16 @@ variable "s3_bucket_arn" {
   type        = string
 }
 
+variable "cors_allow_origin" {
+  description = "Value for the Access-Control-Allow-Origin CORS header. Use '*' for development; restrict to a specific origin (e.g. 'https://example.com') in production."
+  type        = string
+
+  validation {
+    condition     = can(regex("^(\\*|https?://[a-zA-Z0-9][a-zA-Z0-9\\-\\.]*[a-zA-Z0-9](:[0-9]{1,5})?)$", var.cors_allow_origin))
+    error_message = "cors_allow_origin must be '*' or a well-formed origin (e.g. 'https://example.com' or 'http://localhost:3000')."
+  }
+}
+
 variable "enable_code_signing" {
   description = "Enable Lambda code signing enforcement for the delete_user function"
   type        = bool
