@@ -25,14 +25,74 @@ data "archive_file" "media_uploads" {
 
 data "archive_file" "device_tokens" {
   type        = "zip"
-  source_dir  = "${path.module}/../../lambda/device_tokens"
   output_path = "${path.module}/../../.build/device_tokens.zip"
+
+  source {
+    content  = file("${path.module}/../../lambda/device_tokens/auth.py")
+    filename = "auth.py"
+  }
+  source {
+    content  = file("${path.module}/../../lambda/device_tokens/constants.py")
+    filename = "constants.py"
+  }
+  source {
+    content  = file("${path.module}/../../lambda/device_tokens/db.py")
+    filename = "db.py"
+  }
+  source {
+    content  = file("${path.module}/../../lambda/device_tokens/register_device_token.py")
+    filename = "register_device_token.py"
+  }
+  source {
+    content  = file("${path.module}/../../lambda/device_tokens/request_utils.py")
+    filename = "request_utils.py"
+  }
+  source {
+    content  = file("${path.module}/../../lambda/device_tokens/response.py")
+    filename = "response.py"
+  }
+  source {
+    content  = file("${path.module}/../../lambda/device_tokens/unregister_device_token.py")
+    filename = "unregister_device_token.py"
+  }
+  source {
+    content  = file("${path.module}/../../lambda/common/__init__.py")
+    filename = "common/__init__.py"
+  }
+  source {
+    content  = file("${path.module}/../../lambda/common/auth.py")
+    filename = "common/auth.py"
+  }
 }
 
 data "archive_file" "push_notification" {
   type        = "zip"
-  source_dir  = "${path.module}/../../lambda/push_notification"
   output_path = "${path.module}/../../.build/push_notification.zip"
+
+  source {
+    content  = file("${path.module}/../../lambda/push_notification/auth.py")
+    filename = "auth.py"
+  }
+  source {
+    content  = file("${path.module}/../../lambda/push_notification/constants.py")
+    filename = "constants.py"
+  }
+  source {
+    content  = file("${path.module}/../../lambda/push_notification/notify_upload_complete.py")
+    filename = "notify_upload_complete.py"
+  }
+  source {
+    content  = file("${path.module}/../../lambda/push_notification/response.py")
+    filename = "response.py"
+  }
+  source {
+    content  = file("${path.module}/../../lambda/common/__init__.py")
+    filename = "common/__init__.py"
+  }
+  source {
+    content  = file("${path.module}/../../lambda/common/auth.py")
+    filename = "common/auth.py"
+  }
 }
 
 data "archive_file" "users" {
@@ -687,7 +747,7 @@ resource "aws_api_gateway_integration_response" "options_uploads" {
   response_parameters = {
     "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
     "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,OPTIONS'"
-    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'${var.cors_allow_origin}'"
   }
 }
 
@@ -734,7 +794,7 @@ resource "aws_api_gateway_integration_response" "options_upload_item" {
   response_parameters = {
     "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
     "method.response.header.Access-Control-Allow-Methods" = "'DELETE,OPTIONS'"
-    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'${var.cors_allow_origin}'"
   }
 }
 
@@ -808,7 +868,7 @@ resource "aws_api_gateway_integration_response" "options_uploads_complete" {
   response_parameters = {
     "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
     "method.response.header.Access-Control-Allow-Methods" = "'POST,OPTIONS'"
-    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'${var.cors_allow_origin}'"
   }
 }
 
@@ -909,7 +969,7 @@ resource "aws_api_gateway_integration_response" "options_devices_token" {
   response_parameters = {
     "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
     "method.response.header.Access-Control-Allow-Methods" = "'PUT,DELETE,OPTIONS'"
-    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'${var.cors_allow_origin}'"
   }
 }
 
@@ -983,7 +1043,7 @@ resource "aws_api_gateway_integration_response" "options_users" {
   response_parameters = {
     "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
     "method.response.header.Access-Control-Allow-Methods" = "'DELETE,OPTIONS'"
-    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'${var.cors_allow_origin}'"
   }
 }
 
@@ -995,7 +1055,7 @@ resource "aws_api_gateway_gateway_response" "default_4xx" {
   response_type = "DEFAULT_4XX"
 
   response_parameters = {
-    "gatewayresponse.header.Access-Control-Allow-Origin"  = "'*'"
+    "gatewayresponse.header.Access-Control-Allow-Origin"  = "'${var.cors_allow_origin}'"
     "gatewayresponse.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
   }
 }
@@ -1005,7 +1065,7 @@ resource "aws_api_gateway_gateway_response" "default_5xx" {
   response_type = "DEFAULT_5XX"
 
   response_parameters = {
-    "gatewayresponse.header.Access-Control-Allow-Origin"  = "'*'"
+    "gatewayresponse.header.Access-Control-Allow-Origin"  = "'${var.cors_allow_origin}'"
     "gatewayresponse.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
   }
 }

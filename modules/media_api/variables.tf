@@ -70,6 +70,11 @@ variable "s3_bucket_arn" {
   type        = string
 }
 
+variable "cors_allow_origin" {
+  description = "Value for the Access-Control-Allow-Origin CORS header. Use '*' for development; restrict to a specific origin (e.g. 'https://example.com') in production."
+  type        = string
+}
+
 variable "enable_code_signing" {
   description = "Enable Lambda code signing enforcement for the delete_user function"
   type        = bool

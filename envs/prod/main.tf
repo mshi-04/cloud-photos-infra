@@ -73,6 +73,8 @@ module "media_api" {
   s3_bucket_name                  = module.media_storage.bucket_name
   s3_bucket_arn                   = module.media_storage.bucket_arn
   enable_code_signing             = false
+  # TODO: Replace with the actual production frontend domain before go-live
+  cors_allow_origin = "https://your-app-domain.com"
 }
 
 module "device_token_db" {

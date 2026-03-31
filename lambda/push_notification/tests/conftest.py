@@ -8,6 +8,7 @@ import pytest
 from moto import mock_aws
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 TABLE_NAME = "test-device-tokens"
 REGION = "ap-northeast-1"

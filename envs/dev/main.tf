@@ -71,6 +71,7 @@ module "media_api" {
   s3_bucket_name                  = module.media_storage.bucket_name
   s3_bucket_arn                   = module.media_storage.bucket_arn
   enable_code_signing             = false
+  cors_allow_origin               = "*"
 }
 
 module "device_token_db" {
