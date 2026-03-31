@@ -1,36 +1,36 @@
-# セキュリティポリシー
+# Security Policy
 
-## サポート対象バージョン
+## Supported Versions
 
-| ブランチ | サポート状況 |
-|----------|-------------|
-| main     | :white_check_mark: |
-| develop  | :white_check_mark: |
+| Branch | Support Status |
+|--------|----------------|
+| main   | :white_check_mark: |
+| develop| :white_check_mark: |
 
-## 脆弱性の報告方法
+## Reporting a Vulnerability
 
-セキュリティ上の脆弱性を発見した場合は、責任ある開示にご協力ください。
+If you discover a security vulnerability, please help us by disclosing it responsibly.
 
-**セキュリティ脆弱性に関する公開 Issue は作成しないでください。**
+**Do not create a public issue for security vulnerabilities.**
 
-代わりに [GitHub Private Vulnerability Reporting](https://github.com/mshi-04/cloud-photos-infra/security/advisories/new) からご報告ください。
+Instead, please report them via [GitHub Private Vulnerability Reporting](https://github.com/mshi-04/cloud-photos-infra/security/advisories/new).
 
-### 報告に含めてほしい情報
+### Information to Include in Your Report
 
-- 脆弱性の概要
-- 再現手順
-- 想定される影響範囲
-- 修正案（あれば）
+- Overview of the vulnerability
+- Steps to reproduce
+- Potential impact
+- Suggested mitigation (if any)
 
-### 対応スケジュール
+### Response Timeline
 
-- **受領確認**: 3営業日以内
-- **初期評価**: 7営業日以内
-- **修正・緩和策**: 深刻度に応じて対応
+- **Acknowledgement**: Within 3 business days
+- **Initial Assessment**: Within 7 business days
+- **Fix/Mitigation**: Depending on severity
 
-## コントリビューター向けセキュリティガイドライン
+## Contributor Security Guidelines
 
-- シークレット、認証情報、AWS アカウント ID をリポジトリにコミットしないこと
-- インフラ変更は必ず Pull Request を経由すること
-- Terraform state ファイルをリポジトリにコミットしないこと
-- 機密情報は環境変数または AWS Secrets Manager で管理すること
+- Do not commit secrets, credentials, or AWS Account IDs to the repository.
+- Infrastructure changes must always go through a Pull Request.
+- Do not commit Terraform state files to the repository.
+- Manage sensitive information securely using environment variables or AWS Secrets Manager.

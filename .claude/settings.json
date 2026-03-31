@@ -4,13 +4,19 @@
       "Bash(terraform init*)",
       "Bash(terraform plan*)",
       "Bash(terraform fmt*)",
+      "Bash(pytest*)",
+      "Bash(python*)",
+      "Bash(trivy*)",
       "Edit(bootstrap/**)",
       "Edit(envs/**)",
       "Edit(modules/**)",
       "Edit(lambda/**)",
       "Edit(.github/workflows/**)",
+      "Edit(README.md)",
+      "Edit(SECURITY.md)",
       "Edit(CLAUDE.md)",
-      "Edit(SKILLS.md)"
+      "Edit(AGENTS.md)",
+      "Edit(docs/*)"
     ]
   }
 }

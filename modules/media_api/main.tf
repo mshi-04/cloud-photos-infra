@@ -10,6 +10,7 @@ locals {
     register_device_token   = "register-device-token"
     unregister_device_token = "unregister-device-token"
     notify_upload_complete  = "notify-upload-complete"
+    delete_user             = "delete-user"
   }
 }
 
@@ -22,16 +23,63 @@ data "archive_file" "media_uploads" {
   output_path = "${path.module}/../../.build/media_uploads.zip"
 }
 
+# Explicit source lists for Lambda ZIPs that bundle files from multiple directories
+# (function-specific files + shared lambda/common/). To add or remove a file,
+# update the relevant local below; the dynamic source blocks will reflect the change
+# automatically. Introduced to share common/ alongside function files (see Issue #41).
+locals {
+  common_sources = [
+    { path = "lambda/common/__init__.py", filename = "common/__init__.py" },
+    { path = "lambda/common/auth.py", filename = "common/auth.py" },
+  ]
+  device_tokens_sources = concat(local.common_sources, [
+    { path = "lambda/device_tokens/auth.py", filename = "auth.py" },
+    { path = "lambda/device_tokens/constants.py", filename = "constants.py" },
+    { path = "lambda/device_tokens/db.py", filename = "db.py" },
+    { path = "lambda/device_tokens/register_device_token.py", filename = "register_device_token.py" },
+    { path = "lambda/device_tokens/request_utils.py", filename = "request_utils.py" },
+    { path = "lambda/device_tokens/response.py", filename = "response.py" },
+    { path = "lambda/device_tokens/unregister_device_token.py", filename = "unregister_device_token.py" },
+  ])
+  push_notification_sources = concat(local.common_sources, [
+    { path = "lambda/push_notification/auth.py", filename = "auth.py" },
+    { path = "lambda/push_notification/constants.py", filename = "constants.py" },
+    { path = "lambda/push_notification/notify_upload_complete.py", filename = "notify_upload_complete.py" },
+    { path = "lambda/push_notification/response.py", filename = "response.py" },
+  ])
+}
+
 data "archive_file" "device_tokens" {
   type        = "zip"
-  source_dir  = "${path.module}/../../lambda/device_tokens"
   output_path = "${path.module}/../../.build/device_tokens.zip"
+
+  dynamic "source" {
+    for_each = local.device_tokens_sources
+    content {
+      content  = file("${path.module}/../../${source.value.path}")
+      filename = source.value.filename
+    }
+  }
 }
 
 data "archive_file" "push_notification" {
   type        = "zip"
-  source_dir  = "${path.module}/../../lambda/push_notification"
   output_path = "${path.module}/../../.build/push_notification.zip"
+
+  dynamic "source" {
+    for_each = local.push_notification_sources
+    content {
+      content  = file("${path.module}/../../${source.value.path}")
+      filename = source.value.filename
+    }
+  }
+}
+
+data "archive_file" "users" {
+  type        = "zip"
+  source_dir  = "${path.module}/../../lambda/users"
+  output_path = "${path.module}/../../.build/users.zip"
+  excludes    = ["tests/*", "tests/**"]
 }
 
 # ==========================================
@@ -268,6 +316,71 @@ resource "aws_iam_role_policy" "notify_upload_complete_logs" {
   })
 }
 
+resource "aws_iam_role" "delete_user" {
+  name               = "${local.function_prefix}-delete-user-role"
+  assume_role_policy = local.assume_role_policy
+}
+
+resource "aws_iam_role_policy" "delete_user_s3" {
+  name = "s3-delete"
+  role = aws_iam_role.delete_user.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["s3:ListBucketVersions"]
+        Resource = var.s3_bucket_arn
+        Condition = {
+          StringLike = {
+            "s3:prefix" = ["private/*"]
+          }
+        }
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["s3:DeleteObjectVersion", "s3:DeleteObject"]
+        Resource = "${var.s3_bucket_arn}/private/*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "delete_user_dynamodb" {
+  name = "dynamodb-query-delete"
+  role = aws_iam_role.delete_user.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["dynamodb:Query", "dynamodb:BatchWriteItem"]
+        Resource = var.dynamodb_table_arn
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["dynamodb:Query", "dynamodb:BatchWriteItem"]
+        Resource = var.device_tokens_table_arn
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "delete_user_logs" {
+  name = "cloudwatch-logs"
+  role = aws_iam_role.delete_user.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"]
+        Resource = "${aws_cloudwatch_log_group.lambda["delete_user"].arn}:*"
+      }
+    ]
+  })
+}
+
 # ==========================================
 # CloudWatch Log Groups
 # ==========================================
@@ -396,6 +509,40 @@ resource "aws_lambda_function" "notify_upload_complete" {
   depends_on = [aws_cloudwatch_log_group.lambda["notify_upload_complete"]]
 }
 
+resource "aws_lambda_code_signing_config" "delete_user" {
+  count = var.enable_code_signing ? 1 : 0
+
+  allowed_publishers {
+    signing_profile_version_arns = var.code_signing_profile_version_arns
+  }
+
+  policies {
+    untrusted_artifact_on_deployment = "Enforce"
+  }
+}
+
+resource "aws_lambda_function" "delete_user" {
+  function_name           = "${local.function_prefix}-delete-user"
+  role                    = aws_iam_role.delete_user.arn
+  handler                 = "delete_user.handler"
+  runtime                 = "python3.12"
+  memory_size             = var.lambda_memory_size
+  timeout                 = 30
+  filename                = data.archive_file.users.output_path
+  source_code_hash        = data.archive_file.users.output_base64sha256
+  code_signing_config_arn = var.enable_code_signing ? aws_lambda_code_signing_config.delete_user[0].arn : null
+
+  environment {
+    variables = {
+      S3_BUCKET_NAME            = var.s3_bucket_name
+      UPLOAD_RECORDS_TABLE_NAME = var.dynamodb_table_name
+      DEVICE_TOKENS_TABLE_NAME  = var.device_tokens_table_name
+    }
+  }
+
+  depends_on = [aws_cloudwatch_log_group.lambda["delete_user"]]
+}
+
 # ==========================================
 # API Gateway REST API
 # ==========================================
@@ -447,6 +594,13 @@ resource "aws_api_gateway_resource" "devices_token" {
   rest_api_id = aws_api_gateway_rest_api.media.id
   parent_id   = aws_api_gateway_resource.devices.id
   path_part   = "token"
+}
+
+# /users
+resource "aws_api_gateway_resource" "users" {
+  rest_api_id = aws_api_gateway_rest_api.media.id
+  parent_id   = aws_api_gateway_rest_api.media.root_resource_id
+  path_part   = "users"
 }
 
 # ==========================================
@@ -573,7 +727,7 @@ resource "aws_api_gateway_integration_response" "options_uploads" {
   response_parameters = {
     "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
     "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,OPTIONS'"
-    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'${var.cors_allow_origin}'"
   }
 }
 
@@ -620,7 +774,7 @@ resource "aws_api_gateway_integration_response" "options_upload_item" {
   response_parameters = {
     "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
     "method.response.header.Access-Control-Allow-Methods" = "'DELETE,OPTIONS'"
-    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'${var.cors_allow_origin}'"
   }
 }
 
@@ -694,7 +848,7 @@ resource "aws_api_gateway_integration_response" "options_uploads_complete" {
   response_parameters = {
     "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
     "method.response.header.Access-Control-Allow-Methods" = "'POST,OPTIONS'"
-    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'${var.cors_allow_origin}'"
   }
 }
 
@@ -795,7 +949,81 @@ resource "aws_api_gateway_integration_response" "options_devices_token" {
   response_parameters = {
     "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
     "method.response.header.Access-Control-Allow-Methods" = "'PUT,DELETE,OPTIONS'"
-    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'${var.cors_allow_origin}'"
+  }
+}
+
+# ==========================================
+# DELETE /users
+# ==========================================
+resource "aws_api_gateway_method" "delete_user" {
+  rest_api_id   = aws_api_gateway_rest_api.media.id
+  resource_id   = aws_api_gateway_resource.users.id
+  http_method   = "DELETE"
+  authorization = "AWS_IAM"
+}
+
+resource "aws_api_gateway_integration" "delete_user" {
+  rest_api_id             = aws_api_gateway_rest_api.media.id
+  resource_id             = aws_api_gateway_resource.users.id
+  http_method             = aws_api_gateway_method.delete_user.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.delete_user.invoke_arn
+}
+
+resource "aws_lambda_permission" "delete_user" {
+  statement_id  = "AllowAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.delete_user.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.media.execution_arn}/*/DELETE/users"
+}
+
+# ==========================================
+# CORS Preflight for /users
+# ==========================================
+resource "aws_api_gateway_method" "options_users" {
+  rest_api_id   = aws_api_gateway_rest_api.media.id
+  resource_id   = aws_api_gateway_resource.users.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "options_users" {
+  rest_api_id = aws_api_gateway_rest_api.media.id
+  resource_id = aws_api_gateway_resource.users.id
+  http_method = aws_api_gateway_method.options_users.http_method
+  type        = "MOCK"
+
+  request_templates = {
+    "application/json" = "{\"statusCode\": 200}"
+  }
+}
+
+resource "aws_api_gateway_method_response" "options_users" {
+  rest_api_id = aws_api_gateway_rest_api.media.id
+  resource_id = aws_api_gateway_resource.users.id
+  http_method = aws_api_gateway_method.options_users.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+}
+
+resource "aws_api_gateway_integration_response" "options_users" {
+  rest_api_id = aws_api_gateway_rest_api.media.id
+  resource_id = aws_api_gateway_resource.users.id
+  http_method = aws_api_gateway_method.options_users.http_method
+  status_code = aws_api_gateway_method_response.options_users.status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
+    "method.response.header.Access-Control-Allow-Methods" = "'DELETE,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'${var.cors_allow_origin}'"
   }
 }
 
@@ -807,7 +1035,7 @@ resource "aws_api_gateway_gateway_response" "default_4xx" {
   response_type = "DEFAULT_4XX"
 
   response_parameters = {
-    "gatewayresponse.header.Access-Control-Allow-Origin"  = "'*'"
+    "gatewayresponse.header.Access-Control-Allow-Origin"  = "'${var.cors_allow_origin}'"
     "gatewayresponse.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
   }
 }
@@ -817,7 +1045,7 @@ resource "aws_api_gateway_gateway_response" "default_5xx" {
   response_type = "DEFAULT_5XX"
 
   response_parameters = {
-    "gatewayresponse.header.Access-Control-Allow-Origin"  = "'*'"
+    "gatewayresponse.header.Access-Control-Allow-Origin"  = "'${var.cors_allow_origin}'"
     "gatewayresponse.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
   }
 }
@@ -829,6 +1057,7 @@ resource "aws_api_gateway_deployment" "media" {
   rest_api_id = aws_api_gateway_rest_api.media.id
 
   triggers = {
+    cors_allow_origin = var.cors_allow_origin
     redeployment = sha1(jsonencode([
       aws_api_gateway_method.get_uploads.id,
       aws_api_gateway_integration.get_uploads.id,
@@ -858,6 +1087,12 @@ resource "aws_api_gateway_deployment" "media" {
       aws_api_gateway_integration.options_devices_token.id,
       aws_api_gateway_method_response.options_devices_token.id,
       aws_api_gateway_integration_response.options_devices_token.id,
+      aws_api_gateway_method.delete_user.id,
+      aws_api_gateway_integration.delete_user.id,
+      aws_api_gateway_method.options_users.id,
+      aws_api_gateway_integration.options_users.id,
+      aws_api_gateway_method_response.options_users.id,
+      aws_api_gateway_integration_response.options_users.id,
     ]))
   }
 

@@ -1,23 +1,32 @@
 import os
 import sys
 from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+from unittest.mock import MagicMock
 
 import boto3
 import pytest
 from moto import mock_aws
 
-import db
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 TABLE_NAME = "test-device-tokens"
 REGION = "ap-northeast-1"
 
 
+@pytest.fixture(autouse=True)
+def mock_firebase(monkeypatch):
+    import notify_upload_complete
+
+    monkeypatch.setattr(notify_upload_complete, "_firebase_app", MagicMock())
+
+
 @pytest.fixture
 def dynamodb_table():
     with mock_aws():
+        orig_region = os.environ.get("AWS_DEFAULT_REGION")
+        orig_table = os.environ.get("TABLE_NAME")
+
         os.environ["AWS_DEFAULT_REGION"] = REGION
         os.environ["TABLE_NAME"] = TABLE_NAME
 
@@ -35,10 +44,14 @@ def dynamodb_table():
             BillingMode="PAY_PER_REQUEST",
         )
 
-        db._reset_for_testing()
-
         yield client
 
-        db._reset_for_testing()
-        del os.environ["TABLE_NAME"]
-        del os.environ["AWS_DEFAULT_REGION"]
+        if orig_table is None:
+            os.environ.pop("TABLE_NAME", None)
+        else:
+            os.environ["TABLE_NAME"] = orig_table
+
+        if orig_region is None:
+            os.environ.pop("AWS_DEFAULT_REGION", None)
+        else:
+            os.environ["AWS_DEFAULT_REGION"] = orig_region

@@ -70,6 +70,11 @@ module "media_api" {
   firebase_credentials_secret_arn = module.push_notification.firebase_credentials_secret_arn
   firebase_layer_arn              = module.push_notification.firebase_layer_arn
   log_retention_in_days           = 90
+  s3_bucket_name                  = module.media_storage.bucket_name
+  s3_bucket_arn                   = module.media_storage.bucket_arn
+  enable_code_signing             = false
+  # The only client is the Android app; no browser frontend exists, so CORS does not apply.
+  cors_allow_origin = "*"
 }
 
 module "device_token_db" {

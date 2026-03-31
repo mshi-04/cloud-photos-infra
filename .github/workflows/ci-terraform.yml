@@ -1,4 +1,4 @@
-name: "Terraform CI (Plan)"
+name: "Terraform CI"
 
 on:
   pull_request:
@@ -45,12 +45,12 @@ jobs:
 
       - name: Upload SARIF
         if: always()
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-results.sarif
 
   lint-lambda:
-    name: "Lambda Lint (ruff)"
+    name: "Lambda Lint"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -90,6 +90,14 @@ jobs:
         working-directory: lambda
         run: pytest device_tokens/tests
 
+      - name: Run push_notification tests
+        working-directory: lambda
+        run: pytest push_notification/tests
+
+      - name: Run users tests
+        working-directory: lambda
+        run: pytest users/tests
+
   fmt:
     name: "Format Check"
     runs-on: ubuntu-latest
@@ -112,6 +120,9 @@ jobs:
     name: "Plan ${{ matrix.env }}"
     needs: [fmt, test-lambda, trivy, lint-lambda]
     runs-on: ubuntu-latest
+    concurrency:
+      group: terraform-${{ matrix.env }}
+      cancel-in-progress: false
     strategy:
       matrix:
         include:
