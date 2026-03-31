@@ -23,6 +23,30 @@ data "archive_file" "media_uploads" {
   output_path = "${path.module}/../../.build/media_uploads.zip"
 }
 
+# NOTE: Each file bundled into this Lambda ZIP must be listed as an explicit
+# source block below. Unlike source_dir, this approach does NOT auto-detect new
+# files — adding or removing any file under lambda/device_tokens/ or the shared
+# lambda/common/ directory requires a manual update here.
+#
+# Current source list:
+#   lambda/device_tokens/auth.py
+#   lambda/device_tokens/constants.py
+#   lambda/device_tokens/db.py
+#   lambda/device_tokens/register_device_token.py
+#   lambda/device_tokens/request_utils.py
+#   lambda/device_tokens/response.py
+#   lambda/device_tokens/unregister_device_token.py
+#   lambda/common/__init__.py
+#   lambda/common/auth.py
+#
+# When adding a new file:
+#   1. Add a source block with content = file("${path.module}/../../lambda/...") and filename = "..."
+#   2. Verify the zip is regenerated on the next `terraform plan`/`apply`
+#
+# This explicit listing was introduced to bundle shared common/ files alongside
+# the function-specific files (see Issue #41).
+# An alternative is to switch back to source_dir or use a build script that
+# auto-generates the archive, which would eliminate this manual maintenance.
 data "archive_file" "device_tokens" {
   type        = "zip"
   output_path = "${path.module}/../../.build/device_tokens.zip"
