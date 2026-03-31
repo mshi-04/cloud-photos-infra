@@ -72,6 +72,7 @@ module "media_api" {
   log_retention_in_days           = 90
   s3_bucket_name                  = module.media_storage.bucket_name
   s3_bucket_arn                   = module.media_storage.bucket_arn
+  enable_code_signing             = false
 }
 
 module "device_token_db" {

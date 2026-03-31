@@ -469,15 +469,28 @@ resource "aws_lambda_function" "notify_upload_complete" {
   depends_on = [aws_cloudwatch_log_group.lambda["notify_upload_complete"]]
 }
 
+resource "aws_lambda_code_signing_config" "delete_user" {
+  count = var.enable_code_signing ? 1 : 0
+
+  allowed_publishers {
+    signing_profile_version_arns = var.code_signing_profile_version_arns
+  }
+
+  policies {
+    untrusted_artifact_on_deployment = "Enforce"
+  }
+}
+
 resource "aws_lambda_function" "delete_user" {
-  function_name    = "${local.function_prefix}-delete-user"
-  role             = aws_iam_role.delete_user.arn
-  handler          = "delete_user.handler"
-  runtime          = "python3.12"
-  memory_size      = var.lambda_memory_size
-  timeout          = 30
-  filename         = data.archive_file.users.output_path
-  source_code_hash = data.archive_file.users.output_base64sha256
+  function_name           = "${local.function_prefix}-delete-user"
+  role                    = aws_iam_role.delete_user.arn
+  handler                 = "delete_user.handler"
+  runtime                 = "python3.12"
+  memory_size             = var.lambda_memory_size
+  timeout                 = 30
+  filename                = data.archive_file.users.output_path
+  source_code_hash        = data.archive_file.users.output_base64sha256
+  code_signing_config_arn = var.enable_code_signing ? aws_lambda_code_signing_config.delete_user[0].arn : null
 
   environment {
     variables = {

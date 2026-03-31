@@ -44,7 +44,7 @@ jobs:
   plan:
     runs-on: ubuntu-latest
     concurrency:
-      group: terraform-${{ inputs.env_name }}
+      group: cd-terraform-${{ inputs.env_name }}
       cancel-in-progress: false
     defaults:
       run:
@@ -110,7 +110,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: plan
     concurrency:
-      group: terraform-${{ inputs.env_name }}
+      group: cd-terraform-${{ inputs.env_name }}
       cancel-in-progress: false
     # environmentが空文字に評価される場合、承認ゲート（Environment）を使用せずに実行されます
     environment: ${{ inputs.environment_name }}

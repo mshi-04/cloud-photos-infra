@@ -40,8 +40,8 @@ def _flush_s3_batch(s3, bucket: str, objects_to_delete: List[Dict[str, str]]) ->
     result = s3.delete_objects(Bucket=bucket, Delete={"Objects": objects_to_delete, "Quiet": True})
     errors = result.get("Errors")
     if errors:
-        keys = [e.get("Key") for e in errors]
-        raise RuntimeError(f"s3.delete_objects failed for bucket {bucket}: keys={keys}, errors={errors}")
+        codes = [e.get("Code") or e.get("StatusCode") for e in errors]
+        raise RuntimeError(f"s3.delete_objects failed for bucket {bucket}: {len(errors)} object(s) failed, error_codes={codes}")
 
 
 def _delete_s3_objects(identity_id: str) -> None:
