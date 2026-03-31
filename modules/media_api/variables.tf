@@ -59,3 +59,29 @@ variable "firebase_layer_arn" {
   description = "Firebase Admin SDK Lambda Layer ARN"
   type        = string
 }
+
+variable "s3_bucket_name" {
+  description = "メディア S3 バケット名"
+  type        = string
+}
+
+variable "s3_bucket_arn" {
+  description = "メディア S3 バケット ARN"
+  type        = string
+}
+
+variable "enable_code_signing" {
+  description = "Enable Lambda code signing enforcement for the delete_user function"
+  type        = bool
+}
+
+variable "code_signing_profile_version_arns" {
+  description = "List of AWS Signer signing profile version ARNs allowed to sign the delete_user Lambda. Required when enable_code_signing is true."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = !var.enable_code_signing || length(var.code_signing_profile_version_arns) > 0
+    error_message = "code_signing_profile_version_arns must not be empty when enable_code_signing is true."
+  }
+}

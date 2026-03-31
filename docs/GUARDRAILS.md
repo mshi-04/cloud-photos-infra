@@ -15,6 +15,18 @@ This document defines repository-wide safety rules for AI agents.
 - Never assume cloud credentials, backend access, or environment initialization are available.
 - If validation or planning cannot be executed because prerequisites are missing, report that explicitly instead of guessing.
 
+## Terraform State Lock Safety
+
+- **Never run `terraform force-unlock` automatically.** State unlocking is a manual, user-initiated action only.
+- **Never use `-lock=false`** as a workaround for lock conflicts. Bypassing the lock mechanism risks corrupting shared state.
+- If a state lock is detected during `terraform plan` or `terraform validate`, read the lock error output and report the following to the user:
+  - Which environment is locked (e.g., `envs/dev`, `envs/prod`)
+  - The Lock ID, timestamp, and operation shown in the error (if available)
+  - Whether the lock likely originated from a concurrent CI run or a local run that did not release cleanly
+- Treat a lock conflict as an execution/coordination issue, not as evidence that the code change is wrong.
+- Tell the user explicitly: the lock must be removed manually if it appears stale, and provide the Lock ID so they can run `terraform force-unlock <ID>` themselves.
+- Never claim verification passed when it was blocked by a state lock. Report it as a distinct blocked state (see [VERIFICATION_POLICY.md](./VERIFICATION_POLICY.md)).
+
 ## Bootstrap Safety
 
 - Treat everything under `bootstrap/` as high-impact setup infrastructure.

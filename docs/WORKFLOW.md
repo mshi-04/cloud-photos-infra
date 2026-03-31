@@ -36,7 +36,8 @@ Mandatory self-verification as defined in [VERIFICATION_POLICY.md](./VERIFICATIO
 1. **Static Analysis**: Run `terraform fmt` and `terraform validate` for infrastructure when available. Run `ruff format` and `ruff check` for Python code when Lambda code was modified.
 2. **Testing**: Run `pytest` for any modified Lambda functions.
 3. **Review Plan**: Execute `terraform plan` when credentials and initialization are available, and ensure the output matches expectations. Never proceed with unintended resource destructions.
-4. **Final Check**: Complete the completion reporting requirements in [VERIFICATION_POLICY.md](./VERIFICATION_POLICY.md).
+4. **State Lock Handling**: If `terraform validate` or `terraform plan` is blocked by a state lock, stop immediately. Do not use `-lock=false` or `terraform force-unlock`. Report the locked environment, Lock ID, and suspected cause to the user. Ask the user to manually unlock if the lock appears stale. Classify the verification step as **Blocked by Terraform state lock**, not as a code failure.
+5. **Final Check**: Complete the completion reporting requirements in [VERIFICATION_POLICY.md](./VERIFICATION_POLICY.md).
 
 ## Phase 5: Release & Deployment
 

@@ -20,6 +20,7 @@ These rules apply regardless of role. See [docs/GUARDRAILS.md](docs/GUARDRAILS.m
 - Never place environment branching logic inside reusable Terraform modules.
 - Never claim that a verification step passed unless it was actually executed and passed.
 - Prefer the safer interpretation when a change may affect data, permissions, or deployment behavior.
+- **State Lock Rule**: Never run `terraform force-unlock` automatically and never use `-lock=false`. If Terraform verification is blocked by a state lock, report the lock details (environment, Lock ID, timestamp) to the user and ask them to unlock manually. Classify the step as **Blocked by Terraform state lock**, not as a code failure.
 
 ---
 

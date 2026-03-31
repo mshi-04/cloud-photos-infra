@@ -77,3 +77,12 @@ All changes must undergo self-verification based on [VERIFICATION_POLICY.md](doc
 - Create new resources inside `modules/` and reference them from `main.tf` for each environment.
 - Security-sensitive variables (such as `force_destroy`) must not have a default value and must be explicitly set in each environment configuration.
 - If verification steps cannot be executed because prerequisites are missing, report that clearly instead of assuming success.
+
+### Terraform State Lock Policy
+- AI may inspect lock error output and report lock information (environment, Lock ID, timestamp, suspected cause) to the user.
+- AI must **never** run `terraform force-unlock` automatically. Manual unlock must be requested from the user.
+- AI must **never** use `-lock=false` as a workaround.
+- A state lock blocking verification must be reported as a distinct blocked state, not as a code failure. The expected reporting is:
+  1. "Terraform verification was blocked by a state lock."
+  2. "I did not unlock it automatically."
+  3. "Please manually remove the stale lock if you confirm no active run is using it." (with Lock ID and environment path)
