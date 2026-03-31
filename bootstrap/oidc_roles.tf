@@ -51,10 +51,12 @@ locals {
   device_tokens_table_arn_prod = "arn:aws:dynamodb:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:table/${local.project_name}-device-tokens-prod"
 
   # Push Notification (Secrets Manager, Lambda Layer)
-  firebase_secret_arn_dev      = "arn:aws:secretsmanager:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:secret:${local.project_name}-firebase-credentials-dev-*"
-  firebase_secret_arn_prod     = "arn:aws:secretsmanager:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:secret:${local.project_name}-firebase-credentials-prod-*"
-  lambda_layer_arn_prefix_dev  = "arn:aws:lambda:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:layer:${local.project_name}-*-dev"
-  lambda_layer_arn_prefix_prod = "arn:aws:lambda:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:layer:${local.project_name}-*-prod"
+  firebase_secret_arn_dev              = "arn:aws:secretsmanager:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:secret:${local.project_name}-firebase-credentials-dev-*"
+  firebase_secret_arn_prod             = "arn:aws:secretsmanager:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:secret:${local.project_name}-firebase-credentials-prod-*"
+  lambda_layer_arn_prefix_dev          = "arn:aws:lambda:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:layer:${local.project_name}-*-dev"
+  lambda_layer_arn_prefix_prod         = "arn:aws:lambda:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:layer:${local.project_name}-*-prod"
+  lambda_layer_version_arn_prefix_dev  = "arn:aws:lambda:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:layer:${local.project_name}-*-dev:*"
+  lambda_layer_version_arn_prefix_prod = "arn:aws:lambda:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:layer:${local.project_name}-*-prod:*"
 
   lambda_function_arn_prefix_dev  = "arn:aws:lambda:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:function:${local.project_name}-dev-*"
   lambda_function_arn_prefix_prod = "arn:aws:lambda:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:function:${local.project_name}-prod-*"
@@ -234,7 +236,7 @@ resource "aws_iam_role_policy" "plan_dev" {
         Action = [
           "lambda:GetLayerVersion"
         ]
-        Resource = local.lambda_layer_arn_prefix_dev
+        Resource = local.lambda_layer_version_arn_prefix_dev
       }
     ]
   })
@@ -426,14 +428,21 @@ resource "aws_iam_role_policy" "apply_dev" {
         Resource = local.lambda_function_arn_prefix_dev
       },
       {
-        Sid    = "AllowLambdaLayerManagement"
+        Sid    = "AllowLambdaLayerPublish"
         Effect = "Allow"
         Action = [
-          "lambda:PublishLayerVersion",
+          "lambda:PublishLayerVersion"
+        ]
+        Resource = local.lambda_layer_arn_prefix_dev
+      },
+      {
+        Sid    = "AllowLambdaLayerVersionManagement"
+        Effect = "Allow"
+        Action = [
           "lambda:GetLayerVersion",
           "lambda:DeleteLayerVersion"
         ]
-        Resource = local.lambda_layer_arn_prefix_dev
+        Resource = local.lambda_layer_version_arn_prefix_dev
       },
       {
         Sid    = "AllowAPIGatewayManagement"
@@ -611,7 +620,7 @@ resource "aws_iam_role_policy" "plan_prod" {
         Action = [
           "lambda:GetLayerVersion"
         ]
-        Resource = local.lambda_layer_arn_prefix_prod
+        Resource = local.lambda_layer_version_arn_prefix_prod
       }
     ]
   })
@@ -803,14 +812,21 @@ resource "aws_iam_role_policy" "apply_prod" {
         Resource = local.lambda_function_arn_prefix_prod
       },
       {
-        Sid    = "AllowLambdaLayerManagement"
+        Sid    = "AllowLambdaLayerPublish"
         Effect = "Allow"
         Action = [
-          "lambda:PublishLayerVersion",
+          "lambda:PublishLayerVersion"
+        ]
+        Resource = local.lambda_layer_arn_prefix_prod
+      },
+      {
+        Sid    = "AllowLambdaLayerVersionManagement"
+        Effect = "Allow"
+        Action = [
           "lambda:GetLayerVersion",
           "lambda:DeleteLayerVersion"
         ]
-        Resource = local.lambda_layer_arn_prefix_prod
+        Resource = local.lambda_layer_version_arn_prefix_prod
       },
       {
         Sid    = "AllowAPIGatewayManagement"
