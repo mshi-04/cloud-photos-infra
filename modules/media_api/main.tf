@@ -28,7 +28,11 @@ data "archive_file" "media_uploads" {
 # update the relevant local below; the dynamic source blocks will reflect the change
 # automatically. Introduced to share common/ alongside function files (see Issue #41).
 locals {
-  device_tokens_sources = [
+  common_sources = [
+    { path = "lambda/common/__init__.py", filename = "common/__init__.py" },
+    { path = "lambda/common/auth.py", filename = "common/auth.py" },
+  ]
+  device_tokens_sources = concat(local.common_sources, [
     { path = "lambda/device_tokens/auth.py", filename = "auth.py" },
     { path = "lambda/device_tokens/constants.py", filename = "constants.py" },
     { path = "lambda/device_tokens/db.py", filename = "db.py" },
@@ -36,17 +40,13 @@ locals {
     { path = "lambda/device_tokens/request_utils.py", filename = "request_utils.py" },
     { path = "lambda/device_tokens/response.py", filename = "response.py" },
     { path = "lambda/device_tokens/unregister_device_token.py", filename = "unregister_device_token.py" },
-    { path = "lambda/common/__init__.py", filename = "common/__init__.py" },
-    { path = "lambda/common/auth.py", filename = "common/auth.py" },
-  ]
-  push_notification_sources = [
+  ])
+  push_notification_sources = concat(local.common_sources, [
     { path = "lambda/push_notification/auth.py", filename = "auth.py" },
     { path = "lambda/push_notification/constants.py", filename = "constants.py" },
     { path = "lambda/push_notification/notify_upload_complete.py", filename = "notify_upload_complete.py" },
     { path = "lambda/push_notification/response.py", filename = "response.py" },
-    { path = "lambda/common/__init__.py", filename = "common/__init__.py" },
-    { path = "lambda/common/auth.py", filename = "common/auth.py" },
-  ]
+  ])
 }
 
 data "archive_file" "device_tokens" {
@@ -1057,6 +1057,7 @@ resource "aws_api_gateway_deployment" "media" {
   rest_api_id = aws_api_gateway_rest_api.media.id
 
   triggers = {
+    cors_allow_origin = var.cors_allow_origin
     redeployment = sha1(jsonencode([
       aws_api_gateway_method.get_uploads.id,
       aws_api_gateway_integration.get_uploads.id,
