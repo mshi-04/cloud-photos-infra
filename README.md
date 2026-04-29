@@ -32,7 +32,7 @@ API Gateway によって以下のエンドポイントが提供されます。�
 - プッシュ通知用 Lambda には Secrets Manager の `GetSecretValue` 権限のみを追加で付与しています。
 - フロントエンドクライアント（認証済みユーザー）のロールは、S3 の `/private/${cognito-identity.amazonaws.com:sub}/` プレフィックスに対する読み書き権限と、API Gateway の特定のエンドポイントに対する `execute-api:Invoke` 権限のみを持っています。
 
-詳細は [SECURITY.md](SECURITY.md) を参照してください。
+詳細は [docs/security.md](docs/security.md) を参照してください。
 
 ## ディレクトリ構成
 
@@ -43,7 +43,7 @@ API Gateway によって以下のエンドポイントが提供されます。�
 - `modules/`: 各リソースの定義モジュール（`cognito`, `identity_pool`, `media_api`, `media_db`, `media_storage`, `device_token_db`, `push_notification`）
 - `lambda/`: API のバックエンドを処理する Python スクリプトおよび依存関係
 - `.github/workflows/`: CI (PR検証) および CD (マージ時デプロイ) の定義
-- `docs/`: AIワークフロー (`WORKFLOW.md`)、スキルセット (`SKILLS.md`)、および検証ポリシー (`VERIFICATION_POLICY.md`) の定義
+- `docs/`: ワークフロー (`workflow.md`)、インフラ (`infrastructure.md`)、Lambda (`lambda.md`)、セキュリティ (`security.md`) の定義
 
 ## 重要な運用ルール
 
