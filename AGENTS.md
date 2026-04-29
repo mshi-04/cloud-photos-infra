@@ -1,77 +1,97 @@
-# Agent Definitions & Roles (AGENTS.md)
+# AGENTS.md
 
-This document defines the roles, responsibilities, and behavioral guidelines (Harness) for AI agents operating in this repository. The AI agent must select an appropriate role based on the requested task and act professionally according to these guidelines.
+本リポジトリで作業するAIコーディングエージェント向けの唯一の入口です。ディレクトリごとの `AGENTS.md` は置かず、このファイルを短い地図として維持し、詳細は `docs/` に集約します。
 
----
+## First Read
 
-## The Core Harness
+| 目的 | 参照先 |
+|---|---|
+| 作業の進め方 | [docs/workflow.md](docs/workflow.md) |
+| 実行禁止・承認が必要な操作 | [docs/guardrails.md](docs/guardrails.md) |
+| 完了前の検証 | [docs/verification_policy.md](docs/verification_policy.md) |
+| よく使うコマンド | [docs/commands.md](docs/commands.md) |
+| Terraform / Python の規約 | [docs/coding_standards.md](docs/coding_standards.md) |
+| AWS / Terraform の変更 | [docs/infrastructure.md](docs/infrastructure.md) |
+| Lambda の変更 | [docs/lambda.md](docs/lambda.md) |
+| テスト | [docs/testing.md](docs/testing.md) |
+| セキュリティ / IAM | [docs/security.md](docs/security.md) |
+| 技術スタック | [docs/tech_stack.md](docs/tech_stack.md) |
 
-All agents must strictly adhere to the following rules as their harness:
-1. **Thorough Self-Verification**: Always perform verification based on [VERIFICATION_POLICY.md](docs/VERIFICATION_POLICY.md) before completing a task.
-2. **Prioritize Non-Destructive Actions**: In infrastructure modifications, carefully interpret the results of `terraform plan` to ensure existing data or resources are not inadvertently destroyed.
-3. **Synchronize Documentation**: Keep not only the code updated, but also related documents like `README.md`, `docs/SKILLS.md`, `CLAUDE.md`, `docs/GUARDRAILS.md`, and local directory guides when relevant.
-4. **Report Unknowns Honestly**: If required verification steps cannot be executed because prerequisites are missing, report that clearly instead of assuming success.
+## Repository Profile
 
-## Global Guardrails
+- AWS インフラは Terraform で管理します。
+- ルートモジュールは `envs/dev` と `envs/prod`、再利用モジュールは `modules/` に置きます。
+- Lambda は `lambda/` 配下の Python 3.12 実装です。
+- CI/CD は GitHub Actions と AWS OIDC を使います。
+- `bootstrap/` は初期セットアップ用で、通常のCI/CDでは自動適用されません。
 
-These rules apply regardless of role. See [docs/GUARDRAILS.md](docs/GUARDRAILS.md) for the full repository-wide safety rules.
-- Never hardcode secrets, tokens, passwords, or private keys.
-- Never hardcode environment-specific values that should be supplied through variables, managed configuration, or secrets management.
-- Never place environment branching logic inside reusable Terraform modules.
-- Never claim that a verification step passed unless it was actually executed and passed.
-- Prefer the safer interpretation when a change may affect data, permissions, or deployment behavior.
-- **State Lock Rule**: Never run `terraform force-unlock` automatically and never use `-lock=false`. If Terraform verification is blocked by a state lock, report the lock details (environment, Lock ID, timestamp) to the user and ask them to unlock manually. Classify the step as **Blocked by Terraform state lock**, not as a code failure.
+## Directory Scope
 
----
+| パス | 作業時に読む文書 |
+|---|---|
+| `bootstrap/` | `docs/guardrails.md`, `docs/infrastructure.md`, `docs/security.md` |
+| `envs/` | `docs/infrastructure.md`, `docs/verification_policy.md` |
+| `modules/` | `docs/infrastructure.md`, `docs/coding_standards.md`, `docs/security.md` |
+| `lambda/` | `docs/lambda.md`, `docs/testing.md`, `docs/coding_standards.md` |
+| `.github/workflows/` | `docs/workflow.md`, `docs/infrastructure.md` |
+| `docs/` | `docs/workflow.md`, `docs/verification_policy.md` |
 
-## 1. InfraArchitect
+## Operating Rules
 
-A role specializing in AWS infrastructure design, Terraform module construction, and resolving inconsistencies between environments.
+- ユーザーの依頼、既存差分、リポジトリ文書の順に確認してから編集してください。
+- 変更は依頼達成に必要な最小範囲に限定してください。
+- 既存の未コミット変更を、明示的な依頼なしに戻さないでください。
+- コード、変数名、コメントは英語で書いてください。ドキュメントは日本語で構いません。
+- シークレット、トークン、秘密鍵、AWSアカウントID、個人情報をコミットしないでください。
+- ファイル検索や文字列検索に `rg` は使わないでください。PowerShell の `Get-ChildItem`、`Select-String`、またはプロジェクトで許可されたスクリプトを使ってください。
+- ディレクトリ固有の補足を追加したい場合も、新しい `AGENTS.md` を増やさず、対応する `docs/*.md` に追記してください。
 
-- **Responsibilities**: Management of `modules/`, `envs/`, and `bootstrap/`.
-- **Guidelines**:
-  - Always design IAM based on the Least Privilege principle.
-  - Control environment differences via arguments in `envs/<env>/main.tf`, and avoid logical conditional checks inside module code (for example `var.env == "prod"` or ternary operators).
-  - Define module variables in `variables.tf` and outputs in `outputs.tf`.
-  - Use English for variable `description` blocks and actively use `validation` blocks.
-  - Always run `terraform fmt -recursive` after any infrastructure changes.
-  - Do not hardcode AWS Account IDs or secrets inside the code.
-- **Key Skills**: `terraform`, `AWS CLI`, `IAM Policy Design`.
+## Autonomy Boundary
 
----
+即座に進めてよい作業:
 
-## 2. LambdaDeveloper
+- 調査、読み取り、差分確認
+- ドキュメント修正
+- `terraform fmt -recursive`
+- `ruff format`、`ruff check`
+- `pytest`
+- `terraform validate`
+- `terraform plan`
 
-A role specializing in implementing business logic, designing APIs, and maintaining Python code quality.
+事前にユーザー確認が必要な作業:
 
-- **Responsibilities**: Management of `lambda/` and API Gateway endpoint design.
-- **Guidelines**:
-  - Follow `Python 3.12` best practices and actively use type hints.
-  - Use `ruff format` and `ruff check` to ensure code style and maintain code quality.
-  - Write unit tests (`pytest`) simultaneously to maintain test coverage.
-  - Ensure proper error handling and output useful information to CloudWatch Logs without exposing sensitive data.
-- **Key Skills**: `pytest`, `ruff`, `boto3`.
+- `terraform apply`
+- `terraform force-unlock`
+- `terraform plan -lock=false` / `terraform apply -lock=false`
+- `git push --force`
+- 複数環境にまたがる設計変更
+- リソース削除、置換、データ保持に影響する変更
+- IAM権限の拡張
+- `bootstrap/` 配下の変更
 
----
+## Terraform Rules
 
-## 3. SecurityAuditor
+- コミット前に `terraform fmt -recursive` を実行してください。
+- IAMポリシーは heredoc ではなく `jsonencode()` を優先してください。
+- モジュール内に `var.env == "prod"` のような環境分岐を持ち込まないでください。
+- `"Action": "*"` と `"Resource": "*"` は避け、実用可能な範囲で具体的なアクションとARNを指定してください。
+- リネームや構造変更は、強制再作成や state move が必要かを確認してください。
 
-A role specializing in detecting security risks, ensuring compliance, and managing sensitive information.
+## Lambda Rules
 
-- **Responsibilities**: `SECURITY.md`, `trivy` scan results, IAM policy audits, and Secrets Manager oversight.
-- **Guidelines**:
-  - Run `trivy` regularly or upon changes to identify known vulnerabilities or misconfigurations.
-  - Check for hardcoded AWS Account IDs or secrets.
-  - Update [SECURITY.md](SECURITY.md) when relevant changes occur.
-- **Key Skills**: `trivy`, `IAM Policy Simulator`.
+- Python 3.12 と型ヒントを前提に実装してください。
+- API系 Lambda は既存の `auth.py` パターンで Cognito JWT を検証してください。
+- HTTPレスポンスは既存の `response.py` パターンに合わせてください。
+- PII、生トークン、認証情報をログに出さないでください。
+- 動作を変えた場合は、該当テストを追加または更新してください。
 
----
+## Verification Report
 
-## Agent Switching Flow
+完了報告では、関連する検証を次のステータスで明記してください。
 
-AI agents must strictly follow the development cycle defined in [WORKFLOW.md](docs/WORKFLOW.md).
+- `Executed and passed`
+- `Executed and failed`
+- `Not executed` と理由
+- `Blocked by state lock` と環境、Lock ID、推定原因
 
-1. **Receive Task (Phase 1)**: Analyze the user's request and impact.
-2. **Select Role (Phase 2)**: Declare the most appropriate role among `InfraArchitect`, `LambdaDeveloper`, and `SecurityAuditor`.
-3. **Execute Task (Phase 3)**: Proceed according to the guidelines of the selected role and [SKILLS.md](docs/SKILLS.md).
-4. **Verify and Report (Phase 4)**: Execute [VERIFICATION_POLICY.md](docs/VERIFICATION_POLICY.md) and report after checking all items.
+実行していない検証を成功扱いにしないでください。
