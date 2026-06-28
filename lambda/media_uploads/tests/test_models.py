@@ -85,6 +85,27 @@ class TestCreateUploadRecordRequest:
         with pytest.raises(ValidationError, match="fileSize"):
             CreateUploadRecordRequest.from_dict(self._valid_data(fileSize=1.5))
 
+    @pytest.mark.parametrize("data", [[], "string", None])
+    def test_data_not_object_rejected(self, data):
+        with pytest.raises(ValidationError, match="must be an object"):
+            CreateUploadRecordRequest.from_dict(data)
+
+    def test_empty_cloud_storage_path(self):
+        with pytest.raises(ValidationError, match="cloudStoragePath"):
+            CreateUploadRecordRequest.from_dict(self._valid_data(cloudStoragePath="   "))
+
+    def test_empty_content_type(self):
+        with pytest.raises(ValidationError, match="contentType"):
+            CreateUploadRecordRequest.from_dict(self._valid_data(contentType="   "))
+
+    def test_media_type_not_string_rejected(self):
+        with pytest.raises(ValidationError, match="IMAGE or VIDEO"):
+            CreateUploadRecordRequest.from_dict(self._valid_data(mediaType=123))
+
+    def test_file_size_non_numeric_type_rejected(self):
+        with pytest.raises(ValidationError, match="must be a number"):
+            CreateUploadRecordRequest.from_dict(self._valid_data(fileSize="100"))
+
 
 class TestGetUploadRecordsRequest:
     def test_defaults(self):
@@ -142,3 +163,8 @@ class TestGetUploadRecordsRequest:
         key = json.dumps({"userId": IDENTITY_ID, "mediaId": "  "})
         with pytest.raises(ValidationError, match="mediaId"):
             GetUploadRecordsRequest.from_dict({"lastEvaluatedKey": key}, IDENTITY_ID)
+
+    @pytest.mark.parametrize("params", ["string", [1, 2]])
+    def test_params_not_dict_rejected(self, params):
+        with pytest.raises(ValidationError, match="params must be a dict"):
+            GetUploadRecordsRequest.from_dict(params, IDENTITY_ID)
