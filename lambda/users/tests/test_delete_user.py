@@ -215,6 +215,8 @@ class TestBatchDeleteItems:
         delete_user._batch_delete_items(dynamodb, "tbl", _make_items(30), "mediaId")
 
         assert dynamodb.batch_write_item.call_count == 2
+        batch_sizes = [len(call.kwargs["RequestItems"]["tbl"]) for call in dynamodb.batch_write_item.call_args_list]
+        assert batch_sizes == [25, 5]
 
 
 class TestFlushS3Batch:
@@ -270,4 +272,8 @@ class TestDeleteDynamodbRecords:
         delete_user._delete_dynamodb_records("tbl", IDENTITY_ID, "mediaId")
 
         assert fake.query.call_count == 2
+        assert fake.query.call_args_list[1].kwargs["ExclusiveStartKey"] == {
+            "userId": {"S": IDENTITY_ID},
+            "mediaId": {"S": "m1"},
+        }
         assert fake.batch_write_item.call_count == 2
