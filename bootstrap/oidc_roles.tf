@@ -378,18 +378,23 @@ resource "aws_iam_role_policy" "apply_dev" {
         Resource = concat([local.cognito_authenticated_role_arn_dev], local.lambda_role_arns_dev)
       },
       {
-        Sid      = "AllowPassRole"
+        Sid      = "AllowPassRoleLambda"
         Effect   = "Allow"
         Action   = ["iam:PassRole"]
-        Resource = concat([local.cognito_authenticated_role_arn_dev], local.lambda_role_arns_dev)
+        Resource = local.lambda_role_arns_dev
         Condition = {
           StringEquals = {
-            "iam:PassedToService" = [
-              "cognito-identity.amazonaws.com",
-              "lambda.amazonaws.com"
-            ]
+            "iam:PassedToService" = "lambda.amazonaws.com"
           }
         }
+      },
+      {
+        # Cognito の SetIdentityPoolRoles は iam:PassedToService コンテキストを渡さないため、
+        # Condition を付けると暗黙 Deny になる。Resource を当該ロールに限定して許可する。
+        Sid      = "AllowPassRoleCognito"
+        Effect   = "Allow"
+        Action   = ["iam:PassRole"]
+        Resource = [local.cognito_authenticated_role_arn_dev]
       },
       {
         Sid    = "AllowDynamoDBManagement"
@@ -762,18 +767,23 @@ resource "aws_iam_role_policy" "apply_prod" {
         Resource = concat([local.cognito_authenticated_role_arn_prod], local.lambda_role_arns_prod)
       },
       {
-        Sid      = "AllowPassRole"
+        Sid      = "AllowPassRoleLambda"
         Effect   = "Allow"
         Action   = ["iam:PassRole"]
-        Resource = concat([local.cognito_authenticated_role_arn_prod], local.lambda_role_arns_prod)
+        Resource = local.lambda_role_arns_prod
         Condition = {
           StringEquals = {
-            "iam:PassedToService" = [
-              "cognito-identity.amazonaws.com",
-              "lambda.amazonaws.com"
-            ]
+            "iam:PassedToService" = "lambda.amazonaws.com"
           }
         }
+      },
+      {
+        # Cognito の SetIdentityPoolRoles は iam:PassedToService コンテキストを渡さないため、
+        # Condition を付けると暗黙 Deny になる。Resource を当該ロールに限定して許可する。
+        Sid      = "AllowPassRoleCognito"
+        Effect   = "Allow"
+        Action   = ["iam:PassRole"]
+        Resource = [local.cognito_authenticated_role_arn_prod]
       },
       {
         Sid    = "AllowDynamoDBManagement"
