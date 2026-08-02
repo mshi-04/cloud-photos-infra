@@ -21,5 +21,6 @@ description: Lambda のテスト（pytest + moto）の追加・修正・レビ�
 
 ## 参考資料
 
+- [references/pytest-fixtures.md](references/pytest-fixtures.md): `sys.path` と conftest のテンプレート、event ひな形、カバーするケース
 - [docs/testing.md](../../../docs/testing.md)
 - [docs/lambda.md](../../../docs/lambda.md)

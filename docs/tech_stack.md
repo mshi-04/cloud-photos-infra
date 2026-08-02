@@ -22,7 +22,7 @@
 | Database | Amazon DynamoDB | メディアメタデータ、デバイストークン |
 | Compute | AWS Lambda | APIロジック |
 | API | Amazon API Gateway | REST API |
-| Notification | Amazon SNS | プッシュ通知 |
+| Notification | Firebase Cloud Messaging | プッシュ通知 |
 | Security | IAM, KMS, Secrets Manager | 権限、暗号化、機密情報 |
 
 ## Terraform
@@ -60,8 +60,8 @@
 
 | ファイル | 役割 |
 |---|---|
-| `AGENTS.md` | 全エージェント向けの唯一の入口と地図 |
-| `CLAUDE.md` | Claude Code向けの薄い入口 |
+| `AGENTS.md` | Codexなどのエージェント向けの入口と地図 |
+| `CLAUDE.md` | Claude Code向けの入口と地図 |
 | `docs/*.md` | 実際の詳細ルール |
 
-入口ファイルは短く維持し、長い手順や領域別規約は `docs/` に置いてください。ディレクトリごとの `AGENTS.md` は作成しません。
+両入口ファイルは短く維持し、共通内容は手動で整合させてください。長い手順や領域別規約は `docs/` に置き、ディレクトリごとの `AGENTS.md` や `CLAUDE.md` は作成しません。

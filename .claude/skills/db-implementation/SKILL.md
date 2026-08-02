@@ -23,6 +23,7 @@ description: DynamoDB データアクセス（Query / PutItem / UpdateItem / sof
 
 ## 参考資料
 
+- [references/dynamodb-access-patterns.md](references/dynamodb-access-patterns.md): テーブル定義、`db.py` ヘルパー、操作別の実装、Lambda ごとの IAM 対応
 - [docs/infrastructure.md](../../../docs/infrastructure.md)
 - [docs/security.md](../../../docs/security.md)
 - [docs/coding_standards.md](../../../docs/coding_standards.md)

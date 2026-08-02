@@ -8,12 +8,12 @@ description: 実装差分のレビューに使う。最小権限IAM / IDOR防止
 ## 実装手順
 
 1. ベースブランチ（`develop` / `main`）との差分を対象にする。一般的な品質網羅は `review-branch` skill、脆弱性スキャンは `security-review` / `trivy` と併用する。
-2. IAM: アクション・ARN 限定でワイルドカード無し・`jsonencode` か確認する（`modules/media_api/main.tf`）。
+2. IAM: `"Action":"*"` / `"Resource":"*"` を避け、アクションとARNを限定して `jsonencode` で書かれているか確認する。CloudWatch Logs の event write は、限定した log group ARN に必要な `:*` suffixを許容する（`modules/media_api/main.tf`）。
 3. IDOR: 全データアクセス前に identity 境界（S3 `private/<identity>/`、DynamoDB key、`lastEvaluatedKey.userId`）を確認しているか。認証だけで満足していないか。
 4. ログ衛生: `mask_identity` を通し、生 `cognitoIdentityId` / `deviceToken` / 認証情報・リクエストボディをログに出していないか。
 5. シークレット混入: トークン・秘密鍵・AWSアカウントID（12桁）・PII が差分に無いか。
 6. Cognito / 認可設定: `prevent_user_existence_errors`、password policy、`generate_secret = false`、API method の `authorization = "AWS_IAM"` が弱められていないか。
-7. コード品質: `auth.py` / `response.py` / `db.py` パターン準拠、`constants.py` 集約、型ヒント、`ClientError` の 404/500 分離、未認証=403、テスト更新を確認する。
+7. コード品質: `auth.py` / `response.py` / `db.py` パターン準拠、`constants.py` 集約、型ヒント、`ClientError` の操作別レスポンス、テスト更新を確認する。新規実装の未認証レスポンスは403。既存の `users` / `push_notification` は401を維持し、変更する場合はAPI互換性とテストを確認する。
 
 ## トリアージ
 
@@ -31,5 +31,6 @@ description: 実装差分のレビューに使う。最小権限IAM / IDOR防止
 
 ## 参考資料
 
+- [references/review-checklist.md](references/review-checklist.md): 観点ごとの確認項目と根拠となる実装位置
 - [docs/security.md](../../../docs/security.md)
 - [docs/guardrails.md](../../../docs/guardrails.md)
