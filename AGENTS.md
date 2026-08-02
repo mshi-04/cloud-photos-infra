@@ -5,7 +5,6 @@
 
 ## 主要文書
 
-- [docs/workflow.md](docs/workflow.md): 作業の進め方（Intake / Plan / Implement / Verify / Report）
 - [docs/guardrails.md](docs/guardrails.md): 実行禁止・承認が必要な操作、state lock、シークレット
 - [docs/verification_policy.md](docs/verification_policy.md): 変更種別ごとの検証スコープと報告形式
 - [docs/commands.md](docs/commands.md): よく使うコマンド（検索・Terraform・Lambda・security）
@@ -18,7 +17,7 @@
 
 ## AI skills
 
-作業内容に応じて [.agents/skills/](.agents/skills/) の該当 `SKILL.md` を読む（正は `.agents/skills/`。`.claude/skills/` は `scripts/sync-claude-skills.ps1` で生成するミラー）。
+作業内容に応じて [.agents/skills/](.agents/skills/) の該当 `SKILL.md` を読む。
 
 - [lambda-implementation](.agents/skills/lambda-implementation/SKILL.md): Lambda 関数（handler / models / response / constants）の設計・実装・修正
 - [db-implementation](.agents/skills/db-implementation/SKILL.md): DynamoDB データアクセスの設計・実装・修正
@@ -26,4 +25,3 @@
 - [infra-implementation](.agents/skills/infra-implementation/SKILL.md): Terraform / AWS インフラの設計・実装・修正
 - [test-implementation](.agents/skills/test-implementation/SKILL.md): テストの追加・修正・レビュー
 - [implementation-review](.agents/skills/implementation-review/SKILL.md): 実装差分のレビュー
-- [ci-build-troubleshooting](.agents/skills/ci-build-troubleshooting/SKILL.md): build / CI / 静的解析の調査・修正
