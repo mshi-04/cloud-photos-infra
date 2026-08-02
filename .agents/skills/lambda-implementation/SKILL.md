@@ -23,6 +23,8 @@ description: Lambda 関数（handler / models / response / constants）の設計
 
 ## 参考資料
 
+- [references/handler-patterns.md](references/handler-patterns.md): handler の骨格、実在ハンドラ一覧、ステータスコード、冪等性、例外処理
+- [references/function-layout.md](references/function-layout.md): 関数グループの構成、`auth.py` / `response.py` の差、ZIP 配線、環境変数
 - [docs/lambda.md](../../../docs/lambda.md)
 - [docs/coding_standards.md](../../../docs/coding_standards.md)
 - [docs/testing.md](../../../docs/testing.md)
