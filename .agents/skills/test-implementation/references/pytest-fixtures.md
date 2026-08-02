@@ -34,7 +34,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 ## conftest（単一テーブル）
 
-`media_uploads` / `device_tokens` の形です。
+### media_uploads
 
 ```python
 @pytest.fixture
@@ -53,6 +53,40 @@ def dynamodb_table():
             AttributeDefinitions=[
                 {"AttributeName": "userId", "AttributeType": "S"},
                 {"AttributeName": "mediaId", "AttributeType": "S"},
+            ],
+            BillingMode="PAY_PER_REQUEST",
+        )
+
+        db._reset_for_testing()
+
+        yield client
+
+        db._reset_for_testing()
+        del os.environ["TABLE_NAME"]
+        del os.environ["AWS_DEFAULT_REGION"]
+```
+
+### device_tokens
+
+`device_tokens` は RANGE key が `deviceToken` です。`mediaId` の定義を流用しません。
+
+```python
+@pytest.fixture
+def dynamodb_table():
+    with mock_aws():
+        os.environ["AWS_DEFAULT_REGION"] = REGION
+        os.environ["TABLE_NAME"] = TABLE_NAME
+
+        client = boto3.client("dynamodb", region_name=REGION)
+        client.create_table(
+            TableName=TABLE_NAME,
+            KeySchema=[
+                {"AttributeName": "userId", "KeyType": "HASH"},
+                {"AttributeName": "deviceToken", "KeyType": "RANGE"},
+            ],
+            AttributeDefinitions=[
+                {"AttributeName": "userId", "AttributeType": "S"},
+                {"AttributeName": "deviceToken", "AttributeType": "S"},
             ],
             BillingMode="PAY_PER_REQUEST",
         )

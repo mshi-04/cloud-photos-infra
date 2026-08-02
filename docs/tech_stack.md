@@ -22,7 +22,7 @@
 | Database | Amazon DynamoDB | メディアメタデータ、デバイストークン |
 | Compute | AWS Lambda | APIロジック |
 | API | Amazon API Gateway | REST API |
-| Notification | Amazon SNS | プッシュ通知 |
+| Notification | Firebase Cloud Messaging | プッシュ通知 |
 | Security | IAM, KMS, Secrets Manager | 権限、暗号化、機密情報 |
 
 ## Terraform

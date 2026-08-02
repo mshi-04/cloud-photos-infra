@@ -10,7 +10,8 @@
 | `<project>-device-tokens-<env>` | `userId` | `deviceToken` | [modules/device_token_db/main.tf](../../../../modules/device_token_db/main.tf) |
 
 いずれも `PAY_PER_REQUEST`、GSI なし、PITR 有効。`deletion_protection_enabled` は prod のみ true です。
-GSI が無いため、`userId` を条件に含まない検索はできません。`Scan` を足す前に設計を見直します。
+`Query` は partition key の等価条件が必須なので、現行テーブルでは `userId` を条件に含めます。
+`Scan` は `userId` 条件なしでも実行できますが、テーブル全体を読むため現行設計では使いません。追加する前にアクセスパターンとテーブル設計を見直します。
 
 ## db.py
 

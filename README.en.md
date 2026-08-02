@@ -4,7 +4,7 @@
 
 This Terraform repository manages the AWS backend for a photo and video sharing application. It deploys authentication, media storage, metadata APIs, device tokens, and push notifications to separate dev and prod environments.
 
-Infrastructure changes are validated through pull requests and applied by GitHub Actions using OIDC roles. Local `terraform apply` is not part of the normal deployment path.
+Regular environment changes are validated through pull requests and applied by GitHub Actions using OIDC roles. `bootstrap/` is applied manually during initial setup or foundation changes. Local `terraform apply` is not part of the normal deployment path.
 
 ## Architecture
 

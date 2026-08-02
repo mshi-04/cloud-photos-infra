@@ -4,7 +4,7 @@
 
 写真・動画共有アプリケーションの AWS バックエンドを管理する Terraform リポジトリです。認証、メディアストレージ、メタデータ API、デバイストークン、プッシュ通知を dev / prod の2環境へデプロイします。
 
-インフラ変更は Pull Request で検証し、GitHub Actions と OIDC ロールを通じて適用します。ローカルからの `terraform apply` は通常のデプロイ経路ではありません。
+通常の環境変更は Pull Request で検証し、GitHub Actions と OIDC ロールを通じて適用します。`bootstrap/` は初回または基盤変更時に手動適用します。ローカルからの `terraform apply` は通常のデプロイ経路ではありません。
 
 ## アーキテクチャ
 
