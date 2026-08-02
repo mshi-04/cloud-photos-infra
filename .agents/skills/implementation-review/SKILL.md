@@ -31,5 +31,6 @@ description: 実装差分のレビューに使う。最小権限IAM / IDOR防止
 
 ## 参考資料
 
+- [references/review-checklist.md](references/review-checklist.md): 観点ごとの確認項目と根拠となる実装位置
 - [docs/security.md](../../../docs/security.md)
 - [docs/guardrails.md](../../../docs/guardrails.md)

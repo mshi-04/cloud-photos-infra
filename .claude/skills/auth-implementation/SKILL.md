@@ -21,5 +21,6 @@ description: 認証・認可（Cognito Identity 抽出、IDOR防止、統一HTTP
 
 ## 参考資料
 
+- [references/identity-boundaries.md](references/identity-boundaries.md): identity 取得の正本、リソース別の境界チェック、Identity Pool / User Pool 側の設定
 - [docs/security.md](../../../docs/security.md)
 - [docs/lambda.md](../../../docs/lambda.md)

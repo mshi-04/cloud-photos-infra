@@ -23,6 +23,8 @@ description: Terraform / AWS インフラ（modules・envs・IAM・Cognito・S3�
 
 ## 参考資料
 
+- [references/media-api-wiring.md](references/media-api-wiring.md): `modules/media_api` の構成、エンドポイント追加手順、置換になる変更
+- [references/env-matrix.md](references/env-matrix.md): dev / prod の変数差分とモジュール既定値
 - [docs/infrastructure.md](../../../docs/infrastructure.md)
 - [docs/guardrails.md](../../../docs/guardrails.md)
 - [docs/verification_policy.md](../../../docs/verification_policy.md)
