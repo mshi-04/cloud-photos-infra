@@ -1,10 +1,10 @@
 # AI文書・開発基盤リファクタリング設計
 
 - 作成日: 2026-10-30
-- 更新日: 2026-10-31。レビュー指摘の反映、コーディング規約の章の追加、型検査とlintの厳しさの決定
+- 更新日: 2026-10-31。レビュー指摘の反映、コーディング規約の章の追加、型検査とlintの厳しさの決定、段階ごとの作業とブランチの追加
 - 状態: 設計案。実装前。
 - 設計の起点: `develop` の `e4dfb2d`
-- 作業ブランチ: `feature/ai-documentation-refactoring`
+- 本設計書のブランチ: `feature/ai-documentation-refactoring`。各段階のブランチは第10.1節に記す
 
 ## 1. 目的と前提
 
@@ -172,7 +172,7 @@ fixtureは`monkeypatch`などで環境変数を元の状態へ戻す。MotoとFi
 | 通知処理の外部サービス障害 | DynamoDB QueryとSecrets Managerの失敗を500として扱う。登録解除済みトークンの削除に失敗しても、記録したうえで残りの端末への送信を続ける | 応答に内部情報を含めない。ログの識別子とトークンをマスクする。削除の失敗後も残りの端末へ送信される |
 | identity取得 | 認証情報の欠落・nullを未認証として扱う | 関数群ごとの既存401/403契約を保ち、例外にしない |
 
-構造変更と不具合修正は、差分と検証結果を分けて追跡できる単位にする。不具合修正は、段階1で契約を確定した後、段階6より前に行う。先にテストで正しい動作を固定し、その動作を保ったまま値オブジェクトへ移す。通知基盤の非同期化など、別のアーキテクチャ変更はここへ混ぜない。
+構造変更と不具合修正は、差分と検証結果を分けて追跡できる単位にする。不具合修正は、段階1で契約を確定した後、段階6より前に、第10.12節のブランチで行う。先にテストで正しい動作を固定し、その動作を保ったまま値オブジェクトへ移す。通知基盤の非同期化など、別のアーキテクチャ変更はここへ混ぜない。
 
 ## 7. Terraformの設計
 
@@ -339,27 +339,152 @@ Skillの構文やリンクの検証と、AIが適切なSkillを選び必要な�
 
 planの結果を判断に使う場合は、CIのPRコメントの切り詰めに注意する。コメントは60,000文字で切り詰められ、末尾の`Plan:`サマリが失われることがある。[PR 52](https://github.com/mshi-04/cloud-photos-infra/pull/52)のplanコメントで実際に起きている。サマリはコメントの先頭か、ジョブのstep summaryに出す。
 
-## 10. 実施順序と完了条件
+## 10. 実施順序とブランチ
 
-| 段階 | 主な変更 | 完了条件 |
-|---|---|---|
-| 0. 基準の記録 | 関数群別のテストと一括実行、API応答、ZIPの中身、レイヤーの再現性、CI/CDの状態、環境差、規約の候補ルールでの指摘件数を確認する | 実行結果と未実施理由が揃い、構造変更前の契約と既知の失敗が分かる |
-| 1. 契約と規約の確定 | 認証方式、API応答、セキュリティ、検証方針、コーディング規約の正本を書き、誤記を修正する。ruffのバージョンを固定し、従来の既定ルールを明示する。Pyrightを`standard`で導入し、型ヒントの誤りを直す | 文書間の認証方式・必須検証・HTTP応答・CI/CDの説明の矛盾が解消され、文書に記載したAWS不要の検証手順が現状のリポジトリで成功する |
-| 2. 文書の静的検証 | 第9章のAI文書の検証を、AWS接続が不要な別ワークフローとして追加する | 文書だけの変更で検証が起動し、AWS接続とplanを要求しない |
-| 3. Skillの再編 | 両入口・両Skill系統を3つの作業単位に揃え、資料と参照先を整理する。各Skillの手順に規約の要点を入れる | 段階2の検証が成功し、移行前のSkillへの参照が残らず、共通契約の重複定義がなく、必要な資料へ辿れる |
-| 4. Terraformのファイル分割 | `media_api`を責務別のファイルへ分ける。ファイル間の移動だけを行う | ブロック単位の比較で移動以外の変更がなく、`terraform validate`が成功する。planを実行できる場合は、分割前後の結果が同じ |
-| 5. Lambda基盤 | パッケージ・import・ZIPのビルドスクリプト・fixtureを一緒に整え、影響する文書とSkill資料を同じ差分で更新する。書き方の変更は含めない | ローカルとCIで同じ全体テストが成功し、ビルドしたZIPから各handlerを読み込め、文書とSkillの記述が新しい構成と一致する |
-| 6. Lambdaの規約への移行 | 値オブジェクト、例外、型、クライアントのキャッシュなどを規約に揃える。ruffを中間のルールへ広げ、boto3の型スタブを加える | 全関数群が同じ書き方になり、ruffとPyrightがローカルとCIで成功し、handlerのテストが期待値を変えずに成功する |
-| 7. Terraformの改善 | deploymentの更新判定と値の導出を整え、レイヤーを含む成果物のビルドを再現可能にする。Terraformの規約を適用し、tflintを導入する | 同じ入力から同じハッシュの成果物が得られ、tflintが成功する。planを実行できる場合は、動作変更が意図した範囲でplanに現れる |
-| 8. Skill選択の評価 | 第5章の依頼例で、独立したセッションのSkill選択・参照・検証範囲を観察する | 静的検証の結果と実行評価の結果が区別して記録される |
+### 10.1 全体の流れ
+
+| 段階 | ブランチ | 目的 | 前提 |
+|---|---|---|---|
+| 0. 基準の記録 | `feature/ai-refactor-0-baseline` | 構造変更前の結果と既知の失敗を記録する | 本設計書の`develop`への取り込み |
+| 1. 契約と規約の確定 | `feature/ai-refactor-1-contracts-and-standards` | 文書間の矛盾を解消し、規約とツールのバージョンを固定する | 段階0 |
+| 2. 文書の静的検証 | `feature/ai-refactor-2-docs-checks` | 文書とSkillを、AWSに接続せずに検証できるようにする | 段階1 |
+| 3. Skillの再編 | `feature/ai-refactor-3-skills` | Skillを3つの作業単位に揃える | 段階2 |
+| 4. Terraformのファイル分割 | `feature/ai-refactor-4-media-api-split` | `media_api`を責務別のファイルへ移す | 段階1。段階2・3と並行してよい |
+| 5. Lambda基盤 | `feature/ai-refactor-5-lambda-packages` | 名前空間、import、ZIPのビルドを整える | 段階3と段階4 |
+| 6. Lambdaの規約への移行 | `feature/ai-refactor-6-lambda-standards` | Lambdaの書き方を規約に揃える | 段階5と、第10.12節の不具合修正 |
+| 7. Terraformの改善 | `feature/ai-refactor-7-terraform-improvements` | API反映、成果物の再現性、Terraformの規約を整える | 段階5。段階6と並行してよい |
+| 8. Skill選択の評価 | `feature/ai-refactor-8-skill-evaluation` | AIが適切なSkillを選び、必要な資料を読むかを評価する | 段階6と段階7 |
 
 各段階を独立してレビューできる変更単位にする。文書の静的検証とSkillの再編をLambda基盤より先に行うのは、構造変更を実装するAIが、移行後の作業単位と最新の参照先を使えるようにするためである。ファイル分割をLambda基盤より先に行うのは、Lambda基盤で変更する配布物とLambdaの定義を先に責務別のファイルへ移し、移動だけの差分を単独で確認するためである。構造の変更である段階5と、書き方の変更である段階6を分けるのは、性質の異なる差分を別々にレビューするためである。段階6では、handlerのテストが期待値を変えずに成功することで、動作が変わっていないことを確かめる。Pyrightを段階1で導入するのは、段階5でimportを書き換える際に、解決できないimportや存在しない属性の参照を機械的に見つけるためである。
 
 新しい配置やコマンドは、利用可能になった段階で文書とSkillへ反映し、設計上の予定を現行手順として記載しない。現状で失敗する手順も、現行手順として残さない。
 
-第6.5節の不具合修正は、構造変更と別の差分にする。段階1の後、段階6より前であれば、段階5の前後どちらで行ってもよい。
-
 実装時の承認・state lock・シークレットの扱いは、引き続き[guardrails.md](docs/guardrails.md)に従う。検証結果は[verification_policy.md](docs/verification_policy.md)の4つのステータスで報告する。planなど環境に接続する検証を実行できない場合は、`Not executed`として理由を記録し、AWS不要の確認の結果と区別する。
+
+### 10.2 ブランチの運用
+
+- 各段階のブランチは`develop`から作り、`develop`へのPRで取り込む。`main`へは、これまでどおり`develop`から取り込む。
+- 名前は既存の慣例に合わせて`feature/`で始め、英小文字とハイフンで書く。段階のブランチは`feature/ai-refactor-<段階の番号>-<内容>`とし、`ai-refactor`で本設計の取り組みであることを示す。不具合修正は、既存の`feature/fix-`で始まる名前に合わせる。
+- 1つのブランチでは1つの段階だけを扱う。前提の段階が`develop`へ取り込まれてからブランチを作り、取り込まれていないブランチの上に積み重ねない。
+- 1つの段階の差分が大きい場合は、PRを分けてよい。その場合は`feature/ai-refactor-6-lambda-standards-media-uploads`のように、末尾に対象を足す。
+- 本設計書を扱う`feature/ai-documentation-refactoring`は、段階0より前に`develop`へ取り込む。
+
+### 10.3 段階0: 基準の記録
+
+1. 関数群別のテストと、`lambda/`での一括実行の結果を記録する。
+2. 既存テストの期待値から、各handlerが返すステータスと応答本文の一覧を作る。
+3. 各ZIPに入るファイルを、`archive_file`の定義とディレクトリの内容から一覧にする。planを実行できる場合は、生成されたZIPでも確かめる。
+4. Firebaseレイヤーを、CIと同じSAMイメージで2回ビルドし、それぞれのハッシュを記録する。
+5. ruffの中間のルールとPyrightの`standard`での指摘件数、CI/CDの直近の結果、devとprodの変数の違いを記録する。
+
+記録は本設計書の第12章に追記する。確認はAWSに接続せずに行い、planを実行できない場合は`Not executed`として理由を書く。
+
+完了条件: 実行結果と未実施理由が揃い、構造変更前の契約と既知の失敗が分かる。
+
+### 10.4 段階1: 契約と規約の確定
+
+1. [security.md](docs/security.md)、[lambda.md](docs/lambda.md)、[coding_standards.md](docs/coding_standards.md)、[tech_stack.md](docs/tech_stack.md)にあるJWT検証の記述を、API GatewayのIAM認証とLambdaの所有者確認の説明に置き換える。
+2. API応答の規則を[lambda.md](docs/lambda.md)に正本として書き、両系統の認証SkillとテストSkillにある未認証応答の記述を合わせる。
+3. 第3章の「文書の誤り」を直す。テストの手順は、関数群別のコマンドにする。
+4. [coding_standards.md](docs/coding_standards.md)を、第8章の内容で書き直す。
+5. ruffとPyrightのバージョンを、[開発用の依存定義](lambda/requirements-dev.txt)とCIで同じ値に固定する。`pyproject.toml`には、ruffの従来の既定ルールと、Pyrightの`standard`を書く。
+6. CIのlintジョブにPyrightを加え、`GetUploadRecordsRequest.from_dict`の型ヒントを直す。
+7. [commands.md](docs/commands.md)、[verification_policy.md](docs/verification_policy.md)、[README.md](README.md)、[README.en.md](README.en.md)に、ruffとPyrightのコマンドを書く。
+
+確認: 固定したバージョンでの`ruff check`、`ruff format --check`、`pyright`、関数群別のテスト、文書のリンクの確認。
+
+完了条件: 文書間の認証方式・必須検証・HTTP応答・CI/CDの説明の矛盾が解消され、文書に記載したAWS不要の検証手順が、現状のリポジトリで成功する。
+
+### 10.5 段階2: 文書の静的検証
+
+1. 第9章のAI文書の検証を行うスクリプトをPythonで書き、リポジトリに置く。対象は、Markdown、相対リンク、Skillのfrontmatter、旧Skill名の参照、両系統の差分とする。
+2. 両系統で意図して変える差分を書いた許可リストを置く。
+3. AWSに接続しない別のワークフローを追加し、文書、Skill、`pyproject.toml`の変更で起動させる。`pyproject.toml`の変更では、ruffとPyrightも実行する。
+4. ブランチ保護で必須にするチェックを決める。
+
+確認: 文書だけを変えたPRで新しいワークフローが起動し、AWS接続とplanが行われないこと。リンクを意図的に壊したときに失敗すること。
+
+完了条件: 文書だけの変更で検証が起動し、AWS接続とplanを要求しない。
+
+### 10.6 段階3: Skillの再編
+
+1. 第5章のとおり、`auth-implementation`、`db-implementation`、`test-implementation`の手順と資料を、Lambda Skillへ移す。
+2. 各`SKILL.md`を、目的、作業の選び方、判断、参照条件に絞り、コーディング規約の要点を手順に入れる。
+3. Infra Skillのアドレス変更の手順を`moved`ブロック優先にし、レビューSkillが比較対象のブランチをPR情報から確かめるようにする。
+4. `AGENTS.md`と`CLAUDE.md`のSkill一覧を3つに更新し、旧Skillを削除する。両系統で同じ変更を行う。
+
+確認: 段階2の検証。旧Skill名の参照が残らず、両系統の差分が許可リストの範囲に収まること。
+
+完了条件: 段階2の検証が成功し、移行前のSkillへの参照が残らず、共通契約の重複定義がなく、必要な資料へ辿れる。
+
+### 10.7 段階4: Terraformのファイル分割
+
+1. `modules/media_api/main.tf`のブロックを、第7.1節の責務別のファイルへ移す。ブロックの内容は変えない。
+2. `modules/media_api/main.tf`を参照している文書とSkillを、新しいファイル名に合わせる。
+
+確認: ブロック単位の比較、`terraform fmt -check`、`terraform init -backend=false`と`terraform validate`。planを実行できる場合は、分割前後の結果を比べる。比較の方法と結果はPRに記録する。
+
+完了条件: ブロック単位の比較で移動以外の変更がなく、`terraform validate`が成功する。planを実行できる場合は、分割前後の結果が同じ。
+
+### 10.8 段階5: Lambda基盤
+
+1. パッケージ名と、ディレクトリの最終配置を決める。
+2. 関数群と共有処理を名前空間付きのパッケージへ移し、importを修飾付きにする。書き方の変更は含めない。
+3. `conftest.py`の`sys.path`の操作を削除し、[pytestの設定](lambda/pytest.ini)でソースのルートを指定する。
+4. ZIPを作るビルドスクリプトをPythonで追加する。Terraformの`archive_file`を`filename`と`filebase64sha256()`の参照に置き換え、handlerの値を更新する。
+5. ビルドしたZIPを展開して各handlerを読み込む検証を加え、CIとCDのビルド手順を同じスクリプトに揃える。
+6. 影響する文書とSkillを、同じ差分で更新する。
+
+確認: 一括と関数群別のテスト、ruff、Pyright、ZIPの読み込み検証、`terraform validate`。planを実行できる場合は、Lambdaの更新が意図した範囲にとどまることを確かめる。
+
+ZIPの階層とhandlerを同時に変えるため、適用の途中で短時間エラーが起き得る。第6.1節のとおり、本番運用の開始前はこれを許容する。
+
+完了条件: ローカルとCIで同じ全体テストが成功し、ビルドしたZIPから各handlerを読み込め、文書とSkillの記述が新しい構成と一致する。
+
+### 10.9 段階6: Lambdaの規約への移行
+
+1. 値オブジェクト、例外、型、クライアントのキャッシュ、定数、ログを第8.2節に揃え、2系統ある書き方を1つにする。
+2. ruffを中間のルールへ広げ、`boto3-stubs`を開発用の依存に加え、Pyrightの指摘を直す。
+3. 値オブジェクトの単体テストを加える。handlerのテストの期待値は変えない。
+
+確認: ruffの中間のルール、Pyrightの`standard`、全体テスト。
+
+差分が大きい場合は、関数群ごとにPRを分ける。その場合、ruffの中間のルールは最後のPRで有効にする。
+
+完了条件: 全関数群が同じ書き方になり、ruffとPyrightがローカルとCIで成功し、handlerのテストが期待値を変えずに成功する。
+
+### 10.10 段階7: Terraformの改善
+
+1. deploymentの更新判定に、APIの設定内容を含める。
+2. 実行可能ARNなどの重複を、`locals`から導出する。
+3. Firebaseレイヤーのビルドを段階5のスクリプトへ統合し、ZIPを再現可能にして、ビルドイメージのタグを固定する。`firebase-admin`のバージョンを一元化し、Dependabotの対象ディレクトリを直す。
+4. 各モジュールに`versions.tf`を置き、使われていないdata sourceと、コメントアウトしたコードを削除する。
+5. tflintの設定を置き、CIに加える。
+
+確認: 同じ入力から2回ビルドしてハッシュが一致すること、tflint、`terraform fmt -check`、`terraform validate`。planを実行できる場合は、deploymentの更新のほかに意図しない変更がないこと。
+
+完了条件: 同じ入力から同じハッシュの成果物が得られ、tflintが成功する。planを実行できる場合は、動作変更が意図した範囲でplanに現れる。
+
+### 10.11 段階8: Skill選択の評価
+
+1. 第5章の依頼例を、独立したセッションのAIに依頼する。
+2. 選ばれたSkill、読まれた資料、実行された検証を記録する。期待と違う場合は、Skillを直す。
+3. 結果を本設計書の第12章に記録する。
+
+確認: 評価の結果を、静的検証の結果と区別して記録する。行わなかった依頼例は、未実施と書く。
+
+完了条件: 静的検証の結果と実行評価の結果が区別して記録される。
+
+### 10.12 不具合修正のブランチ
+
+第6.5節の不具合修正は、段階とは別のブランチで行う。
+
+| ブランチ | 対象 |
+|---|---|
+| `feature/fix-notify-upload-complete` | 通知の入力、通知先の取得、通知処理の外部サービス障害。修正ごとにコミットを分け、`successCount`が0のときの扱いもここで決める |
+| `feature/fix-identity-null-handling` | identity取得で、認証情報の欠落やnullを未認証として扱う |
+
+どちらも構造変更とは別の差分にし、段階1の後、段階6より前に`develop`へ取り込む。段階5の前後のどちらで行ってもよい。
 
 ## 11. 未決事項
 
@@ -372,7 +497,9 @@ planの結果を判断に使う場合は、CIのPRコメントの切り詰めに
 
 型検査のツールをPyrightとし、ruffとPyrightをどちらも中間の厳しさで運用することは、2026-10-31に決めた。内容は第8.4節に記す。
 
-## 12. 設計書作成・レビュー時点の検証範囲
+## 12. 検証の記録
+
+設計書の作成とレビューで行った検証を記録する。段階0と段階8の記録も、この章に追記する。
 
 - 作成時に、リポジトリの文書、6種類のSkillと参考資料、関係するLambda・Terraform・CI定義を調査した。作成時の環境では、Pythonの既存仮想環境の起動確認に失敗した。
 - レビュー時の2026-10-30に、Python 3.12.3の新しい仮想環境で次を実行した。
@@ -393,3 +520,6 @@ planの結果を判断に使う場合は、CIのPRコメントの切り詰めに
 - [DynamoDB Queryのページング](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Query.Pagination.html): 継続キーを使い、最後のページまで取得する。
 - [Terraform AWS ProviderのAPI Gateway Deployment](https://github.com/hashicorp/terraform-provider-aws/blob/main/website/docs/r/api_gateway_deployment.html.markdown): deploymentはAPI設定のスナップショットであり、IDだけを使ったtriggerは将来の全設定変更を捉えるものではない。
 - [ruff-action](https://github.com/astral-sh/ruff-action): `version`を指定せず、`pyproject.toml`にもruffのバージョンがない場合は最新版を使う。`version`または`version-file`でバージョンを固定できる。
+- [Pyrightの設定](https://github.com/microsoft/pyright/blob/main/docs/configuration.md): `typeCheckingMode`は`off`、`basic`、`standard`、`strict`から選び、既定値は`standard`である。設定は`pyproject.toml`の`[tool.pyright]`にも書ける。
+- [boto3-stubs](https://pypi.org/project/boto3-stubs/): boto3の型注釈で、Pyrightでも使える。`boto3-stubs[dynamodb]`のように、使うサービスを指定して入れる。
+- [Pylance](https://github.com/microsoft/pylance-release): VS CodeのPylanceは、Pyrightを型検査の中核に使う。Pylance自体の厳しさの既定値は`off`だが、`pyproject.toml`の設定で上書きできる。
