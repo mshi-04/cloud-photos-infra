@@ -90,7 +90,7 @@ class GetUploadRecordsRequest:
     last_evaluated_key_media_id: Optional[str] = None
 
     @classmethod
-    def from_dict(cls, params: Dict[str, Any], identity_id: str) -> "GetUploadRecordsRequest":
+    def from_dict(cls, params: Optional[Dict[str, Any]], identity_id: str) -> "GetUploadRecordsRequest":
         if params is None:
             params = {}
         elif not isinstance(params, dict):
