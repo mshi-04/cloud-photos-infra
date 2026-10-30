@@ -1,7 +1,7 @@
 # AI文書・開発基盤リファクタリング設計
 
 - 作成日: 2026-10-30
-- 更新日: 2026-10-31。レビュー指摘の反映、コーディング規約の章の追加、型検査とlintの厳しさの決定、段階ごとの作業とブランチの追加
+- 更新日: 2026-10-31。レビュー指摘の反映、コーディング規約の章の追加、型検査とlintの厳しさの決定、段階ごとの作業とブランチの追加、PRのレビュー指摘の反映
 - 状態: 設計案。実装前。
 - 設計の起点: `develop` の `e4dfb2d`
 - 本設計書のブランチ: `feature/ai-documentation-refactoring`。各段階のブランチは第10.1節に記す
@@ -150,6 +150,11 @@ API応答は204の空bodyなどの差を保つ。DynamoDBのクライアント�
 - ビルドスクリプトは、ローカルのPowerShellとCIのbashのどちらからも同じ手順で呼べるよう、Pythonで実装する。
 - ZIPは再現可能にする。エントリの順序、更新時刻、権限を固定し、同じ入力から同じハッシュを得る。Firebaseレイヤーも同じ方針とし、ビルドに使うコンテナイメージのタグを固定する。再現できない場合、planのたびにLambdaやレイヤーの差分が現れる。
 - 生成したZIPを独立した場所へ展開し、リポジトリのソース検索パスに依存せず各handlerをimportできることを検証する。検証の対象は、Terraformが参照するものと同じZIPとする。
+- 読み込み検証は、ZIPに入っていないモジュールをソースツリーや開発環境から解決しないよう、実行環境を隔離する。
+  - 検証は、ビルドスクリプトとは別のプロセスで行う。
+  - そのプロセスは`python -I -S`で起動し、作業ディレクトリを一時ディレクトリにする。これにより、`PYTHONPATH`、作業ディレクトリ、スクリプトの場所、開発用仮想環境の`site-packages`が検索パスに入らない。
+  - 検索パスに加えるのは、ZIPの展開先とレイヤーの`python/`だけとする。Lambdaランタイムが同梱するboto3は、`pip install --target`で用意した専用のディレクトリから読み込む。
+  - 検証が隔離できていることは、共有処理を1つ外したZIPで検証が失敗することで確かめる。
 - 読み込み検証には実AWS認証情報や実サービス呼び出しを必要としない。外部ライブラリを持つ関数では、その配布レイヤーも含めて依存関係を確認する。`firebase-admin`のバージョンは、テスト用とレイヤー用で一元化するか、一致を検証する。
 - ローカル、CI、CDで同じ成果物生成手順を呼ぶ。Firebaseレイヤーのビルド手順も重複させない。
 - `terraform validate`とplanは、現在のレイヤーと同様に、成果物の生成後に実行する。
@@ -167,7 +172,7 @@ fixtureは`monkeypatch`などで環境変数を元の状態へ戻す。MotoとFi
 
 | 対象 | 修正する動作 | 必要な確認 |
 |---|---|---|
-| 通知の入力 | JSONオブジェクト以外と、真偽値・負数・非整数の`successCount`を400として扱う | 不正入力でDBやFCMへ進まない。既存の正常応答、401、201、204を保つ |
+| 通知の入力 | JSONオブジェクトではないリクエストボディと、真偽値・負数・非整数の`successCount`を400として扱う | 不正入力でDBやFCMへ進まない。既存の正常応答、401、201、204を保つ |
 | 通知先の取得 | Queryの継続キーを処理し、全ページの端末を対象にする | 複数ページ、継続キー付きの空ページ、所有者条件の維持 |
 | 通知処理の外部サービス障害 | DynamoDB QueryとSecrets Managerの失敗を500として扱う。登録解除済みトークンの削除に失敗しても、記録したうえで残りの端末への送信を続ける | 応答に内部情報を含めない。ログの識別子とトークンをマスクする。削除の失敗後も残りの端末へ送信される |
 | identity取得 | 認証情報の欠落・nullを未認証として扱う | 関数群ごとの既存401/403契約を保ち、例外にしない |
@@ -195,7 +200,24 @@ fixtureは`monkeypatch`などで環境変数を元の状態へ戻す。MotoとFi
 
 ### 7.2 APIの接続と再デプロイ
 
-設定変更を確実に反映するため、deploymentの更新判定に対象APIの設定内容を含める。対象は認証設定、integration、CORS、Gateway Responseなど、公開されたAPIの動作へ影響する設定とする。
+現行の`aws_api_gateway_deployment.media`の`triggers`は、`cors_allow_origin`のほかに、method、integration、method response、integration responseの`.id`だけを参照している。`.id`は`authorization`やintegrationの`uri`などを変えても変わらないため、これらの変更は再デプロイされない。Gateway Responseは`triggers`に含まれていない。
+
+設定変更を確実に反映するため、deploymentの更新判定に次の設定内容を含める。値は`locals`に集めて`triggers`へ渡す。
+
+| リソース | 含める属性 |
+|---|---|
+| method | `authorization` |
+| integration | `type`、`integration_http_method`、`uri`、`request_templates` |
+| method response、integration response | `status_code`、`response_parameters` |
+| Gateway Response | `response_type`、`response_parameters` |
+| モジュールの入力 | `cors_allow_origin`（現行どおり） |
+
+これらはレビュー時点で設定している属性である。`passthrough_behavior`や`request_parameters`など、公開されたAPIの動作へ影響する属性を新しく設定する場合は、同じ差分で更新判定にも加える。
+
+更新判定の確認は次のとおりとする。
+
+- AWSに接続しない確認として、モジュール内のmethod、integration、method response、integration response、Gateway Responseがすべて更新判定の入力に含まれることを、ブロック単位で機械的に比較する。
+- planを実行できる場合は、devで上の表の属性を種類ごとに1つずつ変えたplanを作り、deploymentが置き換えられて`triggers`の値が変わることを確かめる。属性を変えないplanでは、deploymentに差分が出ないことを確かめる。確認のための変更はコミットせずに戻す。
 
 必要なmethod・path・実行可能ARNの関係を小さな定義にまとめ、実行可能ARNやpermissionの重複を導出できる箇所を整理する。導出するのは、実行可能ARNの文字列や更新判定の入力値などの`locals`に限り、リソースは個別の定義のまま残す。全リソースを汎用化するための抽象層や`for_each`化は導入せず、Lambdaごとの権限境界と既存のリソースアドレスを維持する。
 
@@ -221,9 +243,9 @@ AIは周辺の既存コードを手本にするため、規約は文書だけで
 
 | 原則 | 内容 | 機械的な確認 |
 |---|---|---|
-| 値オブジェクト | 不変条件や機密性を持つ概念を、`@dataclass(frozen=True, slots=True)`の値オブジェクトや`enum.StrEnum`で表す。対象はIdentity ID、メディアID、保存パス、デバイストークン、件数、ページング位置、列挙値などとする。生成時に検証し、生成できた値は常に正しい状態にする。すべてのプリミティブを包むことはしない | Pyright、レビュー |
+| 値オブジェクト | 不変条件や機密性を持つ概念を、`@dataclass(frozen=True, slots=True)`の値オブジェクトや`enum.StrEnum`で表す。対象はIdentity ID、メディアID、保存パス、デバイストークン、件数、ページング位置、列挙値などとする。検証は`__post_init__`に置き、どの経路で生成しても同じ規則を適用して、生成できた値は常に正しい状態にする。`parse`などの生成メソッドは、入力の型を絞り込んでから生成に委ねる。すべてのプリミティブを包むことはしない | Pyright、レビュー |
 | 規則の置き場所 | 所有者確認などの規則は、値オブジェクトのメソッドに置く。例えば、保存パスが本人のものかは保存パスの値オブジェクトが判定する | レビュー |
-| 機密値 | デバイストークンなどの機密値は`__repr__`で伏せ字にし、ログへ生の値が出ることを構造的に防ぐ。生の値は、AWSやFCMを呼び出す直前にだけ取り出す | レビュー、テスト |
+| 機密値 | デバイストークンなどの機密値は`__repr__`で伏せ字にし、ログへ生の値が出ることを構造的に防ぐ。既存の`mask_identity`と同じく、8文字以下の値は全体を伏せ字にする。生の値は、AWSやFCMを呼び出す直前にだけ取り出す | レビュー、テスト |
 | 早期リターン | 前提条件はガード節で先に返すか送出する。`return`や`raise`の後に`else`を書かず、ネストを浅く保つ | ruffの`RET`、`SIM`、`C901` |
 | handlerの責務 | handlerは、イベントの解釈、処理の呼び出し、HTTP応答への変換だけを行う。検証と業務規則は値オブジェクトと純粋な関数に置き、AWSの呼び出しは薄い関数に分ける | レビュー |
 | 例外 | 入力不正や所有者違反は専用の例外で表し、HTTP応答への変換はhandlerの1か所で行う。`except Exception`は最も外側で、記録と理由のコメントがある場合に限る | ruffの`BLE`、`TRY400` |
@@ -236,17 +258,26 @@ AIは周辺の既存コードを手本にするため、規約は文書だけで
 値オブジェクトとガード節を組み合わせた例を示す。値オブジェクトは現行の検証内容と応答メッセージを保ったまま移す。
 
 ```python
+FULLY_MASKED_MAX_LENGTH: Final = 8
+
+
 @dataclass(frozen=True, slots=True)
 class DeviceToken:
     value: str
 
+    def __post_init__(self) -> None:
+        if not isinstance(self.value, str) or not self.value:
+            raise ValidationError("deviceToken is required")
+
     @classmethod
     def parse(cls, raw: object) -> Self:
-        if not isinstance(raw, str) or not raw:
+        if not isinstance(raw, str):
             raise ValidationError("deviceToken is required")
         return cls(raw)
 
     def __repr__(self) -> str:
+        if len(self.value) <= FULLY_MASKED_MAX_LENGTH:
+            return "DeviceToken(***)"
         return f"DeviceToken(***{self.value[-4:]})"
 
 
@@ -435,7 +466,7 @@ planの結果を判断に使う場合は、CIのPRコメントの切り詰めに
 5. ビルドしたZIPを展開して各handlerを読み込む検証を加え、CIとCDのビルド手順を同じスクリプトに揃える。
 6. 影響する文書とSkillを、同じ差分で更新する。
 
-確認: 一括と関数群別のテスト、ruff、Pyright、ZIPの読み込み検証、`terraform validate`。planを実行できる場合は、Lambdaの更新が意図した範囲にとどまることを確かめる。
+確認: 一括と関数群別のテスト、ruff、Pyright、第6.3節の隔離した環境でのZIPの読み込み検証、`terraform validate`。planを実行できる場合は、Lambdaの更新が意図した範囲にとどまることを確かめる。
 
 ZIPの階層とhandlerを同時に変えるため、適用の途中で短時間エラーが起き得る。第6.1節のとおり、本番運用の開始前はこれを許容する。
 
@@ -455,13 +486,13 @@ ZIPの階層とhandlerを同時に変えるため、適用の途中で短時間�
 
 ### 10.10 段階7: Terraformの改善
 
-1. deploymentの更新判定に、APIの設定内容を含める。
+1. deploymentの更新判定に、第7.2節の表の属性を含める。
 2. 実行可能ARNなどの重複を、`locals`から導出する。
 3. Firebaseレイヤーのビルドを段階5のスクリプトへ統合し、ZIPを再現可能にして、ビルドイメージのタグを固定する。`firebase-admin`のバージョンを一元化し、Dependabotの対象ディレクトリを直す。
 4. 各モジュールに`versions.tf`を置き、使われていないdata sourceと、コメントアウトしたコードを削除する。
 5. tflintの設定を置き、CIに加える。
 
-確認: 同じ入力から2回ビルドしてハッシュが一致すること、tflint、`terraform fmt -check`、`terraform validate`。planを実行できる場合は、deploymentの更新のほかに意図しない変更がないこと。
+確認: 同じ入力から2回ビルドしてハッシュが一致すること、tflint、`terraform fmt -check`、`terraform validate`、第7.2節の更新判定の確認。planを実行できる場合は、deploymentの更新のほかに意図しない変更がないこと。
 
 完了条件: 同じ入力から同じハッシュの成果物が得られ、tflintが成功する。planを実行できる場合は、動作変更が意図した範囲でplanに現れる。
 
