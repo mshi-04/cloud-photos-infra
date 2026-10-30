@@ -53,7 +53,7 @@
 |---|---|
 | Platform | GitHub Actions |
 | Auth to AWS | OIDC roles |
-| PR | `main` と `develop` への PR で、lint、Pyright、test、Terraform の format と plan |
+| PR | `main` と `develop` への PR で、lint、Pyright、test、Trivy、Terraform の format と plan |
 | `develop` への push | dev へ自動で plan と apply |
 | `main` への push | dev へ適用した後、prod へ plan と apply |
 | Prod | GitHub の Environment `production` で apply する。承認の要否は Environment の保護設定による |

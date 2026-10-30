@@ -81,7 +81,7 @@ docs/               Implementation, verification, security, and operational guid
 - Terraform `1.15.6`; [.terraform-version](.terraform-version) is the source of truth
 - Python `3.12`
 - Docker for building the Firebase Admin Lambda Layer
-- Ruff, Pyright, and pytest; their versions are pinned in [lambda/requirements-dev.txt](lambda/requirements-dev.txt) to match CI
+- Ruff, Pyright, and pytest, installed from [lambda/requirements-dev.txt](lambda/requirements-dev.txt). Ruff and Pyright are pinned to the same versions as CI; pytest uses the compatible-release specifier `~=8.0`
 - Optional: Trivy for IaC security scans
 - AWS permissions equivalent to the target environment's `gh-terraform-plan-<env>` role and the state bucket name, only when running `terraform plan`. In addition to resource read access, planning requires KMS decryption and S3 lockfile read/write permissions
 

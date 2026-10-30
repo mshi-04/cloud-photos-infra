@@ -81,7 +81,7 @@ docs/               実装、検証、セキュリティ、運用ルール
 - Terraform `1.15.6`（正確な値は [.terraform-version](.terraform-version) を参照）
 - Python `3.12`
 - Docker（Firebase Admin Lambda Layer のビルドに使用）
-- Ruff、Pyright、pytest（バージョンは [lambda/requirements-dev.txt](lambda/requirements-dev.txt) で CI と同じ値に固定）
+- Ruff、Pyright、pytest（[lambda/requirements-dev.txt](lambda/requirements-dev.txt) から入れます。Ruff と Pyright は CI と同じバージョンに固定し、pytest は `~=8.0` の互換リリース指定です）
 - 任意: Trivy（IaC セキュリティスキャン）
 - `terraform plan` を行う場合のみ、対象環境の `gh-terraform-plan-<env>` ロール相当の AWS 権限と state bucket 名。リソースの参照に加え、state の KMS 復号と S3 lockfile の読み書き権限が必要です
 
