@@ -22,7 +22,7 @@
 | ドキュメントのみ | Markdownの整合性、リンク対象の存在確認 |
 | Terraform | `terraform fmt -recursive`、影響環境の `terraform validate`、可能なら `terraform plan` |
 | IAM / security | Terraform検証に加え、権限差分レビュー、可能なら `trivy conf .` |
-| Lambda | `ruff format`、`ruff check`、関連 `pytest` |
+| Lambda | `ruff check`、`ruff format --check`、`pyright`、関連する関数群の `pytest` |
 | CI/CD | ワークフロー構文と影響するコマンドの確認 |
 | bootstrap | 検証に加え、手動適用手順とリスクの明記 |
 
@@ -55,16 +55,19 @@ prodに影響する場合は `envs/prod` でも同様に確認します。認証
 
 ## Lambda
 
-Lambda変更時は `lambda/` を基準にテストします。
+Lambda変更時は、リポジトリルートで lint、整形、型検査を実行し、`lambda/` で関数群ごとにテストします。ツールのバージョンと仮想環境の準備は [commands.md](commands.md) を参照してください。
 
 ```powershell
-ruff format lambda/
 ruff check lambda/
+ruff format --check lambda/
+pyright
 Set-Location lambda
-pytest
+pytest <function_group>/tests/
 ```
 
-対象が限定されている場合は、関連するテストディレクトリだけを実行して構いません。ただし、その理由を報告してください。
+変更した関数群のテストを実行します。共有する `lambda/common/` を変えた場合は、それを使う `device_tokens` と `push_notification` の両方を実行します。複数の関数群に影響する変更や、影響範囲を判断できない場合は、4つの関数群すべてを実行します。実行しなかった関数群がある場合は、その理由を報告してください。
+
+`lambda/` で `pytest` を一度に実行すると、関数群どうしの同名モジュールが衝突して失敗します。この失敗を変更による失敗として報告しないでください。
 
 ## Security
 

@@ -52,8 +52,10 @@ IAM権限を広げる場合や `bootstrap/` の変更が必要な場合は、実
 
 ワークフローは `.github/workflows/` にあります。
 
-- PRでは plan、lint、test を実行します。
-- `main` マージ後、devへ自動適用されます。
-- prodは手動承認を前提にします。
+- `main` と `develop` への PR では、lint、Pyright、test、Terraform の format と、dev と prod の plan を実行します。
+- `develop` への push で、dev へ plan と apply を行います。
+- `main` への push で、dev へ適用した後に prod へ plan と apply を行います。
+- prod の apply は GitHub の Environment `production` で実行します。承認の要否は Environment の保護設定によります。
+- CI と CD は、ワークフローの `paths` に当たる変更でだけ起動します。文書だけの変更では起動しません。
 
 ワークフローを変更する場合は、認証方式、対象環境、permissions、secrets参照を確認してください。

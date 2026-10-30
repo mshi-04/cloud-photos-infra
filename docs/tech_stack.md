@@ -43,8 +43,9 @@
 | Runtime | Python 3.12 |
 | SDK | `boto3` |
 | Lint / format | `ruff` |
+| Type check | Pyright |
 | Test | `pytest` |
-| Auth pattern | Cognito JWT validation via existing `auth.py` helpers |
+| Auth pattern | API Gateway の IAM 認証（`AWS_IAM`）と、Lambda での Identity ID による所有者確認 |
 
 ## CI/CD
 
@@ -52,9 +53,10 @@
 |---|---|
 | Platform | GitHub Actions |
 | Auth to AWS | OIDC roles |
-| PR | Terraform plan、lint、test |
-| Main merge | dev auto deploy |
-| Prod | manual approval |
+| PR | `main` と `develop` への PR で、lint、Pyright、test、Terraform の format と plan |
+| `develop` への push | dev へ自動で plan と apply |
+| `main` への push | dev へ適用した後、prod へ plan と apply |
+| Prod | GitHub の Environment `production` で apply する。承認の要否は Environment の保護設定による |
 
 ## Agent Instruction Files
 

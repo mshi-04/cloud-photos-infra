@@ -81,7 +81,7 @@ docs/               実装、検証、セキュリティ、運用ルール
 - Terraform `1.15.6`（正確な値は [.terraform-version](.terraform-version) を参照）
 - Python `3.12`
 - Docker（Firebase Admin Lambda Layer のビルドに使用）
-- Ruff、pytest
+- Ruff、Pyright、pytest（バージョンは [lambda/requirements-dev.txt](lambda/requirements-dev.txt) で CI と同じ値に固定）
 - 任意: Trivy（IaC セキュリティスキャン）
 - `terraform plan` を行う場合のみ、対象環境の `gh-terraform-plan-<env>` ロール相当の AWS 権限と state bucket 名。リソースの参照に加え、state の KMS 復号と S3 lockfile の読み書き権限が必要です
 
@@ -91,8 +91,10 @@ docs/               実装、検証、セキュリティ、運用ルール
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-python -m pip install -r lambda/requirements-dev.txt ruff
+python -m pip install -r lambda/requirements-dev.txt
 ```
+
+`lambda/requirements-dev.txt` には、pytest と moto に加えて、CI と同じバージョンの ruff と Pyright が含まれます。
 
 ### 基本検証
 
@@ -100,11 +102,17 @@ python -m pip install -r lambda/requirements-dev.txt ruff
 terraform fmt -check -recursive
 ruff check lambda/
 ruff format --check lambda/
+pyright
 Push-Location lambda
-pytest
+pytest media_uploads/tests/
+pytest device_tokens/tests/
+pytest push_notification/tests/
+pytest users/tests/
 Pop-Location
 trivy conf .
 ```
+
+pytest は関数群ごとに実行します。`lambda/` で `pytest` を一度に実行すると、関数群どうしの同名モジュールが衝突して失敗します。`pyright` は、有効にした仮想環境の依存を使って型を検査します。
 
 Terraform の `validate` / `plan` では backend の初期化に加え、`.build/firebase_admin_layer.zip` が必要です。リポジトリルートで、CI と同じ AWS SAM Python 3.12 イメージを使ってレイヤーを生成します。
 
@@ -137,7 +145,7 @@ state lock が発生した場合、`-lock=false` や `terraform force-unlock` �
 `main` または `develop` 向けの Pull Request で対象パスが変更されると、次を実行します。
 
 - Terraform format check
-- Ruff lint / format check
+- Ruff lint / format check と Pyright の型検査
 - Lambda unit tests
 - Trivy IaC scan と SARIF アップロード
 - dev / prod の `terraform validate` と `terraform plan`

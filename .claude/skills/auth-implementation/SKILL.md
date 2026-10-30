@@ -8,10 +8,10 @@ description: 認証・認可（Cognito Identity 抽出、IDOR防止、統一HTTP
 ## 実装手順
 
 1. 前提を確認する: API Gateway の `authorization = "AWS_IAM"` が署名検証済みで、Lambda は `requestContext.identity.cognitoIdentityId` を信頼する（JWT を自前検証しない）。
-2. handler 冒頭で `get_identity_id(event)` を取り、無ければ `error(HTTPStatus.FORBIDDEN, "Unauthorized")` を返す。
+2. handler 冒頭で `get_identity_id(event)` を取り、無ければ `error(HTTPStatus.FORBIDDEN, "Unauthorized")` を返す。既存の `users` と `push_notification` は 401 を返しており、互換性のため維持する。
 3. 認証 ≠ 認可。リソース操作前に所有者境界を必ず確認する: S3 は `private/<identity_id>/` プレフィックス一致、DynamoDB は Key の HASH に `identity_id`、ページネーションは `lastEvaluatedKey.userId == identity_id`。
 4. 境界違反は `AuthorizationError` → 403 に変換する（`models.py` / `get_upload_records.py` パターン）。
-5. レスポンスは `response.py` の `success` / `error` のみ。ステータスは 未認証/IDOR=403、検証/不正JSON=400、不在=404、内部=500。新規実装は未認証=403 に揃える（`delete_user.py` は 401 だが踏襲しない）。
+5. レスポンスは `response.py` の `success` / `error` のみ。ステータスは [docs/lambda.md](../../../docs/lambda.md) の API 応答の契約に従う（未認証/IDOR=403、検証/不正JSON=400、不在=404、内部=500）。新規実装の未認証は 403 にし、既存の `users`（`delete_user.py`）と `push_notification`（`notify_upload_complete.py`）の 401 は踏襲しない。
 6. ログのユーザー識別子は `mask_identity` を通す。PII・生トークン・認証情報を出さない。
 
 ## 検証手順

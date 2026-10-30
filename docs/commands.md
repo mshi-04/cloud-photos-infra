@@ -58,16 +58,33 @@ terraform apply -lock=false
 
 ## Lambda
 
+ruff、Pyright、pytest は、[lambda/requirements-dev.txt](../lambda/requirements-dev.txt) で CI と同じバージョンに固定しています。仮想環境を有効にしてから、依存を入れてください。
+
 ```powershell
-ruff format lambda/
-ruff check lambda/
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r lambda/requirements-dev.txt
 ```
+
+リポジトリルートで、lint、整形、型検査を実行します。ルールと型検査の厳しさは [pyproject.toml](../pyproject.toml) で設定しています。
+
+```powershell
+ruff check lambda/
+ruff format --check lambda/
+pyright
+```
+
+整形を適用する場合は `ruff format lambda/` を実行します。`pyright` は、有効にした仮想環境の Python と依存を使って import を解決します。
+
+テストは `lambda/` で、関数群ごとに実行します。`lambda/` で `pytest` を一度に実行すると、関数群どうしの同名モジュールが衝突して失敗します。
 
 ```powershell
 Set-Location lambda
-pytest
-pytest <function_name>/tests/
-pytest -v <function_name>/tests/
+pytest media_uploads/tests/
+pytest device_tokens/tests/
+pytest push_notification/tests/
+pytest users/tests/
+pytest -v <function_group>/tests/
 ```
 
 ## Security

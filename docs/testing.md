@@ -11,37 +11,42 @@
 
 ## Lambda Tests
 
-テストは `lambda/` を基準に実行します。
+テストは `lambda/` を作業ディレクトリにして、関数群ごとに実行します。CI も同じく関数群ごとに別のステップで実行します。
 
 ```powershell
 Set-Location lambda
-pytest
+pytest media_uploads/tests/
+pytest device_tokens/tests/
+pytest push_notification/tests/
+pytest users/tests/
 ```
 
-対象を絞る場合:
+`lambda/` で `pytest` を一度に実行すると、収集時に失敗します。各関数群の `conftest.py` が `sys.path` に自分のディレクトリを加え、`constants` や `auth` などを同じ名前で読み込むため、関数群どうしのモジュールが衝突します。
+
+詳細を表示する場合:
 
 ```powershell
 Set-Location lambda
-pytest <function_name>/tests/
-pytest -v <function_name>/tests/
+pytest -v <function_group>/tests/
 ```
 
 ## Test Structure
 
 ```text
 lambda/
-  <function_name>/
+  pytest.ini
+  <function_group>/
     tests/
       conftest.py
       test_<behavior>.py
 ```
 
-`conftest.py` には API Gateway event、Cognito claims、環境変数、AWS mock などの共有フィクスチャを置きます。
+`conftest.py` には、API Gateway event、`requestContext.identity.cognitoIdentityId` を持つ認証済みの event、環境変数、AWS mock などの共有フィクスチャを置きます。API Gateway は IAM 認証のため、event に Cognito のクレームや JWT は含まれません。
 
 ## What To Cover
 
 - 正常系
-- 認証エラー
+- 認証エラー（ステータスは [lambda.md](lambda.md) の API 応答の契約に従う）
 - 必須パラメータ不足
 - 不正JSONや不正型
 - AWS呼び出し失敗
@@ -69,4 +74,4 @@ prodに影響する場合は `envs/prod` でも確認します。state lock や�
 
 ## CI Expectations
 
-PRでは GitHub Actions が Terraform と Lambda の検証を実行します。ローカルで全てを再現できない場合でも、実行できた範囲と未実行理由を明確にしてください。
+PRでは GitHub Actions が Terraform と Lambda の検証を実行します。Lambda では ruff、Pyright、関数群ごとの pytest を実行します。ローカルで全てを再現できない場合でも、実行できた範囲と未実行理由を明確にしてください。
