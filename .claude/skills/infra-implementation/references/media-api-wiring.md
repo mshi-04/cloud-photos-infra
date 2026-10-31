@@ -1,30 +1,24 @@
 # media_api モジュールの配線
 
-[modules/media_api/main.tf](../../../../modules/media_api/main.tf) は Lambda、IAM、API Gateway を
-1 ファイルで持ちます。1 つのエンドポイントを足すのに触る箇所が多いため、順序を固定します。
+[modules/media_api/](../../../../modules/media_api/) は、Lambda の配布物、IAM、Lambda、API Gateway を
+責務ごとのファイルに分けて持ちます。1 つのエンドポイントを足すのに複数のファイルを触るため、順序を固定します。
 
-## 構成の並び
+## ファイルの構成
 
-```text
-data archive_file           Lambda ZIP（source_dir 一括 / locals の明示リスト）
-locals assume_role_policy   Lambda 共通の信頼ポリシー
-aws_iam_role                Lambda ごとに 1 つ
-aws_iam_role_policy         用途ごとに分割（dynamodb / s3 / secretsmanager / logs）
-aws_cloudwatch_log_group    local.lambda_functions を for_each
-aws_lambda_function         Lambda ごと
-aws_api_gateway_rest_api    1 つ
-aws_api_gateway_resource    パスセグメントごと
-method / integration / lambda_permission   エンドポイントごとに 3 点セット
-options 系                  CORS プリフライト（method_response と integration_response も必要）
-aws_api_gateway_deployment  triggers.redeployment に全 method / integration の id
-aws_api_gateway_stage       stage_name = var.env
-```
+| ファイル | 内容 |
+|---|---|
+| [main.tf](../../../../modules/media_api/main.tf) | `data`（`aws_region`、`aws_caller_identity`）、`locals` の `function_prefix` と `lambda_functions` |
+| [archives.tf](../../../../modules/media_api/archives.tf) | `data archive_file`（`source_dir` 一括 / `locals` の明示リスト） |
+| [iam.tf](../../../../modules/media_api/iam.tf) | `locals` の `assume_role_policy`、Lambda ごとの `aws_iam_role`、用途ごとの `aws_iam_role_policy`（dynamodb / s3 / secretsmanager / logs） |
+| [lambda.tf](../../../../modules/media_api/lambda.tf) | `aws_cloudwatch_log_group`（`local.lambda_functions` を `for_each`）、`aws_lambda_function`、`aws_lambda_code_signing_config` |
+| [api_gateway.tf](../../../../modules/media_api/api_gateway.tf) | REST API、パスごとの resource、エンドポイントごとの method / integration / `aws_lambda_permission`、CORS の `OPTIONS`、Gateway Response、deployment、stage |
+| [variables.tf](../../../../modules/media_api/variables.tf) / [outputs.tf](../../../../modules/media_api/outputs.tf) | 入出力 |
 
 ## エンドポイント追加の手順
 
-1. `local.lambda_functions` に `<key> = "<ハイフン区切り関数名>"` を足す。
+1. `main.tf` の `local.lambda_functions` に `<key> = "<ハイフン区切り関数名>"` を足す。
    log group の `for_each` がこのマップを参照します。
-2. `aws_iam_role` を 1 つ作り、`assume_role_policy = local.assume_role_policy` を使う。
+2. `iam.tf` に `aws_iam_role` を 1 つ作り、`assume_role_policy = local.assume_role_policy` を使う。
 3. 用途ごとに `aws_iam_role_policy` を分ける。`name` は `dynamodb-query` / `s3-delete` /
    `cloudwatch-logs` のように権限内容を表す。logs は必ず自分の log group ARN に限定する。
 
@@ -32,10 +26,10 @@ aws_api_gateway_stage       stage_name = var.env
    Resource = "${aws_cloudwatch_log_group.lambda["<key>"].arn}:*"
    ```
 
-4. `aws_lambda_function` を追加する。`runtime = "python3.12"`、`handler = "<file>.handler"`、
+4. `lambda.tf` に `aws_lambda_function` を追加する。ZIP は `archives.tf` の `data archive_file` に足す。`runtime = "python3.12"`、`handler = "<file>.handler"`、
    `filename` と `source_code_hash` は `data.archive_file` から取り、
    `depends_on = [aws_cloudwatch_log_group.lambda["<key>"]]` を付ける。
-5. パスが新しければ `aws_api_gateway_resource` を足す。既存パスなら再利用する。
+5. 以降は `api_gateway.tf` を変える。パスが新しければ `aws_api_gateway_resource` を足す。既存パスなら再利用する。
 6. `aws_api_gateway_method`（`authorization = "AWS_IAM"`）、
    `aws_api_gateway_integration`（`integration_http_method = "POST"`、`type = "AWS_PROXY"`）、
    `aws_lambda_permission` の 3 点セットを作る。
@@ -66,8 +60,8 @@ aws_api_gateway_stage       stage_name = var.env
 - `local.lambda_functions` の key を変えると log group が置換されます。関数名の変更は
   Lambda 本体・log group・IAM ロール名を同時に動かすため、`terraform plan` の destroy / replace を必ず読みます。
 - `aws_api_gateway_resource` の `path_part` 変更は下流の method / integration をすべて置換します。
-- リソース名やモジュールパスを変えるだけの整理でも state move が必要になります。判断がつかなければ
-  ユーザーへ確認します。
+- リソース名やモジュールパスを変えるだけの整理でも state の移行が必要になります。`moved` ブロックで移し、
+  実装前にユーザーへ方針を示します。ファイルを分けるだけなら、リソースアドレスは変わりません。
 - IAM 権限を広げる変更と `bootstrap/` の変更は、実装前に方針を提示します。
 
 ## 検証

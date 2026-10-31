@@ -52,7 +52,7 @@ Lambda の ZIP はフラット展開されるため、handler からの import �
 
 ## Terraform の ZIP 配線
 
-[modules/media_api/main.tf](../../../../modules/media_api/main.tf) の `archive_file` は 2 系統あります。
+[modules/media_api/archives.tf](../../../../modules/media_api/archives.tf) の `archive_file` は 2 系統あります。
 
 | ZIP | 生成方法 |
 |---|---|
@@ -81,9 +81,10 @@ Lambda の ZIP はフラット展開されるため、handler からの import �
 1. 既存グループに属するか、新規グループを作るかを決める。新規なら `auth.py` / `response.py` /
    `constants.py` / `tests/` を揃える。
 2. handler は [handler-patterns.md](handler-patterns.md) の骨格に合わせる。
-3. `modules/media_api/main.tf` に `archive_file`（必要なら `locals` のソースリスト）、
-   `aws_iam_role` + 用途別 `aws_iam_role_policy`、`local.lambda_functions` への追加、
-   `aws_lambda_function`、API Gateway の resource / method / integration / `aws_lambda_permission` を足す。
+3. `modules/media_api/` の次のファイルに追加する。
+   `archives.tf` に `archive_file`（必要なら `locals` のソースリスト）、
+   `main.tf` の `local.lambda_functions` に関数名、`iam.tf` に `aws_iam_role` と用途別の `aws_iam_role_policy`、
+   `lambda.tf` に `aws_lambda_function`、`api_gateway.tf` に resource / method / integration / `aws_lambda_permission`。
 4. `aws_api_gateway_deployment.media` の `triggers.redeployment` に新しい method / integration の id を追加する。
    忘れるとステージへ反映されません。
 5. `tests/` を追加し、`lambda/` を作業ディレクトリにして `pytest <function_group>/tests` を通す。新規グループなら、CI（`.github/workflows/ci-terraform.yml`）の `test-lambda` ジョブにも実行ステップを足す。

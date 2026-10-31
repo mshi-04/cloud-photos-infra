@@ -1,8 +1,8 @@
 # AI文書・開発基盤リファクタリング設計
 
 - 作成日: 2026-10-30
-- 更新日: 2026-10-31。レビュー指摘の反映、コーディング規約の章の追加、型検査とlintの厳しさの決定、段階ごとの作業とブランチの追加、PRのレビュー指摘の反映、段階0の省略と段階1の実施、段階2の省略、段階3の実施
-- 状態: 段階1（契約と規約の確定）と段階3（Skillの再編）を実施。段階0と段階2は行わない。段階4以降は未実施。
+- 更新日: 2026-10-31。レビュー指摘の反映、コーディング規約の章の追加、型検査とlintの厳しさの決定、段階ごとの作業とブランチの追加、PRのレビュー指摘の反映、段階0の省略と段階1の実施、段階2の省略、段階3と段階4の実施
+- 状態: 段階1（契約と規約の確定）、段階3（Skillの再編）、段階4（Terraformのファイル分割）を実施。段階0と段階2は行わない。段階5以降は未実施。
 - 設計の起点: `develop` の `e4dfb2d`
 - 本設計書のブランチ: `feature/ai-documentation-refactoring`。各段階のブランチは第10.1節に記す
 
@@ -40,7 +40,7 @@ AIが、変更する場所、守る契約、必要な検証、完了の判断方
 | 認証 | [Lambdaガイド](docs/lambda.md)などはLambdaでのJWT検証を指示するが、認証Skill（当時の`auth-implementation`）と[実装](lambda/common/auth.py)はCognito Identity IDを扱う。業務用の7メソッドはAPI GatewayのIAM認証である`AWS_IAM`を使い、`NONE`はCORSの`OPTIONS`だけである | API GatewayのIAM認証とLambdaの所有者確認を正しく説明する。JWT検証の追加は行わない |
 | テスト | 文書は全体を一度に実行する手順だが、[CI](.github/workflows/ci-terraform.yml)は4つの関数群を別プロセスで実行する。関数群別の実行は成功し、一括実行は`constants`の名前衝突により収集時に失敗する | 名前空間とimportを整理し、一度の全体実行を成立させる。それまでは関数群別の実行を現行手順として記載する |
 | import | [関数群のfixture](lambda/device_tokens/tests/conftest.py)が`sys.path`を変更し、`auth`、`constants`、`db`などを同名でimportする | 関数群ごとに区別できるモジュール名へ移行する |
-| 配布 | [Lambda ZIP生成](modules/media_api/main.tf)はディレクトリ収録とファイル列挙が混在する。`media_uploads`のZIPは`tests/`を含み、`users`のZIPは`__pycache__/`を除外していない | 共通の配布方針と、生成物を使う読み込み検証を設ける |
+| 配布 | [Lambda ZIP生成](modules/media_api/archives.tf)はディレクトリ収録とファイル列挙が混在する。`media_uploads`のZIPは`tests/`を含み、`users`のZIPは`__pycache__/`を除外していない | 共通の配布方針と、生成物を使う読み込み検証を設ける |
 | レイヤー | [Firebaseレイヤー](modules/push_notification/main.tf)のZIPは毎回ビルドされ、ZIPのハッシュで更新を判定する。同じ手順で2回ビルドするとハッシュが異なる | 成果物の生成を再現可能にする |
 | 依存関係 | `firebase-admin`のバージョンが[テスト用](lambda/requirements-dev.txt)と[レイヤー用](lambda/layers/firebase_admin/requirements.txt)の2か所にある。[Dependabot](.github/dependabot.yml)のpip設定は、依存定義のない`/lambda/media_uploads`を対象にしている | バージョンを一元化するか、一致を検証する |
 | Terraform | `media_api/main.tf`の1,108行にZIP生成、IAM、Lambda、API Gatewayが集まる | モジュールを維持したまま、責務別のファイルへ分ける |
@@ -465,6 +465,8 @@ planの結果を判断に使う場合は、CIのPRコメントの切り詰めに
 
 完了条件: ブロック単位の比較で移動以外の変更がなく、`terraform validate`が成功する。planを実行できる場合は、分割前後の結果が同じ。
 
+実施: 2026-10-31に作業1と作業2を行った。`main.tf`の既存の見出しの位置で、`main.tf`、`archives.tf`、`iam.tf`、`lambda.tf`、`api_gateway.tf`の5つに分けた。比較の結果は第12章に記す。
+
 ### 10.8 段階5: Lambda基盤
 
 1. パッケージ名と、ディレクトリの最終配置を決める。
@@ -550,7 +552,8 @@ ZIPの階層とhandlerを同時に変えるため、適用の途中で短時間�
 - 2026-10-31に、Pyright 1.1.414を`standard`で実行し、指摘が1件であることを確認した。`boto3-stubs`を加えると5件、加えたうえで`strict`にすると883件だった。あわせてTerraformのモジュールを確認し、すべての変数に`type`と`description`があること、モジュールが`required_providers`を宣言していないこと、`media_api`の`aws_region`と`aws_caller_identity`のdata sourceが使われていないことを確認した。
 - GitHub Actionsの記録で、PRのCIの`Lambda Lint`がruff 0.16.1で失敗してplanジョブがスキップされたことと、CDの直近2回がOIDCのロール引受けで失敗したことを確認した。
 - Terraformのvalidate・plan、trivy、tflintは未実施であり、現行の全検証が成功するとは主張しない。
-- 段階1と段階3の変更は実装済み。段階2は行わない。段階3の作業3のうち、Infra Skillのアドレス変更の手順を`moved`ブロック優先にする変更は、新しいコーディング規約との矛盾を避けるため段階1で実施した。段階4以降のコード・Skill・CIの変更は未実装。設計書を作成したことと、提案した変更を検証したことを区別する。
+- 2026-10-31に段階4の分割を確認した。分割前の`main.tf`と分割後の5つのファイルから、トップレベルのブロック（`data`が6、`locals`が3、`resource`が85の計94）を取り出して比べ、内容がすべて一致し、各ブロックがちょうど1回ずつ現れることを確かめた。コメントの68行も一致した。`terraform fmt -check -recursive`は成功した。`terraform init -backend=false`の後の`terraform validate`は、`envs/dev`と`envs/prod`で分割の前後とも成功した。プロバイダは、ロックファイルと同じ版をreleases.hashicorp.comから取得し、公開されたSHA256と照合して使った。`validate`に必要なFirebaseレイヤーのZIPは、空のZIPで代用した。planは、AWSの認証情報がないため実行していない。
+- 段階1、段階3、段階4の変更は実装済み。段階2は行わない。段階3の作業3のうち、Infra Skillのアドレス変更の手順を`moved`ブロック優先にする変更は、新しいコーディング規約との矛盾を避けるため段階1で実施した。段階5以降のコード・Skill・CIの変更は未実装。設計書を作成したことと、提案した変更を検証したことを区別する。
 
 ## 13. 外部仕様の確認先
 

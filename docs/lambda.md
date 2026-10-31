@@ -23,7 +23,7 @@ lambda/
       test_<behavior>.py
 ```
 
-Lambda の `handler` 設定は `<handler_module>.handler` です。ZIP の構成は [modules/media_api/main.tf](../modules/media_api/main.tf) の `archive_file` で決まります。新しいファイルを追加する場合は、その関数群の ZIP に収録されるかを確認してください。
+Lambda の `handler` 設定は `<handler_module>.handler` です。ZIP の構成は [modules/media_api/archives.tf](../modules/media_api/archives.tf) の `archive_file` で決まります。新しいファイルを追加する場合は、その関数群の ZIP に収録されるかを確認してください。
 
 ## Handler Design
 
