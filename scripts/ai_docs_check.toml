@@ -1,0 +1,16 @@
+# Config for scripts/check_ai_docs.py.
+
+# Intended differences between AGENTS.md and CLAUDE.md, and between .agents/skills and .claude/skills.
+# Lines are compared after `.agents/` is rewritten to `.claude/` on the AGENTS side, so path differences need no entry.
+# `path` is `AGENTS.md` for the entry files, or `skills/<relative path>` for skill files.
+# Each entry must match one differing block exactly; an entry that matches nothing fails the check.
+[[parity.allowed]]
+path = "AGENTS.md"
+agents = ["# AGENTS.md"]
+claude = ["# CLAUDE.md"]
+
+# Skills that were removed. Any reference to these names fails the check.
+[retired_skills]
+names = []
+# Files that may keep the old names, such as records of past decisions.
+exempt_paths = ["ai-documentation-refactoring-design.md"]
