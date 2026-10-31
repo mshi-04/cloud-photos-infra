@@ -56,16 +56,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run ruff check
-        uses: astral-sh/ruff-action@v3
+      - uses: actions/setup-python@v5
         with:
-          src: lambda
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: lambda/requirements-dev.txt
+
+      # ruff and Pyright versions are pinned in requirements-dev.txt so that CI and local runs match.
+      - name: Install dependencies
+        run: pip install -r lambda/requirements-dev.txt
+
+      - name: Run ruff check
+        run: ruff check lambda
 
       - name: Run ruff format check
-        uses: astral-sh/ruff-action@v3
-        with:
-          src: lambda
-          args: format --check
+        if: ${{ !cancelled() }}
+        run: ruff format --check lambda
+
+      - name: Run Pyright
+        if: ${{ !cancelled() }}
+        run: pyright
 
   test-lambda:
     name: "Lambda Unit Tests"

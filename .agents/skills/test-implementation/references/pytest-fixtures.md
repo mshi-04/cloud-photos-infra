@@ -11,11 +11,12 @@ addopts = --import-mode=importlib --override-ini="pythonpath="
 ```
 
 `pythonpath` を空にしているため、import path は各 `conftest.py` の `sys.path.insert` が作ります。
-テストは必ず `lambda/` を作業ディレクトリにして実行します。
+テストは必ず `lambda/` を作業ディレクトリにして、関数グループごとに実行します。
+`lambda/` で `pytest` を一度に実行すると、関数グループどうしの `constants` などの同名モジュールが衝突し、収集時に失敗します。
 
 ```powershell
 Set-Location lambda
-pytest
+pytest <function_group>/tests
 ```
 
 ## sys.path
@@ -168,7 +169,7 @@ class TestCreateUploadRecord:
 | ケース | 期待 |
 |---|---|
 | 正常系 | 200 / 201 と本文の内容 |
-| identity 無し | 403（`users` / `push_notification` の既存は 401） |
+| identity 無し | 403（`users` / `push_notification` の既存は 401。規則は `docs/lambda.md` の API 応答の契約） |
 | IDOR（他人の path / `lastEvaluatedKey`） | 403 |
 | 必須欠落 | 400 |
 | 不正 JSON・型不正・列挙外 | 400 |

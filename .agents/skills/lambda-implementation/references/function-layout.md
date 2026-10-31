@@ -86,7 +86,7 @@ Lambda の ZIP はフラット展開されるため、handler からの import �
    `aws_lambda_function`、API Gateway の resource / method / integration / `aws_lambda_permission` を足す。
 4. `aws_api_gateway_deployment.media` の `triggers.redeployment` に新しい method / integration の id を追加する。
    忘れるとステージへ反映されません。
-5. `tests/` を追加し、`lambda/` 基準で `pytest` を通す。
+5. `tests/` を追加し、`lambda/` を作業ディレクトリにして `pytest <function_group>/tests` を通す。新規グループなら、CI（`.github/workflows/ci-terraform.yml`）の `test-lambda` ジョブにも実行ステップを足す。
 
 ## 参考資料
 

@@ -81,7 +81,7 @@ docs/               Implementation, verification, security, and operational guid
 - Terraform `1.15.6`; [.terraform-version](.terraform-version) is the source of truth
 - Python `3.12`
 - Docker for building the Firebase Admin Lambda Layer
-- Ruff and pytest
+- Ruff, Pyright, and pytest, installed from [lambda/requirements-dev.txt](lambda/requirements-dev.txt). Ruff and Pyright are pinned to the same versions as CI; pytest uses the compatible-release specifier `~=8.0`
 - Optional: Trivy for IaC security scans
 - AWS permissions equivalent to the target environment's `gh-terraform-plan-<env>` role and the state bucket name, only when running `terraform plan`. In addition to resource read access, planning requires KMS decryption and S3 lockfile read/write permissions
 
@@ -91,8 +91,10 @@ docs/               Implementation, verification, security, and operational guid
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-python -m pip install -r lambda/requirements-dev.txt ruff
+python -m pip install -r lambda/requirements-dev.txt
 ```
+
+`lambda/requirements-dev.txt` includes pytest and moto, as well as ruff and Pyright at the same versions as CI.
 
 ### Basic verification
 
@@ -100,11 +102,17 @@ python -m pip install -r lambda/requirements-dev.txt ruff
 terraform fmt -check -recursive
 ruff check lambda/
 ruff format --check lambda/
+pyright
 Push-Location lambda
-pytest
+pytest media_uploads/tests/
+pytest device_tokens/tests/
+pytest push_notification/tests/
+pytest users/tests/
 Pop-Location
 trivy conf .
 ```
+
+Run pytest separately for each function group. Running `pytest` once from `lambda/` fails because modules with the same name in different function groups collide. `pyright` checks types using the dependencies in the activated virtual environment.
 
 Terraform `validate` and `plan` require backend initialization and `.build/firebase_admin_layer.zip`. From the repository root, build the layer with the same AWS SAM Python 3.12 image used by CI.
 
@@ -137,7 +145,7 @@ If a state lock is encountered, do not bypass it with `-lock=false` or `terrafor
 When relevant paths change in a pull request targeting `main` or `develop`, CI runs:
 
 - Terraform formatting checks
-- Ruff lint and formatting checks
+- Ruff lint and formatting checks, and Pyright type checks
 - Lambda unit tests
 - Trivy IaC scanning with SARIF upload
 - `terraform validate` and `terraform plan` for dev and prod

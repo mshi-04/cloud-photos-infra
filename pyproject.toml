@@ -1,2 +1,12 @@
 [tool.ruff]
 line-length = 130
+
+[tool.ruff.lint]
+# Pin the rule set explicitly so that ruff upgrades do not change it.
+# These are ruff's former default rules.
+select = ["E4", "E7", "E9", "F"]
+
+[tool.pyright]
+include = ["lambda"]
+pythonVersion = "3.12"
+typeCheckingMode = "standard"

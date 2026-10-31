@@ -24,10 +24,13 @@ IAM変更では次を確認します。
 
 ## Authentication And Authorization
 
-- API系Lambdaは Cognito JWT を検証します。
-- ユーザーごとのS3 prefix、DynamoDB key、Identity ID の境界を維持します。
+- 認証は API Gateway の IAM 認証で行います。業務用のメソッドは `authorization = "AWS_IAM"` で、クライアントは Cognito Identity Pool の一時認証情報で SigV4 署名します。`authorization = "NONE"` は CORS の `OPTIONS` だけに許します。
+- Lambda は JWT を検証しません。API Gateway が渡す `requestContext.identity.cognitoIdentityId` を、呼び出したユーザーの Identity ID として信頼します。
+- 業務メソッドの `authorization` を変えると、Lambda のコードを変えずに認証が外れます。API Gateway の変更では、この設定を必ず確認してください。
+- 認可は Lambda で行います。ユーザーごとのS3 prefix、DynamoDB key、Identity ID の境界を維持します。
 - 認証と所有者チェックを混同しないでください。
 - 認証済みでも、他ユーザーのメディアやデバイストークンへアクセスできないことを確認します。
+- 未認証と所有者境界違反のステータスは [lambda.md](lambda.md) の API 応答の契約に従います。
 
 ## Secrets
 
