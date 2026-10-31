@@ -19,10 +19,12 @@
 
 | 変更対象 | 必須検証 |
 |---|---|
-| ドキュメントのみ | Markdownの整合性、リンク対象の存在確認 |
+| ドキュメント・Skill | `python scripts/check_ai_docs.py` |
 | Terraform | `terraform fmt -recursive`、影響環境の `terraform validate`、可能なら `terraform plan` |
 | IAM / security | Terraform検証に加え、権限差分レビュー、可能なら `trivy conf .` |
 | Lambda | `ruff check`、`ruff format --check`、`pyright`、関連する関数群の `pytest` |
+| Pythonのツール設定（`pyproject.toml`、`lambda/requirements-dev.txt`） | `ruff check lambda/ scripts/`、`ruff format --check lambda/ scripts/`、`pyright` |
+| `scripts/` | `ruff check scripts/`、`ruff format --check scripts/`、`pyright`、`pytest scripts/tests/`、`python scripts/check_ai_docs.py` |
 | CI/CD | ワークフロー構文と影響するコマンドの確認 |
 | bootstrap | 検証に加え、手動適用手順とリスクの明記 |
 
@@ -68,6 +70,16 @@ pytest <function_group>/tests/
 変更した関数群のテストを実行します。共有する `lambda/common/` を変えた場合は、それを使う `device_tokens` と `push_notification` の両方を実行します。複数の関数群に影響する変更や、影響範囲を判断できない場合は、4つの関数群すべてを実行します。実行しなかった関数群がある場合は、その理由を報告してください。
 
 `lambda/` で `pytest` を一度に実行すると、関数群どうしの同名モジュール（`constants` など）が衝突し、収集時に失敗します。一括実行の失敗のうち、この衝突だけが原因の収集エラーは既知の失敗として扱い、変更による失敗として報告しないでください。それ以外の import や収集の失敗と、関数群ごとの実行結果は、通常どおり報告します。
+
+## AI文書
+
+文書やSkillを変えた場合は、リポジトリルートで次を実行します。確かめる内容は [commands.md](commands.md) を参照してください。
+
+```powershell
+python scripts/check_ai_docs.py
+```
+
+このチェックが確かめるのは、構文、リンク、frontmatter、両系統の差分です。AIが作業に合ったSkillを選び、必要な資料を読むかは確かめません。チェックの成功を、Skillが適切に使われることの確認として報告しないでください。
 
 ## Security
 

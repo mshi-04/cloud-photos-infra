@@ -74,4 +74,4 @@ prodに影響する場合は `envs/prod` でも確認します。state lock や�
 
 ## CI Expectations
 
-PRでは GitHub Actions が Terraform と Lambda の検証を実行します。Lambda では ruff、Pyright、関数群ごとの pytest を実行します。ローカルで全てを再現できない場合でも、実行できた範囲と未実行理由を明確にしてください。
+PRでは GitHub Actions が Terraform と Lambda の検証を実行します。Lambda では ruff、Pyright、関数群ごとの pytest を実行します。文書の検証スクリプトのテスト（`scripts/tests/`）は、Docs CI で実行します。ローカルで全てを再現できない場合でも、実行できた範囲と未実行理由を明確にしてください。

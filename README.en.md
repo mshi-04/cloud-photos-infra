@@ -103,6 +103,7 @@ terraform fmt -check -recursive
 ruff check lambda/
 ruff format --check lambda/
 pyright
+python scripts/check_ai_docs.py
 Push-Location lambda
 pytest media_uploads/tests/
 pytest device_tokens/tests/
@@ -112,7 +113,7 @@ Pop-Location
 trivy conf .
 ```
 
-Run pytest separately for each function group. Running `pytest` once from `lambda/` fails because modules with the same name in different function groups collide. `pyright` checks types using the dependencies in the activated virtual environment.
+Run pytest separately for each function group. Running `pytest` once from `lambda/` fails because modules with the same name in different function groups collide. `pyright` checks types using the dependencies in the activated virtual environment. `python scripts/check_ai_docs.py` checks links, front matter, and differences between the two copies of the AI documents and skills.
 
 Terraform `validate` and `plan` require backend initialization and `.build/firebase_admin_layer.zip`. From the repository root, build the layer with the same AWS SAM Python 3.12 image used by CI.
 
@@ -150,6 +151,11 @@ When relevant paths change in a pull request targeting `main` or `develop`, CI r
 - Trivy IaC scanning with SARIF upload
 - `terraform validate` and `terraform plan` for dev and prod
 - Sanitized Terraform plan comments on the pull request
+
+Pull requests that change documents, skills, or Python tool settings also run Docs CI, which does not connect to AWS. Docs CI starts on every pull request and skips the jobs whose paths did not change.
+
+- AI document and skill checks: Markdown, relative links, skill front matter, and differences between `.agents` and `.claude`
+- Ruff, Pyright, and the `scripts/` tests when `pyproject.toml`, `lambda/requirements-dev.txt`, or `scripts/` changes
 
 ### Deployment
 
