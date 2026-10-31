@@ -1,0 +1,98 @@
+name: "Docs CI"
+
+# Checks that need no AWS access. The workflow runs on every pull request, and each job decides from the
+# changed paths whether it has work to do, so a required check never waits on a workflow that did not start.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - main
+      - develop
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+concurrency:
+  group: docs-ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    name: "Detect Changes"
+    runs-on: ubuntu-latest
+    outputs:
+      docs: ${{ steps.filter.outputs.docs }}
+      python: ${{ steps.filter.outputs.python }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Filter changed paths
+        id: filter
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          changed="$(git diff --name-only "$BASE_SHA...$HEAD_SHA")"
+          printf 'Changed files:\n%s\n' "$changed"
+
+          matches() {
+            if printf '%s\n' "$changed" | grep -Eq "$1"; then echo true; else echo false; fi
+          }
+
+          # Documents, skills, and the docs check itself.
+          echo "docs=$(matches '(\.md$|^\.agents/|^\.claude/|^scripts/|^\.github/workflows/ci-docs\.yml$)')" >> "$GITHUB_OUTPUT"
+          # Python tool settings and the Python code under scripts/.
+          echo "python=$(matches '^(pyproject\.toml|lambda/requirements-dev\.txt|scripts/.*|\.github/workflows/ci-docs\.yml)$')" >> "$GITHUB_OUTPUT"
+
+  ai-docs:
+    name: "AI Docs Check"
+    needs: changes
+    if: needs.changes.outputs.docs == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check AI documents and skills
+        run: python scripts/check_ai_docs.py
+
+  python-tooling:
+    name: "Python Lint and Type Check"
+    needs: changes
+    if: needs.changes.outputs.python == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: lambda/requirements-dev.txt
+
+      # The same pinned ruff and Pyright as the Lambda Lint job in Terraform CI.
+      - name: Install dependencies
+        run: pip install -r lambda/requirements-dev.txt
+
+      - name: Run ruff check
+        run: ruff check lambda scripts
+
+      - name: Run ruff format check
+        if: ${{ !cancelled() }}
+        run: ruff format --check lambda scripts
+
+      - name: Run Pyright
+        if: ${{ !cancelled() }}
+        run: pyright
+
+      - name: Run docs check tests
+        if: ${{ !cancelled() }}
+        run: pytest scripts/tests
