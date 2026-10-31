@@ -46,9 +46,11 @@ terraform fmt -recursive
 Set-Location envs/dev
 terraform validate
 terraform plan
+Set-Location ../..
+trivy conf .
 ```
 
-prod に影響する場合は `envs/prod` でも確かめる。IaC や IAM を変えた場合は、可能なら `trivy conf .` も実行する。認証情報や backend に接続できず実行できない場合は、`Not executed` として理由を報告する。state lock が出た場合は回避せず、`Blocked by state lock` として報告する。報告の形式は [docs/verification_policy.md](../../../docs/verification_policy.md) に従う。
+prod に影響する場合は `envs/prod` でも、`bootstrap/` を変えた場合は `bootstrap/` でも、`terraform validate` と `terraform plan` を実行する。`trivy conf .` はリポジトリルートで実行し、全体を検査する。IAM を変えた場合は、Terraform の検証に加えて権限の差分をレビューし、広がった権限とその理由を報告する。認証情報や backend に接続できず実行できない場合は、`Not executed` として理由を報告する。state lock が出た場合は回避せず、`Blocked by state lock` として報告する。報告の形式は [docs/verification_policy.md](../../../docs/verification_policy.md) に従う。
 
 ## 参考資料
 
