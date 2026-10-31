@@ -109,7 +109,7 @@ S3 側は `list_object_versions` のページネータで `Versions` と `Delete
 
 ## IAM との対応
 
-アクションを増やしたら [modules/media_api/main.tf](../../../../modules/media_api/main.tf) の
+アクションを増やしたら [modules/media_api/iam.tf](../../../../modules/media_api/iam.tf) の
 対応する `aws_iam_role_policy` を、infra-implementation Skill の手順で更新します。現状の割り当ては次のとおりです。
 
 | Lambda | DynamoDB アクション | Resource |

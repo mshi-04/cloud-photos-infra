@@ -8,7 +8,7 @@
 `event.requestContext.identity.cognitoIdentityId` を信頼します。説明の正本は
 [docs/lambda.md](../../../../docs/lambda.md) の Authentication です。
 
-認証の実効的な境界は Terraform 側にあります。`modules/media_api/main.tf` の業務メソッドから
+認証の実効的な境界は Terraform 側にあります。`modules/media_api/api_gateway.tf` の業務メソッドから
 `authorization = "AWS_IAM"` が外れると、Lambda 側のコードを変えずに全ハンドラが無認証になります。
 
 ## identity の取得

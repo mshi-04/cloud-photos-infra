@@ -66,7 +66,7 @@
 - 型ヒントが付いているか（Python 3.12）
 - 条件式失敗を操作別に扱っているか。`create_upload_record.py` の重複は 200、`delete_upload_record.py` の対象不存在は 404、その他の例外は 500
 - 動作変更に対応するテストが追加・更新されているか
-- 新規ファイルが明示リスト方式の ZIP に属する場合、`modules/media_api/main.tf` の `locals` へ
+- 新規ファイルが明示リスト方式の ZIP に属する場合、`modules/media_api/archives.tf` の `locals` へ
   追加されているか
 
 ## コーディング規約
