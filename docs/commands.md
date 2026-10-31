@@ -79,10 +79,11 @@ pyright
 テストは `lambda/` で実行します。全体を一度に実行でき、関数群を指定して実行することもできます。
 
 ```powershell
-Set-Location lambda
+Push-Location lambda
 pytest
 pytest cloud_photos/<function_group>/tests/
 pytest -v cloud_photos/<function_group>/tests/
+Pop-Location
 ```
 
 ### Lambda の ZIP
@@ -100,7 +101,7 @@ python -m pip install --target "$env:TEMP\lambda-runtime-deps" boto3
 python scripts/verify_lambda_packages.py --runtime-deps "$env:TEMP\lambda-runtime-deps" --layer push_notification=.build/firebase_admin_layer.zip
 ```
 
-レイヤーの ZIP がない場合は、`python -m pip install --target <dir>/python -r lambda/layers/firebase_admin/requirements.txt` で作ったディレクトリを `--layer push_notification=<dir>` に渡せます。CI はこの方法で確かめます。
+レイヤーの ZIP がない場合は、`python -m pip install --target <dir>/python -r lambda/layers/firebase_admin/requirements.txt` で作ったディレクトリを `--layer push_notification=<dir>` に渡せます。レイヤーは、Lambda と同じく `python/` の下だけを読み込みます。`python/` がないレイヤーは検証に失敗します。CI はこの方法で確かめます。
 
 ## Security
 

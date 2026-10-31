@@ -61,14 +61,15 @@ def handler_modules(archive: zipfile.ZipFile, group: str) -> list[str]:
     return modules
 
 
-def layer_python_dir(layer: Path, workdir: Path) -> Path:
+def layer_python_dir(layer: Path, workdir: Path) -> Path | None:
+    """Return the layer's python/ directory, which Lambda adds to the path, or None if it is missing."""
     if layer.is_file():
         target = workdir / "layer"
         with zipfile.ZipFile(layer) as archive:
             archive.extractall(target)
         layer = target
     python_dir = layer / "python"
-    return python_dir if python_dir.is_dir() else layer
+    return python_dir if python_dir.is_dir() else None
 
 
 def verify_group(group: str, zip_path: Path, runtime_deps: Path, layer: Path | None) -> list[str]:
@@ -83,7 +84,10 @@ def verify_group(group: str, zip_path: Path, runtime_deps: Path, layer: Path | N
 
         paths = [str(package_root)]
         if layer is not None:
-            paths.append(str(layer_python_dir(layer, workdir)))
+            python_dir = layer_python_dir(layer, workdir)
+            if python_dir is None:
+                return [f"{zip_path.name}: layer {layer} has no python/ directory, so Lambda would not load it"]
+            paths.append(str(python_dir))
         paths.append(str(runtime_deps))
         config = {"paths": paths, "modules": modules, "package_root": str(package_root)}
 
