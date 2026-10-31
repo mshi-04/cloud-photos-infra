@@ -1,37 +1,35 @@
 # pytest フィクスチャとテンプレート
 
-`lambda/<function_group>/tests/` に置く conftest とテストの実装です。
+`lambda/cloud_photos/<function_group>/tests/` に置く conftest とテストの実装です。
 
 ## 実行前提
 
-[lambda/pytest.ini](../../../../lambda/pytest.ini) は次の 1 行だけです。
+[lambda/pytest.ini](../../../../lambda/pytest.ini) は次のとおりです。
 
 ```ini
-addopts = --import-mode=importlib --override-ini="pythonpath="
+[pytest]
+addopts = --import-mode=importlib
+pythonpath = .
+testpaths = cloud_photos
 ```
 
-`pythonpath` を空にしているため、import path は各 `conftest.py` の `sys.path.insert` が作ります。
-テストは必ず `lambda/` を作業ディレクトリにして、関数グループごとに実行します。
-`lambda/` で `pytest` を一度に実行すると、関数グループどうしの `constants` などの同名モジュールが衝突し、収集時に失敗します。
+`pythonpath = .` で `lambda/` を import の起点にします。テストは `lambda/` を作業ディレクトリにして実行します。
+全体を一度に実行でき、関数グループを指定することもできます。
 
 ```powershell
 Set-Location lambda
-pytest <function_group>/tests
+pytest
+pytest cloud_photos/<function_group>/tests
 ```
 
-## sys.path
+## import
 
-| 関数グループ | 追加するパス |
-|---|---|
-| `media_uploads` / `users` | 関数グループのルートのみ |
-| `device_tokens` / `push_notification` | 関数グループのルート + `lambda/`（`common/` を import するため） |
+テストも本番コードと同じく修飾付きで import します。`conftest.py` で `sys.path` を操作しません。
 
 ```python
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+from cloud_photos.media_uploads import db
+from cloud_photos.media_uploads.create_upload_record import handler
 ```
-
-`auth.py` が `from common.auth import ...` を使うグループでは 2 行目が必須です。
 
 ## conftest（単一テーブル）
 
@@ -96,7 +94,7 @@ s3.put_bucket_versioning(Bucket=S3_BUCKET_NAME, VersioningConfiguration={"Status
 ```python
 @pytest.fixture(autouse=True)
 def mock_firebase(monkeypatch):
-    import notify_upload_complete
+    from cloud_photos.push_notification import notify_upload_complete
 
     monkeypatch.setattr(notify_upload_complete, "_firebase_app", MagicMock())
 ```

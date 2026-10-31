@@ -67,7 +67,8 @@ bootstrap/          Terraform backend、GitHub OIDC、plan/apply IAM ロール
 envs/dev/           dev 環境の Terraform ルートモジュール
 envs/prod/          prod 環境の Terraform ルートモジュール
 modules/            再利用可能な AWS リソースモジュール
-lambda/             Lambda 実装、共有コード、レイヤー、pytest テスト
+lambda/             Lambda 実装（cloud_photos パッケージ）、レイヤー、pytest テスト
+scripts/            Lambda の ZIP のビルドと読み込み検証
 .github/workflows/  Terraform CI/CD と再利用可能なデプロイワークフロー
 docs/               実装、検証、セキュリティ、運用ルール
 .agents/skills/     Codex 向けリポジトリローカル Skills
@@ -100,21 +101,24 @@ python -m pip install -r lambda/requirements-dev.txt
 
 ```powershell
 terraform fmt -check -recursive
-ruff check lambda/
-ruff format --check lambda/
+ruff check lambda/ scripts/
+ruff format --check lambda/ scripts/
 pyright
 Push-Location lambda
-pytest media_uploads/tests/
-pytest device_tokens/tests/
-pytest push_notification/tests/
-pytest users/tests/
+pytest
 Pop-Location
 trivy conf .
 ```
 
-pytest は関数群ごとに実行します。`lambda/` で `pytest` を一度に実行すると、関数群どうしの同名モジュールが衝突して失敗します。`pyright` は、有効にした仮想環境の依存を使って型を検査します。
+pytest は `lambda/` で全体を一度に実行します。1 つの関数群だけを実行する場合は `pytest cloud_photos/<function_group>/tests/` を使います。`pyright` は、有効にした仮想環境の依存を使って型を検査します。
 
-Terraform の `validate` / `plan` では backend の初期化に加え、`.build/firebase_admin_layer.zip` が必要です。リポジトリルートで、CI と同じ AWS SAM Python 3.12 イメージを使ってレイヤーを生成します。
+Terraform の `validate` / `plan` では backend の初期化に加え、`.build/` に Lambda の ZIP と `firebase_admin_layer.zip` が必要です。Lambda の ZIP は、リポジトリルートで次のスクリプトを実行して作ります。CI と CD も同じスクリプトを使います。
+
+```powershell
+python scripts/build_lambda.py
+```
+
+レイヤーは、リポジトリルートで、CI と同じ AWS SAM Python 3.12 イメージを使って生成します。
 
 ```powershell
 New-Item -ItemType Directory -Force .build | Out-Null
@@ -126,7 +130,14 @@ docker run --rm `
   bash -c "pip install -r /requirements/requirements.txt -t /tmp/python --quiet && cd /tmp && zip -r9 /out/firebase_admin_layer.zip python"
 ```
 
-レイヤー生成後、対象環境を初期化して検証します。
+ZIP から各 handler を読み込めるかは、次のように確かめます。boto3 は、Lambda ランタイムと同じく ZIP の外から読み込みます。`.build/` の外に入れてください。
+
+```powershell
+python -m pip install --target "$env:TEMP\lambda-runtime-deps" boto3
+python scripts/verify_lambda_packages.py --runtime-deps "$env:TEMP\lambda-runtime-deps" --layer push_notification=.build/firebase_admin_layer.zip
+```
+
+ZIP とレイヤーの生成後、対象環境を初期化して検証します。
 
 ```powershell
 Push-Location envs/dev

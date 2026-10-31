@@ -4,26 +4,31 @@
 
 ## Layout
 
-Lambda は関数群ごとのディレクトリにまとめます。1 つの関数群に複数の handler を置き、関数群の中で `auth.py`、`response.py`、`constants.py` などを共有します。
+Lambda のコードは、`lambda/` をソースのルートとして、`cloud_photos` パッケージの下に関数群ごとにまとめます。1 つの関数群に複数の handler を置き、関数群の中で `auth.py`、`response.py`、`constants.py` などを共有します。
 
 ```text
 lambda/
-  common/                  # device_tokens と push_notification が ZIP に同梱する共有処理
-  media_uploads/           # get_upload_records / create_upload_record / delete_upload_record
-  device_tokens/           # register_device_token / unregister_device_token
-  push_notification/       # notify_upload_complete
-  users/                   # delete_user
-  <function_group>/
-    <handler_module>.py    # def handler(event, context)
-    auth.py
-    response.py
-    constants.py
-    tests/
-      conftest.py
-      test_<behavior>.py
+  pytest.ini
+  cloud_photos/
+    common/                  # 複数の関数群で使う共有処理
+    media_uploads/           # get_upload_records / create_upload_record / delete_upload_record
+    device_tokens/           # register_device_token / unregister_device_token
+    push_notification/       # notify_upload_complete
+    users/                   # delete_user
+    <function_group>/
+      __init__.py
+      <handler_module>.py    # def handler(event, context)
+      auth.py
+      response.py
+      constants.py
+      tests/
+        conftest.py
+        test_<behavior>.py
 ```
 
-Lambda の `handler` 設定は `<handler_module>.handler` です。ZIP の構成は [modules/media_api/archives.tf](../modules/media_api/archives.tf) の `archive_file` で決まります。新しいファイルを追加する場合は、その関数群の ZIP に収録されるかを確認してください。
+import は、本番とテストのどちらでも `from cloud_photos.<function_group>.<module> import ...` のように修飾付きで書きます。Lambda の `handler` 設定は `cloud_photos.<function_group>.<handler_module>.handler` です。
+
+ZIP は [scripts/build_lambda.py](../scripts/build_lambda.py) が関数群ごとに `.build/<function_group>.zip` へ作ります。ZIP には、関数群のパッケージと、そこから import している `cloud_photos` の共有パッケージが入り、`tests/` とキャッシュは入りません。Terraform は [modules/media_api/archives.tf](../modules/media_api/archives.tf) でこの ZIP を参照します。新しいファイルや共有処理を追加した場合は、[scripts/verify_lambda_packages.py](../scripts/verify_lambda_packages.py) で、ZIP から各 handler を読み込めることを確かめてください。手順は [commands.md](commands.md) にあります。
 
 ## Handler Design
 
@@ -98,14 +103,14 @@ Lambda の `handler` 設定は `<handler_module>.handler` です。ZIP の構成
 
 ## Tests
 
-動作を変更したらテストを追加または更新します。テストは関数群ごとに実行します。`lambda/` で `pytest` を一度に実行すると、関数群どうしの同名モジュールが衝突して失敗します。
+動作を変更したらテストを追加または更新します。テストは `lambda/` で全体を一度に実行できます。
 
 ```powershell
 ruff format lambda/
 ruff check lambda/
 pyright
 Set-Location lambda
-pytest <function_group>/tests/
+pytest
 ```
 
 AWS呼び出しはモックし、実リソースを作成しないでください。テストの詳細は [testing.md](testing.md)、コマンドの前提は [commands.md](commands.md) を参照してください。

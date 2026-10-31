@@ -11,23 +11,21 @@
 
 ## Lambda Tests
 
-テストは `lambda/` を作業ディレクトリにして、関数群ごとに実行します。CI も同じく関数群ごとに別のステップで実行します。
+テストは `lambda/` を作業ディレクトリにして実行します。CI も同じく `pytest` を一度だけ実行します。
 
 ```powershell
 Set-Location lambda
-pytest media_uploads/tests/
-pytest device_tokens/tests/
-pytest push_notification/tests/
-pytest users/tests/
+pytest
 ```
 
-`lambda/` で `pytest` を一度に実行すると、収集時に失敗します。各関数群の `conftest.py` が `sys.path` に自分のディレクトリを加え、`constants` や `auth` などを同じ名前で読み込むため、関数群どうしのモジュールが衝突します。
+[lambda/pytest.ini](../lambda/pytest.ini) が `lambda/` を import の起点にします。テストは `from cloud_photos.<function_group>.<module> import ...` のように修飾付きで import するため、関数群どうしで同じ名前のモジュールがあっても衝突しません。`conftest.py` で `sys.path` を操作しないでください。
 
-詳細を表示する場合:
+関数群を指定する場合や、詳細を表示する場合:
 
 ```powershell
 Set-Location lambda
-pytest -v <function_group>/tests/
+pytest cloud_photos/<function_group>/tests/
+pytest -v cloud_photos/<function_group>/tests/
 ```
 
 ## Test Structure
@@ -35,10 +33,11 @@ pytest -v <function_group>/tests/
 ```text
 lambda/
   pytest.ini
-  <function_group>/
-    tests/
-      conftest.py
-      test_<behavior>.py
+  cloud_photos/
+    <function_group>/
+      tests/
+        conftest.py
+        test_<behavior>.py
 ```
 
 `conftest.py` には、API Gateway event、`requestContext.identity.cognitoIdentityId` を持つ認証済みの event、環境変数、AWS mock などの共有フィクスチャを置きます。API Gateway は IAM 認証のため、event に Cognito のクレームや JWT は含まれません。
@@ -74,4 +73,4 @@ prodに影響する場合は `envs/prod` でも確認します。state lock や�
 
 ## CI Expectations
 
-PRでは GitHub Actions が Terraform と Lambda の検証を実行します。Lambda では ruff、Pyright、関数群ごとの pytest を実行します。ローカルで全てを再現できない場合でも、実行できた範囲と未実行理由を明確にしてください。
+PRでは GitHub Actions が Terraform と Lambda の検証を実行します。Lambda では ruff、Pyright、pytest と、ビルドした ZIP から各 handler を読み込む検証を実行します。ローカルで全てを再現できない場合でも、実行できた範囲と未実行理由を明確にしてください。

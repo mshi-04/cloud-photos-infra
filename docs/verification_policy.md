@@ -22,7 +22,7 @@
 | ドキュメントのみ | Markdownの整合性、リンク対象の存在確認 |
 | Terraform | `terraform fmt -recursive`、影響環境の `terraform validate`、可能なら `terraform plan` |
 | IAM / security | Terraform検証に加え、権限差分レビュー、可能なら `trivy conf .` |
-| Lambda | `ruff check`、`ruff format --check`、`pyright`、関連する関数群の `pytest` |
+| Lambda | `ruff check`、`ruff format --check`、`pyright`、`pytest`。ファイルや共有処理を追加・移動した場合は、ZIP のビルドと読み込み検証 |
 | CI/CD | ワークフロー構文と影響するコマンドの確認 |
 | bootstrap | 検証に加え、手動適用手順とリスクの明記 |
 
@@ -55,19 +55,19 @@ prodに影響する場合は `envs/prod` でも同様に確認します。認証
 
 ## Lambda
 
-Lambda変更時は、リポジトリルートで lint、整形、型検査を実行し、`lambda/` で関数群ごとにテストします。ツールのバージョンと仮想環境の準備は [commands.md](commands.md) を参照してください。
+Lambda変更時は、リポジトリルートで lint、整形、型検査を実行し、`lambda/` でテストを実行します。ツールのバージョンと仮想環境の準備は [commands.md](commands.md) を参照してください。
 
 ```powershell
 ruff check lambda/
 ruff format --check lambda/
 pyright
 Set-Location lambda
-pytest <function_group>/tests/
+pytest
 ```
 
-変更した関数群のテストを実行します。共有する `lambda/common/` を変えた場合は、それを使う `device_tokens` と `push_notification` の両方を実行します。複数の関数群に影響する変更や、影響範囲を判断できない場合は、4つの関数群すべてを実行します。実行しなかった関数群がある場合は、その理由を報告してください。
+テストは全体を一度に実行します。実行しなかったテストがある場合は、その理由を報告してください。
 
-`lambda/` で `pytest` を一度に実行すると、関数群どうしの同名モジュール（`constants` など）が衝突し、収集時に失敗します。一括実行の失敗のうち、この衝突だけが原因の収集エラーは既知の失敗として扱い、変更による失敗として報告しないでください。それ以外の import や収集の失敗と、関数群ごとの実行結果は、通常どおり報告します。
+ファイルや共有処理を追加・移動した場合や、`scripts/build_lambda.py` を変えた場合は、[commands.md](commands.md) の手順で ZIP をビルドし、各 handler を ZIP から読み込めることを確かめます。boto3 やレイヤーを用意できず実行できない場合は、`Not executed` として理由を報告します。
 
 ## Security
 

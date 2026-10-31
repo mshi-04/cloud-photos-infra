@@ -69,23 +69,39 @@ python -m pip install -r lambda/requirements-dev.txt
 リポジトリルートで、lint、整形、型検査を実行します。ルールと型検査の厳しさは [pyproject.toml](../pyproject.toml) で設定しています。
 
 ```powershell
-ruff check lambda/
-ruff format --check lambda/
+ruff check lambda/ scripts/
+ruff format --check lambda/ scripts/
 pyright
 ```
 
-整形を適用する場合は `ruff format lambda/` を実行します。`pyright` は、有効にした仮想環境の Python と依存を使って import を解決します。
+整形を適用する場合は `ruff format lambda/ scripts/` を実行します。`pyright` は、有効にした仮想環境の Python と依存を使って import を解決します。
 
-テストは `lambda/` で、関数群ごとに実行します。`lambda/` で `pytest` を一度に実行すると、関数群どうしの同名モジュールが衝突して失敗します。
+テストは `lambda/` で実行します。全体を一度に実行でき、関数群を指定して実行することもできます。
 
 ```powershell
-Set-Location lambda
-pytest media_uploads/tests/
-pytest device_tokens/tests/
-pytest push_notification/tests/
-pytest users/tests/
-pytest -v <function_group>/tests/
+Push-Location lambda
+pytest
+pytest cloud_photos/<function_group>/tests/
+pytest -v cloud_photos/<function_group>/tests/
+Pop-Location
 ```
+
+### Lambda の ZIP
+
+リポジトリルートで、関数群ごとの ZIP を `.build/` に作ります。同じソースからは、同じハッシュの ZIP ができます。
+
+```powershell
+python scripts/build_lambda.py
+```
+
+ZIP から各 handler を読み込めるかを確かめます。検証は、ソースツリーや開発環境の依存を使わない別のプロセスで行います。boto3 は Lambda ランタイムと同じく ZIP の外から読み込むため、`.build/` の外に入れます。`push_notification` には Firebase のレイヤーが必要です。
+
+```powershell
+python -m pip install --target "$env:TEMP\lambda-runtime-deps" boto3
+python scripts/verify_lambda_packages.py --runtime-deps "$env:TEMP\lambda-runtime-deps" --layer push_notification=.build/firebase_admin_layer.zip
+```
+
+レイヤーの ZIP がない場合は、`python -m pip install --target <dir>/python -r lambda/layers/firebase_admin/requirements.txt` で作ったディレクトリを `--layer push_notification=<dir>` に渡せます。レイヤーは、Lambda と同じく `python/` と `python/lib/python3.12/site-packages/` から読み込みます。`python/` がないレイヤーは検証に失敗します。CI はこの方法で確かめます。
 
 ## Security
 
