@@ -4,28 +4,16 @@
 
 ## 信頼の前提
 
-API Gateway のメソッドが `authorization = "AWS_IAM"` である限り、SigV4 署名は API Gateway 側で
-検証済みです。Lambda は `event.requestContext.identity.cognitoIdentityId` を信頼します。
-JWT を Lambda で自前検証しません。
+認証は API Gateway の IAM 認証（`authorization = "AWS_IAM"`）で行い、Lambda は
+`event.requestContext.identity.cognitoIdentityId` を信頼します。説明の正本は
+[docs/lambda.md](../../../../docs/lambda.md) の Authentication です。
 
-したがって認証の実効的な境界は Terraform 側にあります。`modules/media_api/main.tf` の業務メソッドから
+認証の実効的な境界は Terraform 側にあります。`modules/media_api/main.tf` の業務メソッドから
 `authorization = "AWS_IAM"` が外れると、Lambda 側のコードを変えずに全ハンドラが無認証になります。
-`authorization = "NONE"` を許すのは CORS の `OPTIONS` だけです。
 
 ## identity の取得
 
-[lambda/common/auth.py](../../../../lambda/common/auth.py) が正本です。
-
-```python
-def get_identity_id(event: Dict[str, Any]) -> Optional[str]:
-    return event.get("requestContext", {}).get("identity", {}).get("cognitoIdentityId")
-
-
-def mask_identity(identity_id: Optional[str]) -> str:
-    if not identity_id:
-        return "***"
-    return f"{identity_id[:4]}***{identity_id[-4:]}" if len(identity_id) > 8 else "***"
-```
+`get_identity_id` と `mask_identity` の正本は [lambda/common/auth.py](../../../../lambda/common/auth.py) です。
 
 `device_tokens/auth.py` と `push_notification/auth.py` はこれを re-export します。
 `media_uploads/auth.py` と `users/auth.py` は同等実装のコピーです。新規は re-export に揃えます。

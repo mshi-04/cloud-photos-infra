@@ -69,37 +69,8 @@ def dynamodb_table():
 
 ### device_tokens
 
-`device_tokens` は RANGE key が `deviceToken` です。`mediaId` の定義を流用しません。
-
-```python
-@pytest.fixture
-def dynamodb_table():
-    with mock_aws():
-        os.environ["AWS_DEFAULT_REGION"] = REGION
-        os.environ["TABLE_NAME"] = TABLE_NAME
-
-        client = boto3.client("dynamodb", region_name=REGION)
-        client.create_table(
-            TableName=TABLE_NAME,
-            KeySchema=[
-                {"AttributeName": "userId", "KeyType": "HASH"},
-                {"AttributeName": "deviceToken", "KeyType": "RANGE"},
-            ],
-            AttributeDefinitions=[
-                {"AttributeName": "userId", "AttributeType": "S"},
-                {"AttributeName": "deviceToken", "AttributeType": "S"},
-            ],
-            BillingMode="PAY_PER_REQUEST",
-        )
-
-        db._reset_for_testing()
-
-        yield client
-
-        db._reset_for_testing()
-        del os.environ["TABLE_NAME"]
-        del os.environ["AWS_DEFAULT_REGION"]
-```
+`media_uploads` と同じ形で、RANGE key だけが `deviceToken` です。`KeySchema` と
+`AttributeDefinitions` の `mediaId` を `deviceToken` に置き換えます。`mediaId` の定義を流用しません。
 
 `db.py` はクライアントとテーブル名をモジュールスコープにキャッシュします。
 `_reset_for_testing()` を `yield` の前後で呼ばないと、前のテストのキャッシュや実 AWS を向きます。
@@ -166,10 +137,13 @@ class TestCreateUploadRecord:
 
 ## カバーするケース
 
+値オブジェクトは AWS のモックを使わずに直接テストします。handler のテストでは次を確かめます。
+
+
 | ケース | 期待 |
 |---|---|
 | 正常系 | 200 / 201 と本文の内容 |
-| identity 無し | 403（`users` / `push_notification` の既存は 401。規則は `docs/lambda.md` の API 応答の契約） |
+| identity 無し | [docs/lambda.md](../../../../docs/lambda.md) の API 応答の契約のとおり（新規は 403、既存の `users` / `push_notification` は 401） |
 | IDOR（他人の path / `lastEvaluatedKey`） | 403 |
 | 必須欠落 | 400 |
 | 不正 JSON・型不正・列挙外 | 400 |

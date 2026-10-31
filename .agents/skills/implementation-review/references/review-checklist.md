@@ -55,7 +55,7 @@
 
 - `local.lambda_functions` の key 変更 → log group の置換
 - `aws_api_gateway_resource.path_part` 変更 → 下流 method / integration の置換
-- リソース名・モジュールパスの変更 → `terraform state mv` の要否
+- リソース名・モジュールパスの変更 → `moved` ブロックがあるか。手作業の `terraform state mv` を前提にしていないか
 - `deletion_protection_enabled` / `force_destroy` / `noncurrent_version_expiration_days` の変更 → データ保護の後退
 - `aws_api_gateway_deployment.media` の `triggers.redeployment` に新しい id が入っているか
 
@@ -69,16 +69,24 @@
 - 新規ファイルが明示リスト方式の ZIP に属する場合、`modules/media_api/main.tf` の `locals` へ
   追加されているか
 
-## トリアージ
+## コーディング規約
 
-- **Critical**: クラッシュ・未処理例外、データ損失、認証/権限不備、secret 漏洩、state 破壊、CI 確実失敗
-- **Suggestion**: 保守性・責務分離・テスト網羅・エラー処理・性能の明確な改善
-- **Nitpick**: 表記・命名・整形。対応任意
+新しく書いたコードと、変更した範囲を [docs/coding_standards.md](../../../../docs/coding_standards.md) の原則と照らします。
+変更していない既存コードの書き方は、指摘の対象にしません。指摘には原則の名前を添えます。
 
-指摘には「ファイル:行」と根拠（規約または既存実装の該当箇所）を添えます。
+- 値オブジェクト: 不変条件や機密性を持つ入力を、検証付きの値オブジェクトで表しているか
+- 早期リターン: 前提条件をガード節で返しているか。`return` や `raise` の後に `else` を重ねていないか
+- handler の責務: 検証や業務規則を handler に直接書いていないか
+- 例外: `except Exception` を最も外側以外で使っていないか
+- 型: 引数と戻り値に型があるか。`Any` を境界以外で使っていないか
+- Terraform: 新しいモジュールに `versions.tf` があるか。変数に `type` と `description` があるか。
+  `count` を有効と無効の切り替え以外に使っていないか。モジュールの中で環境名による分岐をしていないか
+
+指摘の分類（Critical / Suggestion / Nitpick）は SKILL.md のトリアージに従い、「ファイル:行」と根拠を添えます。
 
 ## 参考資料
 
 - [docs/security.md](../../../../docs/security.md)
+- [docs/coding_standards.md](../../../../docs/coding_standards.md)
 - [docs/guardrails.md](../../../../docs/guardrails.md)
 - [docs/verification_policy.md](../../../../docs/verification_policy.md)
