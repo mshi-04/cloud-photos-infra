@@ -10,6 +10,7 @@ on:
       - 'envs/**'
       - 'modules/**'
       - 'lambda/**'
+      - 'scripts/**'
       - 'bootstrap/**'
       - '.github/workflows/**'
       - '.terraform-version'
@@ -67,11 +68,11 @@ jobs:
         run: pip install -r lambda/requirements-dev.txt
 
       - name: Run ruff check
-        run: ruff check lambda
+        run: ruff check lambda scripts
 
       - name: Run ruff format check
         if: ${{ !cancelled() }}
-        run: ruff format --check lambda
+        run: ruff format --check lambda scripts
 
       - name: Run Pyright
         if: ${{ !cancelled() }}
@@ -93,21 +94,24 @@ jobs:
         working-directory: lambda
         run: pip install -r requirements-dev.txt
 
-      - name: Run media_uploads tests
+      - name: Run tests
         working-directory: lambda
-        run: pytest media_uploads/tests
+        run: pytest
 
-      - name: Run device_tokens tests
-        working-directory: lambda
-        run: pytest device_tokens/tests
+      # Build the same ZIPs that Terraform deploys and import every handler from them alone.
+      # The layer contents come from the layer's requirements, without Docker.
+      - name: Build Lambda packages
+        if: ${{ !cancelled() }}
+        run: python scripts/build_lambda.py
 
-      - name: Run push_notification tests
-        working-directory: lambda
-        run: pytest push_notification/tests
-
-      - name: Run users tests
-        working-directory: lambda
-        run: pytest users/tests
+      - name: Verify Lambda packages
+        if: ${{ !cancelled() }}
+        run: |
+          pip install --quiet --target "$RUNNER_TEMP/runtime-deps" boto3
+          pip install --quiet --target "$RUNNER_TEMP/firebase-layer/python" -r lambda/layers/firebase_admin/requirements.txt
+          python scripts/verify_lambda_packages.py \
+            --runtime-deps "$RUNNER_TEMP/runtime-deps" \
+            --layer "push_notification=$RUNNER_TEMP/firebase-layer"
 
   fmt:
     name: "Format Check"
@@ -174,6 +178,14 @@ jobs:
             -v "${{ github.workspace }}/lambda/layers/firebase_admin:/requirements" \
             public.ecr.aws/sam/build-python3.12:latest-x86_64 \
             bash -c "pip install -r /requirements/requirements.txt -t /tmp/python --quiet && cd /tmp && zip -r9 /out/firebase_admin_layer.zip python"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build Lambda packages
+        working-directory: ${{ github.workspace }}
+        run: python scripts/build_lambda.py
 
       - name: Terraform Init
         id: init

@@ -83,6 +83,23 @@ jobs:
             public.ecr.aws/sam/build-python3.12:latest-x86_64 \
             bash -c "pip install -r /requirements/requirements.txt -t /tmp/python --quiet && cd /tmp && zip -r9 /out/firebase_admin_layer.zip python"
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # The ZIPs built here are uploaded with the plan, so apply deploys exactly what plan saw.
+      - name: Build Lambda packages
+        working-directory: ${{ github.workspace }}
+        run: python scripts/build_lambda.py
+
+      - name: Verify Lambda packages
+        working-directory: ${{ github.workspace }}
+        run: |
+          pip install --quiet --target "$RUNNER_TEMP/runtime-deps" boto3
+          python scripts/verify_lambda_packages.py \
+            --runtime-deps "$RUNNER_TEMP/runtime-deps" \
+            --layer "push_notification=.build/firebase_admin_layer.zip"
+
       - name: Terraform init
         run: terraform init -backend-config="bucket=${{ inputs.tf_state_bucket }}"
 
