@@ -1,8 +1,8 @@
 # AI文書・開発基盤リファクタリング設計
 
 - 作成日: 2026-10-30
-- 更新日: 2026-10-31。レビュー指摘の反映、コーディング規約の章の追加、型検査とlintの厳しさの決定、段階ごとの作業とブランチの追加、PRのレビュー指摘の反映、段階0の省略と段階1の実施
-- 状態: 段階1（契約と規約の確定）を実施。段階0は行わない。段階2以降は未実施。
+- 更新日: 2026-10-31。レビュー指摘の反映、コーディング規約の章の追加、型検査とlintの厳しさの決定、段階ごとの作業とブランチの追加、PRのレビュー指摘の反映、段階0の省略と段階1の実施、段階2の省略、段階3の実施
+- 状態: 段階1（契約と規約の確定）と段階3（Skillの再編）を実施。段階0と段階2は行わない。段階4以降は未実施。
 - 設計の起点: `develop` の `e4dfb2d`
 - 本設計書のブランチ: `feature/ai-documentation-refactoring`。各段階のブランチは第10.1節に記す
 
@@ -37,7 +37,7 @@ AIが、変更する場所、守る契約、必要な検証、完了の判断方
 |---|---|---|
 | 入口 | [AGENTS.md](AGENTS.md)と[CLAUDE.md](CLAUDE.md)は各27行で、共通文書と6種類のSkillを案内する。両者の違いはパス表記だけで、`.agents/skills/`と`.claude/skills/`は現在一致している | 独立した入口を維持し、必読事項と作業別の参照順を明確にする |
 | 共通ルール | 検証、state lock、IAM、ログの要件が複数の文書・Skillへ繰り返し記載される | 各要件の正本と、参照する側を決める |
-| 認証 | [Lambdaガイド](docs/lambda.md)などはLambdaでのJWT検証を指示するが、[認証Skill](.agents/skills/auth-implementation/SKILL.md)と[実装](lambda/common/auth.py)はCognito Identity IDを扱う。業務用の7メソッドはAPI GatewayのIAM認証である`AWS_IAM`を使い、`NONE`はCORSの`OPTIONS`だけである | API GatewayのIAM認証とLambdaの所有者確認を正しく説明する。JWT検証の追加は行わない |
+| 認証 | [Lambdaガイド](docs/lambda.md)などはLambdaでのJWT検証を指示するが、認証Skill（当時の`auth-implementation`）と[実装](lambda/common/auth.py)はCognito Identity IDを扱う。業務用の7メソッドはAPI GatewayのIAM認証である`AWS_IAM`を使い、`NONE`はCORSの`OPTIONS`だけである | API GatewayのIAM認証とLambdaの所有者確認を正しく説明する。JWT検証の追加は行わない |
 | テスト | 文書は全体を一度に実行する手順だが、[CI](.github/workflows/ci-terraform.yml)は4つの関数群を別プロセスで実行する。関数群別の実行は成功し、一括実行は`constants`の名前衝突により収集時に失敗する | 名前空間とimportを整理し、一度の全体実行を成立させる。それまでは関数群別の実行を現行手順として記載する |
 | import | [関数群のfixture](lambda/device_tokens/tests/conftest.py)が`sys.path`を変更し、`auth`、`constants`、`db`などを同名でimportする | 関数群ごとに区別できるモジュール名へ移行する |
 | 配布 | [Lambda ZIP生成](modules/media_api/main.tf)はディレクトリ収録とファイル列挙が混在する。`media_uploads`のZIPは`tests/`を含み、`users`のZIPは`__pycache__/`を除外していない | 共通の配布方針と、生成物を使う読み込み検証を設ける |
@@ -57,7 +57,7 @@ AIが、変更する場所、守る契約、必要な検証、完了の判断方
 - 同処理の端末取得はDynamoDB Queryの最初のページだけを取得し、継続キーを処理していない。1ページは最大1MBのため、影響が出るのは1ユーザーあたり数千台規模からであり、優先度は低い。
 - 同処理では、DynamoDB QueryとSecrets Managerの失敗が例外のまま返る。登録解除済みトークンの削除に失敗した場合も例外のまま返り、残りの端末へは送信されない。
 - [共通認証ヘルパー](lambda/common/auth.py)と[Media Uploadsの認証ヘルパー](lambda/media_uploads/auth.py)は、`requestContext`や`identity`がnullの場合に例外となる。[Usersのヘルパー](lambda/users/auth.py)とは扱いが異なる。
-- UsersとPushの未認証応答は401、Media UploadsとDevice Tokensは403であり、既存テストもそれぞれを期待する。多くのSkill資料は「新規は403、既存の401は維持」と書き分けている。ただし、[認証Skill](.agents/skills/auth-implementation/SKILL.md)は401の例外を`delete_user.py`だけとしてPushを含めておらず、[テストSkill](.agents/skills/test-implementation/SKILL.md)は例外に触れずに未認証を403としている。
+- UsersとPushの未認証応答は401、Media UploadsとDevice Tokensは403であり、既存テストもそれぞれを期待する。多くのSkill資料は「新規は403、既存の401は維持」と書き分けている。ただし、認証Skill（当時の`auth-implementation`）は401の例外を`delete_user.py`だけとしてPushを含めておらず、テストSkill（当時の`test-implementation`）は例外に触れずに未認証を403としている。
 
 これらは文書整理や構造変更とは区別し、個別の動作変更としてテストとともに修正する。401と403の統一は、本リファクタリングの完了条件にしない。
 
@@ -351,6 +351,8 @@ typeCheckingMode = "standard"
 
 ## 9. CIと検証の設計
 
+2026-10-31に、AI文書の検証と、そのためのワークフロー（段階2）は行わないことにした。検証は、Pythonの検証（ruff、Pyright、pytest）で足りると判断した。この章のAI文書の検証に関する記述は、当初の計画として残す。
+
 検証を、AWS接続が不要なものと、環境に接続するものに分ける。
 
 | 対象 | 主な検証 |
@@ -379,14 +381,14 @@ planの結果を判断に使う場合は、CIのPRコメントの切り詰めに
 | 0. 基準の記録 | `feature/ai-refactor-0-baseline` | 構造変更前の結果と既知の失敗を記録する | 本設計書の`develop`への取り込み |
 | 1. 契約と規約の確定 | `feature/ai-refactor-1-contracts-and-standards` | 文書間の矛盾を解消し、規約とツールのバージョンを固定する | 本設計書の`develop`への取り込み |
 | 2. 文書の静的検証 | `feature/ai-refactor-2-docs-checks` | 文書とSkillを、AWSに接続せずに検証できるようにする | 段階1 |
-| 3. Skillの再編 | `feature/ai-refactor-3-skills` | Skillを3つの作業単位に揃える | 段階2 |
-| 4. Terraformのファイル分割 | `feature/ai-refactor-4-media-api-split` | `media_api`を責務別のファイルへ移す | 段階1。段階2・3と並行してよい |
+| 3. Skillの再編 | `feature/ai-refactor-3-skills` | Skillを3つの作業単位に揃える | 段階1 |
+| 4. Terraformのファイル分割 | `feature/ai-refactor-4-media-api-split` | `media_api`を責務別のファイルへ移す | 段階1。段階3と並行してよい |
 | 5. Lambda基盤 | `feature/ai-refactor-5-lambda-packages` | 名前空間、import、ZIPのビルドを整える | 段階3と段階4 |
 | 6. Lambdaの規約への移行 | `feature/ai-refactor-6-lambda-standards` | Lambdaの書き方を規約に揃える | 段階5と、第10.12節の不具合修正 |
 | 7. Terraformの改善 | `feature/ai-refactor-7-terraform-improvements` | API反映、成果物の再現性、Terraformの規約を整える | 段階5。段階6と並行してよい |
 | 8. Skill選択の評価 | `feature/ai-refactor-8-skill-evaluation` | AIが適切なSkillを選び、必要な資料を読むかを評価する | 段階6と段階7 |
 
-各段階を独立してレビューできる変更単位にする。文書の静的検証とSkillの再編をLambda基盤より先に行うのは、構造変更を実装するAIが、移行後の作業単位と最新の参照先を使えるようにするためである。ファイル分割をLambda基盤より先に行うのは、Lambda基盤で変更する配布物とLambdaの定義を先に責務別のファイルへ移し、移動だけの差分を単独で確認するためである。構造の変更である段階5と、書き方の変更である段階6を分けるのは、性質の異なる差分を別々にレビューするためである。段階6では、handlerのテストが期待値を変えずに成功することで、動作が変わっていないことを確かめる。Pyrightを段階1で導入するのは、段階5でimportを書き換える際に、解決できないimportや存在しない属性の参照を機械的に見つけるためである。
+各段階を独立してレビューできる変更単位にする。Skillの再編をLambda基盤より先に行うのは、構造変更を実装するAIが、移行後の作業単位と最新の参照先を使えるようにするためである。ファイル分割をLambda基盤より先に行うのは、Lambda基盤で変更する配布物とLambdaの定義を先に責務別のファイルへ移し、移動だけの差分を単独で確認するためである。構造の変更である段階5と、書き方の変更である段階6を分けるのは、性質の異なる差分を別々にレビューするためである。段階6では、handlerのテストが期待値を変えずに成功することで、動作が変わっていないことを確かめる。Pyrightを段階1で導入するのは、段階5でimportを書き換える際に、解決できないimportや存在しない属性の参照を機械的に見つけるためである。
 
 新しい配置やコマンドは、利用可能になった段階で文書とSkillへ反映し、設計上の予定を現行手順として記載しない。現状で失敗する手順も、現行手順として残さない。
 
@@ -430,6 +432,8 @@ planの結果を判断に使う場合は、CIのPRコメントの切り詰めに
 
 ### 10.5 段階2: 文書の静的検証
 
+2026-10-31に、段階2は行わないことにした。理由は第9章に記す。以下は当初の計画として残す。
+
 1. 第9章のAI文書の検証を行うスクリプトをPythonで書き、リポジトリに置く。対象は、Markdown、相対リンク、Skillのfrontmatter、旧Skill名の参照、両系統の差分とする。
 2. 両系統で意図して変える差分を書いた許可リストを置く。
 3. AWSに接続しない別のワークフローを追加し、文書、Skill、`pyproject.toml`の変更で起動させる。`pyproject.toml`の変更では、ruffとPyrightも実行する。
@@ -446,9 +450,11 @@ planの結果を判断に使う場合は、CIのPRコメントの切り詰めに
 3. Infra Skillのアドレス変更の手順を`moved`ブロック優先にし（段階1で実施済み）、レビューSkillが比較対象のブランチをPR情報から確かめるようにする。
 4. `AGENTS.md`と`CLAUDE.md`のSkill一覧を3つに更新し、旧Skillを削除する。両系統で同じ変更を行う。
 
-確認: 段階2の検証。旧Skill名の参照が残らず、両系統の差分が許可リストの範囲に収まること。
+確認: 旧Skill名の参照が残らないことを検索で、両系統の差分が意図したものだけであることを`AGENTS.md`と`CLAUDE.md`、`.agents/skills/`と`.claude/skills/`の比較で確かめる。
 
-完了条件: 段階2の検証が成功し、移行前のSkillへの参照が残らず、共通契約の重複定義がなく、必要な資料へ辿れる。
+完了条件: 移行前のSkillへの参照が残らず、共通契約の重複定義がなく、必要な資料へ辿れる。
+
+実施: 2026-10-31に作業1から作業4を行った。`auth-implementation`、`db-implementation`、`test-implementation`の参考資料は、Lambda Skillの`references/`へ移し、3つのSkillを削除した。参考資料のうち、[docs/lambda.md](docs/lambda.md)と重複するステータスの表とAPIの一覧、`get_identity_id`の実装の写し、同じ形のfixtureの例は、正本への参照に置き換えた。旧Skill名は、本設計書の記録を除いて参照が残っていない。
 
 ### 10.7 段階4: Terraformのファイル分割
 
@@ -523,7 +529,6 @@ ZIPの階層とhandlerを同時に変えるため、適用の途中で短時間�
 
 | 事項 | 決める時期 |
 |---|---|
-| ブランチ保護で必須にするチェックと、文書の検証をそこへ含めるか | 段階2 |
 | パッケージ名と、ディレクトリの最終配置 | 段階5 |
 | `successCount`が0のときに通知するか。現状は「0件のメディアをアップロードしました」と通知する | 第6.5節の修正時 |
 | 本番運用を開始する時期。開始後は、第6.1節の段階的なhandlerの切り替え手順を使う | 本番運用の開始前 |
@@ -545,7 +550,7 @@ ZIPの階層とhandlerを同時に変えるため、適用の途中で短時間�
 - 2026-10-31に、Pyright 1.1.414を`standard`で実行し、指摘が1件であることを確認した。`boto3-stubs`を加えると5件、加えたうえで`strict`にすると883件だった。あわせてTerraformのモジュールを確認し、すべての変数に`type`と`description`があること、モジュールが`required_providers`を宣言していないこと、`media_api`の`aws_region`と`aws_caller_identity`のdata sourceが使われていないことを確認した。
 - GitHub Actionsの記録で、PRのCIの`Lambda Lint`がruff 0.16.1で失敗してplanジョブがスキップされたことと、CDの直近2回がOIDCのロール引受けで失敗したことを確認した。
 - Terraformのvalidate・plan、trivy、tflintは未実施であり、現行の全検証が成功するとは主張しない。
-- 段階1の変更は実装済み。段階2以降のコード・Skill・CIの変更は、次の1件を除いて未実装。段階3の作業3のうち、Infra Skillのアドレス変更の手順を`moved`ブロック優先にする変更は、新しいコーディング規約との矛盾を避けるため段階1で実施した。設計書を作成したことと、提案した変更を検証したことを区別する。
+- 段階1と段階3の変更は実装済み。段階2は行わない。段階3の作業3のうち、Infra Skillのアドレス変更の手順を`moved`ブロック優先にする変更は、新しいコーディング規約との矛盾を避けるため段階1で実施した。段階4以降のコード・Skill・CIの変更は未実装。設計書を作成したことと、提案した変更を検証したことを区別する。
 
 ## 13. 外部仕様の確認先
 
