@@ -31,35 +31,12 @@ def handler(event: Dict[str, Any], _context: Any) -> Dict[str, Any]:
 ```
 
 順序は 認証 → ボディ解析 → 入力検証 → 所有者境界 → 永続化 → レスポンス で固定です。
-境界チェックを永続化の後ろに置かないでください。
+境界チェックを永続化の後ろに置かないでください。前提条件はガード節で先に返し、正常系を最後に置きます。
+新しく書く入力の検証は、値オブジェクトの `__post_init__` に置きます（[docs/coding_standards.md](../../../../docs/coding_standards.md)）。
 
-## 実在 handler 一覧
+## ステータスと現在の API
 
-| メソッド / パス | 実装 | 未認証 | 入力検証 | 成功時 |
-|---|---|---|---|---|
-| `GET /media/uploads` | [get_upload_records.py](../../../../lambda/media_uploads/get_upload_records.py) | 403 | `GetUploadRecordsRequest.from_dict` | 200 |
-| `POST /media/uploads` | [create_upload_record.py](../../../../lambda/media_uploads/create_upload_record.py) | 403 | `CreateUploadRecordRequest.from_dict` | 201 / 既存時 200 |
-| `DELETE /media/uploads/{mediaId}` | [delete_upload_record.py](../../../../lambda/media_uploads/delete_upload_record.py) | 403 | `pathParameters.mediaId` | 200 |
-| `POST /media/uploads/complete` | [notify_upload_complete.py](../../../../lambda/push_notification/notify_upload_complete.py) | 401 | `successCount` が非負 int | 201 / トークン無し 204 |
-| `PUT /devices/token` | [register_device_token.py](../../../../lambda/device_tokens/register_device_token.py) | 403 | `deviceToken` 文字列、`platform` 列挙 | 201 |
-| `DELETE /devices/token` | [unregister_device_token.py](../../../../lambda/device_tokens/unregister_device_token.py) | 403 | `deviceToken` 文字列 | 200 |
-| `DELETE /users` | [delete_user.py](../../../../lambda/users/delete_user.py) | 401 | なし | 200 / 部分失敗 500 |
-
-未認証時の 401 は `users` と `push_notification` に残る既存実装です。新規実装は 403 に揃えます。
-
-## ステータスコード
-
-| 状況 | コード |
-|---|---|
-| identity 無し | 403 |
-| identity 境界違反（IDOR） | 403 |
-| ボディが不正 JSON / 非オブジェクト | 400 |
-| 必須欠落・型不正・列挙外 | 400 |
-| 対象が存在しない | 404 |
-| AWS 呼び出し失敗・想定外例外 | 500 |
-| 作成成功 | 201 |
-| 取得・更新・削除成功 | 200 |
-| 返す本文が無い | 204 |
+ステータスの規則と、現在の API ごとの未認証応答・成功時の応答は、[docs/lambda.md](../../../../docs/lambda.md) の API 応答の契約が正本です。ここには書き写しません。
 
 `HTTPStatus` を使う実装（`media_uploads` / `device_tokens`）と、数値リテラルを使う実装
 （`users` / `push_notification`）が混在します。新規実装は `HTTPStatus` を使います。

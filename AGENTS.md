@@ -19,9 +19,6 @@
 
 作業内容に応じて [.agents/skills/](.agents/skills/) の該当 `SKILL.md` を読む。
 
-- [lambda-implementation](.agents/skills/lambda-implementation/SKILL.md): Lambda 関数（handler / models / response / constants）の設計・実装・修正
-- [db-implementation](.agents/skills/db-implementation/SKILL.md): DynamoDB データアクセスの設計・実装・修正
-- [auth-implementation](.agents/skills/auth-implementation/SKILL.md): 認証・認可（Cognito Identity / IDOR）の設計・実装・修正
+- [lambda-implementation](.agents/skills/lambda-implementation/SKILL.md): Lambda の API 追加、handler の修正、認証・認可、DynamoDB アクセス、テストだけの変更
 - [infra-implementation](.agents/skills/infra-implementation/SKILL.md): Terraform / AWS インフラの設計・実装・修正
-- [test-implementation](.agents/skills/test-implementation/SKILL.md): テストの追加・修正・レビュー
 - [implementation-review](.agents/skills/implementation-review/SKILL.md): 実装差分のレビュー
