@@ -545,7 +545,7 @@ ZIPの階層とhandlerを同時に変えるため、適用の途中で短時間�
 - 2026-10-31に、Pyright 1.1.414を`standard`で実行し、指摘が1件であることを確認した。`boto3-stubs`を加えると5件、加えたうえで`strict`にすると883件だった。あわせてTerraformのモジュールを確認し、すべての変数に`type`と`description`があること、モジュールが`required_providers`を宣言していないこと、`media_api`の`aws_region`と`aws_caller_identity`のdata sourceが使われていないことを確認した。
 - GitHub Actionsの記録で、PRのCIの`Lambda Lint`がruff 0.16.1で失敗してplanジョブがスキップされたことと、CDの直近2回がOIDCのロール引受けで失敗したことを確認した。
 - Terraformのvalidate・plan、trivy、tflintは未実施であり、現行の全検証が成功するとは主張しない。
-- 本設計のコード・Skill・CIの変更は未実装。設計書を作成したことと、提案した変更を検証したことを区別する。
+- 段階1の変更は実装済み。段階2以降のコード・Skill・CIの変更は未実装。設計書を作成したことと、提案した変更を検証したことを区別する。
 
 ## 13. 外部仕様の確認先
 
