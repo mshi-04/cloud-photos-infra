@@ -53,6 +53,7 @@ IAM権限を広げる場合や `bootstrap/` の変更が必要な場合は、実
 ワークフローは `.github/workflows/` にあります。
 
 - `main` と `develop` への PR では、lint、Pyright、test、Trivy、Terraform の format と、dev と prod の plan を実行します。
+- plan の前に、`scripts/build_lambda.py` で Lambda の ZIP を `.build/` に作ります。CD は、ZIP から各 handler を読み込めることも確かめます。plan で使った ZIP は、plan と一緒に apply へ渡します。
 - `develop` への push で、dev へ plan と apply を行います。
 - `main` への push で、dev へ適用した後に prod へ plan と apply を行います。
 - prod の apply は GitHub の Environment `production` で実行します。承認の要否は Environment の保護設定によります。

@@ -8,7 +8,7 @@
 | ファイル | 内容 |
 |---|---|
 | [main.tf](../../../../modules/media_api/main.tf) | `data`（`aws_region`、`aws_caller_identity`）、`locals` の `function_prefix` と `lambda_functions` |
-| [archives.tf](../../../../modules/media_api/archives.tf) | `data archive_file`（`source_dir` 一括 / `locals` の明示リスト） |
+| [archives.tf](../../../../modules/media_api/archives.tf) | `local.lambda_packages`（`scripts/build_lambda.py` が `.build/` に作る ZIP のパス） |
 | [iam.tf](../../../../modules/media_api/iam.tf) | `locals` の `assume_role_policy`、Lambda ごとの `aws_iam_role`、用途ごとの `aws_iam_role_policy`（dynamodb / s3 / secretsmanager / logs） |
 | [lambda.tf](../../../../modules/media_api/lambda.tf) | `aws_cloudwatch_log_group`（`local.lambda_functions` を `for_each`）、`aws_lambda_function`、`aws_lambda_code_signing_config` |
 | [api_gateway.tf](../../../../modules/media_api/api_gateway.tf) | REST API、パスごとの resource、エンドポイントごとの method / integration / `aws_lambda_permission`、CORS の `OPTIONS`、Gateway Response、deployment、stage |
@@ -26,8 +26,8 @@
    Resource = "${aws_cloudwatch_log_group.lambda["<key>"].arn}:*"
    ```
 
-4. `lambda.tf` に `aws_lambda_function` を追加する。ZIP は `archives.tf` の `data archive_file` に足す。`runtime = "python3.12"`、`handler = "<file>.handler"`、
-   `filename` と `source_code_hash` は `data.archive_file` から取り、
+4. `lambda.tf` に `aws_lambda_function` を追加する。`runtime = "python3.12"`、`handler = "cloud_photos.<function_group>.<module>.handler"`、
+   `filename = local.lambda_packages.<function_group>`、`source_code_hash = filebase64sha256(local.lambda_packages.<function_group>)` とし、
    `depends_on = [aws_cloudwatch_log_group.lambda["<key>"]]` を付ける。
 5. 以降は `api_gateway.tf` を変える。パスが新しければ `aws_api_gateway_resource` を足す。既存パスなら再利用する。
 6. `aws_api_gateway_method`（`authorization = "AWS_IAM"`）、
@@ -76,7 +76,7 @@ terraform validate
 terraform plan
 ```
 
-`validate` / `plan` には `.build/firebase_admin_layer.zip` と backend 初期化が必要です。手順は
+`validate` / `plan` には、`python scripts/build_lambda.py` で作る Lambda の ZIP、`.build/firebase_admin_layer.zip`、backend の初期化が必要です。手順は
 [README.md](../../../../README.md) のローカル開発を参照します。実行できない場合は
 `Not executed` と理由を報告します。
 

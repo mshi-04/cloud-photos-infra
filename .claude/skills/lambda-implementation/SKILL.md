@@ -39,7 +39,7 @@ API 応答のステータスと本文の形式は、[docs/lambda.md](../../../do
 - **未認証の応答:** 新しい API は 403 にする。既存の `users` と `push_notification` の 401 を変える場合は、API 互換性の変更としてユーザーに確認する。
 - **既存の書き方と規約の衝突:** `global` 文によるクライアントのキャッシュなど、同じモジュールの既存の仕組みと組み合わせる場合は、[docs/coding_standards.md](../../../docs/coding_standards.md) の「既存コードとの関係」に従う。
 - **新しい AWS アクション:** IAM ポリシーの追加が必要になる。infra-implementation Skill で、アクションと ARN を限定して追加する。
-- **新しいファイル:** 関数群の ZIP に入るかを確かめる。明示リストで ZIP を作る関数群では、Terraform の `locals` も更新する。
+- **新しいファイル:** import は `cloud_photos.<function_group>.<module>` の修飾付きで書く。ZIP は `scripts/build_lambda.py` が import をたどって作るため、定義の更新は要らない。ZIP から handler を読み込めることを検証で確かめる。
 
 ## 検証手順
 
@@ -50,10 +50,10 @@ ruff check lambda/
 ruff format --check lambda/
 pyright
 Set-Location lambda
-pytest <function_group>/tests/
+pytest
 ```
 
-`lambda/common/` を変えた場合は、`device_tokens` と `push_notification` の両方をテストする。実行する範囲と報告の形式は [docs/verification_policy.md](../../../docs/verification_policy.md) に従う。
+ファイルや共有処理を追加・移動した場合は、ZIP をビルドして、各 handler を ZIP から読み込めることも確かめる（[docs/commands.md](../../../docs/commands.md) の Lambda の ZIP）。実行する範囲と報告の形式は [docs/verification_policy.md](../../../docs/verification_policy.md) に従う。
 
 ## 参考資料
 

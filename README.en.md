@@ -67,7 +67,8 @@ bootstrap/          Terraform backend, GitHub OIDC, and plan/apply IAM roles
 envs/dev/           Terraform root module for dev
 envs/prod/          Terraform root module for prod
 modules/            Reusable AWS resource modules
-lambda/             Lambda handlers, shared code, layers, and pytest tests
+lambda/             Lambda handlers (cloud_photos package), layers, and pytest tests
+scripts/            Building the Lambda ZIPs and checking that they import
 .github/workflows/  Terraform CI/CD and the reusable deployment workflow
 docs/               Implementation, verification, security, and operational guidance
 .agents/skills/     Repository-local Skills for Codex
@@ -100,21 +101,24 @@ python -m pip install -r lambda/requirements-dev.txt
 
 ```powershell
 terraform fmt -check -recursive
-ruff check lambda/
-ruff format --check lambda/
+ruff check lambda/ scripts/
+ruff format --check lambda/ scripts/
 pyright
 Push-Location lambda
-pytest media_uploads/tests/
-pytest device_tokens/tests/
-pytest push_notification/tests/
-pytest users/tests/
+pytest
 Pop-Location
 trivy conf .
 ```
 
-Run pytest separately for each function group. Running `pytest` once from `lambda/` fails because modules with the same name in different function groups collide. `pyright` checks types using the dependencies in the activated virtual environment.
+Run pytest once from `lambda/` to test everything. To run one function group, use `pytest cloud_photos/<function_group>/tests/`. `pyright` checks types using the dependencies in the activated virtual environment.
 
-Terraform `validate` and `plan` require backend initialization and `.build/firebase_admin_layer.zip`. From the repository root, build the layer with the same AWS SAM Python 3.12 image used by CI.
+Terraform `validate` and `plan` require backend initialization, and the Lambda ZIPs and `firebase_admin_layer.zip` in `.build/`. Build the Lambda ZIPs from the repository root with the script below. CI and CD use the same script.
+
+```powershell
+python scripts/build_lambda.py
+```
+
+Build the layer from the repository root with the same AWS SAM Python 3.12 image used by CI.
 
 ```powershell
 New-Item -ItemType Directory -Force .build | Out-Null
@@ -126,7 +130,14 @@ docker run --rm `
   bash -c "pip install -r /requirements/requirements.txt -t /tmp/python --quiet && cd /tmp && zip -r9 /out/firebase_admin_layer.zip python"
 ```
 
-After building the layer, initialize and verify the target environment.
+To check that every handler imports from the ZIPs, run the following. boto3 is loaded from outside the ZIPs, as in the Lambda runtime; install it outside `.build/`.
+
+```powershell
+python -m pip install --target "$env:TEMP\lambda-runtime-deps" boto3
+python scripts/verify_lambda_packages.py --runtime-deps "$env:TEMP\lambda-runtime-deps" --layer push_notification=.build/firebase_admin_layer.zip
+```
+
+After building the ZIPs and the layer, initialize and verify the target environment.
 
 ```powershell
 Push-Location envs/dev

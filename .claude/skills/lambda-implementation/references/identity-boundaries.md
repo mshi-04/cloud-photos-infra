@@ -13,7 +13,7 @@
 
 ## identity の取得
 
-`get_identity_id` と `mask_identity` の正本は [lambda/common/auth.py](../../../../lambda/common/auth.py) です。
+`get_identity_id` と `mask_identity` の正本は [lambda/cloud_photos/common/auth.py](../../../../lambda/cloud_photos/common/auth.py) です。
 
 `device_tokens/auth.py` と `push_notification/auth.py` はこれを re-export します。
 `media_uploads/auth.py` と `users/auth.py` は同等実装のコピーです。新規は re-export に揃えます。

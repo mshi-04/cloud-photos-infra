@@ -1,8 +1,8 @@
 # AI文書・開発基盤リファクタリング設計
 
 - 作成日: 2026-10-30
-- 更新日: 2026-10-31。レビュー指摘の反映、コーディング規約の章の追加、型検査とlintの厳しさの決定、段階ごとの作業とブランチの追加、PRのレビュー指摘の反映、段階0の省略と段階1の実施、段階2の省略、段階3と段階4の実施
-- 状態: 段階1（契約と規約の確定）、段階3（Skillの再編）、段階4（Terraformのファイル分割）を実施。段階0と段階2は行わない。段階5以降は未実施。
+- 更新日: 2026-10-31。レビュー指摘の反映、コーディング規約の章の追加、型検査とlintの厳しさの決定、段階ごとの作業とブランチの追加、PRのレビュー指摘の反映、段階0の省略と段階1の実施、段階2の省略、段階3から段階5の実施
+- 状態: 段階1（契約と規約の確定）、段階3（Skillの再編）、段階4（Terraformのファイル分割）、段階5（Lambda基盤）を実施。段階0と段階2は行わない。段階6以降は未実施。
 - 設計の起点: `develop` の `e4dfb2d`
 - 本設計書のブランチ: `feature/ai-documentation-refactoring`。各段階のブランチは第10.1節に記す
 
@@ -37,9 +37,9 @@ AIが、変更する場所、守る契約、必要な検証、完了の判断方
 |---|---|---|
 | 入口 | [AGENTS.md](AGENTS.md)と[CLAUDE.md](CLAUDE.md)は各27行で、共通文書と6種類のSkillを案内する。両者の違いはパス表記だけで、`.agents/skills/`と`.claude/skills/`は現在一致している | 独立した入口を維持し、必読事項と作業別の参照順を明確にする |
 | 共通ルール | 検証、state lock、IAM、ログの要件が複数の文書・Skillへ繰り返し記載される | 各要件の正本と、参照する側を決める |
-| 認証 | [Lambdaガイド](docs/lambda.md)などはLambdaでのJWT検証を指示するが、認証Skill（当時の`auth-implementation`）と[実装](lambda/common/auth.py)はCognito Identity IDを扱う。業務用の7メソッドはAPI GatewayのIAM認証である`AWS_IAM`を使い、`NONE`はCORSの`OPTIONS`だけである | API GatewayのIAM認証とLambdaの所有者確認を正しく説明する。JWT検証の追加は行わない |
+| 認証 | [Lambdaガイド](docs/lambda.md)などはLambdaでのJWT検証を指示するが、認証Skill（当時の`auth-implementation`）と[実装](lambda/cloud_photos/common/auth.py)はCognito Identity IDを扱う。業務用の7メソッドはAPI GatewayのIAM認証である`AWS_IAM`を使い、`NONE`はCORSの`OPTIONS`だけである | API GatewayのIAM認証とLambdaの所有者確認を正しく説明する。JWT検証の追加は行わない |
 | テスト | 文書は全体を一度に実行する手順だが、[CI](.github/workflows/ci-terraform.yml)は4つの関数群を別プロセスで実行する。関数群別の実行は成功し、一括実行は`constants`の名前衝突により収集時に失敗する | 名前空間とimportを整理し、一度の全体実行を成立させる。それまでは関数群別の実行を現行手順として記載する |
-| import | [関数群のfixture](lambda/device_tokens/tests/conftest.py)が`sys.path`を変更し、`auth`、`constants`、`db`などを同名でimportする | 関数群ごとに区別できるモジュール名へ移行する |
+| import | [関数群のfixture](lambda/cloud_photos/device_tokens/tests/conftest.py)が`sys.path`を変更し、`auth`、`constants`、`db`などを同名でimportする | 関数群ごとに区別できるモジュール名へ移行する |
 | 配布 | [Lambda ZIP生成](modules/media_api/archives.tf)はディレクトリ収録とファイル列挙が混在する。`media_uploads`のZIPは`tests/`を含み、`users`のZIPは`__pycache__/`を除外していない | 共通の配布方針と、生成物を使う読み込み検証を設ける |
 | レイヤー | [Firebaseレイヤー](modules/push_notification/main.tf)のZIPは毎回ビルドされ、ZIPのハッシュで更新を判定する。同じ手順で2回ビルドするとハッシュが異なる | 成果物の生成を再現可能にする |
 | 依存関係 | `firebase-admin`のバージョンが[テスト用](lambda/requirements-dev.txt)と[レイヤー用](lambda/layers/firebase_admin/requirements.txt)の2か所にある。[Dependabot](.github/dependabot.yml)のpip設定は、依存定義のない`/lambda/media_uploads`を対象にしている | バージョンを一元化するか、一致を検証する |
@@ -53,10 +53,10 @@ AIが、変更する場所、守る契約、必要な検証、完了の判断方
 
 ### 調査で確認した実装上の不足
 
-- [通知処理](lambda/push_notification/notify_upload_complete.py)は、JSON配列・文字列・数値などをオブジェクトとして扱おうとして例外になる。`successCount`の整数判定は真偽値も受け入れ、`true`を送ると201を返して「True件のメディアをアップロードしました」と通知する。
+- [通知処理](lambda/cloud_photos/push_notification/notify_upload_complete.py)は、JSON配列・文字列・数値などをオブジェクトとして扱おうとして例外になる。`successCount`の整数判定は真偽値も受け入れ、`true`を送ると201を返して「True件のメディアをアップロードしました」と通知する。
 - 同処理の端末取得はDynamoDB Queryの最初のページだけを取得し、継続キーを処理していない。1ページは最大1MBのため、影響が出るのは1ユーザーあたり数千台規模からであり、優先度は低い。
 - 同処理では、DynamoDB QueryとSecrets Managerの失敗が例外のまま返る。登録解除済みトークンの削除に失敗した場合も例外のまま返り、残りの端末へは送信されない。
-- [共通認証ヘルパー](lambda/common/auth.py)と[Media Uploadsの認証ヘルパー](lambda/media_uploads/auth.py)は、`requestContext`や`identity`がnullの場合に例外となる。[Usersのヘルパー](lambda/users/auth.py)とは扱いが異なる。
+- [共通認証ヘルパー](lambda/cloud_photos/common/auth.py)と[Media Uploadsの認証ヘルパー](lambda/cloud_photos/media_uploads/auth.py)は、`requestContext`や`identity`がnullの場合に例外となる。[Usersのヘルパー](lambda/cloud_photos/users/auth.py)とは扱いが異なる。
 - UsersとPushの未認証応答は401、Media UploadsとDevice Tokensは403であり、既存テストもそれぞれを期待する。多くのSkill資料は「新規は403、既存の401は維持」と書き分けている。ただし、認証Skill（当時の`auth-implementation`）は401の例外を`delete_user.py`だけとしてPushを含めておらず、テストSkill（当時の`test-implementation`）は例外に触れずに未認証を403としている。
 
 これらは文書整理や構造変更とは区別し、個別の動作変更としてテストとともに修正する。401と403の統一は、本リファクタリングの完了条件にしない。
@@ -482,6 +482,8 @@ ZIPの階層とhandlerを同時に変えるため、適用の途中で短時間�
 
 完了条件: ローカルとCIで同じ全体テストが成功し、ビルドしたZIPから各handlerを読み込め、文書とSkillの記述が新しい構成と一致する。
 
+実施: 2026-10-31に作業1から作業6を行った。パッケージ名は`cloud_photos`とし、`lambda/cloud_photos/`の下に`common`と4つの関数群を置いた。テストは各関数群の`tests/`に残し、ZIPからは外す。ビルドは`scripts/build_lambda.py`、読み込みの検証は`scripts/verify_lambda_packages.py`で行う。ZIPに入れる共有パッケージは、`cloud_photos.<パッケージ>`のimportをたどって決める。Terraformの`archive_file`はなくなり、archiveプロバイダもロックファイルから外した。Firebaseレイヤーのビルドの統合は、第10.10節のとおり段階7で行う。
+
 ### 10.9 段階6: Lambdaの規約への移行
 
 1. 値オブジェクト、例外、型、クライアントのキャッシュ、定数、ログを第8.2節に揃え、2系統ある書き方を1つにする。
@@ -531,11 +533,12 @@ ZIPの階層とhandlerを同時に変えるため、適用の途中で短時間�
 
 | 事項 | 決める時期 |
 |---|---|
-| パッケージ名と、ディレクトリの最終配置 | 段階5 |
 | `successCount`が0のときに通知するか。現状は「0件のメディアをアップロードしました」と通知する | 第6.5節の修正時 |
 | 本番運用を開始する時期。開始後は、第6.1節の段階的なhandlerの切り替え手順を使う | 本番運用の開始前 |
 
 型検査のツールをPyrightとし、ruffとPyrightをどちらも中間の厳しさで運用することは、2026-10-31に決めた。内容は第8.4節に記す。
+
+パッケージ名を`cloud_photos`とし、`lambda/cloud_photos/<関数群>/`に置くことは、段階5の実施時（2026-10-31）に決めた。
 
 ## 12. 検証の記録
 
@@ -553,7 +556,8 @@ ZIPの階層とhandlerを同時に変えるため、適用の途中で短時間�
 - GitHub Actionsの記録で、PRのCIの`Lambda Lint`がruff 0.16.1で失敗してplanジョブがスキップされたことと、CDの直近2回がOIDCのロール引受けで失敗したことを確認した。
 - Terraformのvalidate・plan、trivy、tflintは未実施であり、現行の全検証が成功するとは主張しない。
 - 2026-10-31に段階4の分割を確認した。分割前の`main.tf`と分割後の5つのファイルから、トップレベルのブロック（`data`が6、`locals`が3、`resource`が85の計94）を取り出して比べ、内容がすべて一致し、各ブロックがちょうど1回ずつ現れることを確かめた。コメントの68行も一致した。`terraform fmt -check -recursive`は成功した。`terraform init -backend=false`の後の`terraform validate`は、`envs/dev`と`envs/prod`で分割の前後とも成功した。プロバイダは、ロックファイルと同じ版をreleases.hashicorp.comから取得し、公開されたSHA256と照合して使った。`validate`に必要なFirebaseレイヤーのZIPは、空のZIPで代用した。planは、AWSの認証情報がないため実行していない。
-- 段階1、段階3、段階4の変更は実装済み。段階2は行わない。段階3の作業3のうち、Infra Skillのアドレス変更の手順を`moved`ブロック優先にする変更は、新しいコーディング規約との矛盾を避けるため段階1で実施した。段階5以降のコード・Skill・CIの変更は未実装。設計書を作成したことと、提案した変更を検証したことを区別する。
+- 2026-10-31に段階5を確認した。`lambda/`での`pytest`の一括実行が147件すべて成功し、関数群別の件数は移行前と同じだった（82、19、17、29）。ruffとPyright（`standard`）は指摘なしだった。ビルドした4つのZIPから7つのhandlerを、`python -I -S`で起動した別プロセスで読み込めた。同じソースから2回ビルドしたZIPのハッシュは一致した。`device_tokens`のZIPから`common`を外すと検証が失敗し、ソースツリーと開発環境の`site-packages`を`PYTHONPATH`に加えても失敗したことで、隔離を確かめた。Terraformの各`handler`が、参照するZIPの中で`handler`を定義するモジュールを指すことも確かめた。`terraform validate`は`envs/dev`と`envs/prod`で成功した。planは、AWSの認証情報がないため実行していない。Firebaseレイヤーは、ローカルではrequirements.txtから`pip install --target`で用意して検証した。
+- 段階1、段階3、段階4、段階5の変更は実装済み。段階2は行わない。段階3の作業3のうち、Infra Skillのアドレス変更の手順を`moved`ブロック優先にする変更は、新しいコーディング規約との矛盾を避けるため段階1で実施した。段階6以降のコード・Skill・CIの変更は未実装。設計書を作成したことと、提案した変更を検証したことを区別する。
 
 ## 13. 外部仕様の確認先
 
