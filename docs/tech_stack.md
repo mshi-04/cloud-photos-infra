@@ -53,7 +53,7 @@
 |---|---|
 | Platform | GitHub Actions |
 | Auth to AWS | OIDC roles |
-| PR | `main` と `develop` への PR で、Terraform CI が lint、Pyright、test、Trivy、Terraform の format と plan を、Docs CI が AWS に接続せずに文書とSkillの検証を行う |
+| PR | `main` と `develop` への PR で、lint、Pyright、test、Trivy、Terraform の format と plan |
 | `develop` への push | dev へ自動で plan と apply |
 | `main` への push | dev へ適用した後、prod へ plan と apply |
 | Prod | GitHub の Environment `production` で apply する。承認の要否は Environment の保護設定による |
@@ -66,4 +66,4 @@
 | `CLAUDE.md` | Claude Code向けの入口と地図 |
 | `docs/*.md` | 実際の詳細ルール |
 
-両入口ファイルは短く維持し、共通内容は手動で整合させてください。両系統の差分は `python scripts/check_ai_docs.py` で確かめ、意図した差分は [scripts/ai_docs_check.toml](../scripts/ai_docs_check.toml) の許可リストに書きます。長い手順や領域別規約は `docs/` に置き、ディレクトリごとの `AGENTS.md` や `CLAUDE.md` は作成しません。
+両入口ファイルは短く維持し、共通内容は手動で整合させてください。長い手順や領域別規約は `docs/` に置き、ディレクトリごとの `AGENTS.md` や `CLAUDE.md` は作成しません。

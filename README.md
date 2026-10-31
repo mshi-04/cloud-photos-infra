@@ -103,7 +103,6 @@ terraform fmt -check -recursive
 ruff check lambda/
 ruff format --check lambda/
 pyright
-python scripts/check_ai_docs.py
 Push-Location lambda
 pytest media_uploads/tests/
 pytest device_tokens/tests/
@@ -113,7 +112,7 @@ Pop-Location
 trivy conf .
 ```
 
-pytest は関数群ごとに実行します。`lambda/` で `pytest` を一度に実行すると、関数群どうしの同名モジュールが衝突して失敗します。`pyright` は、有効にした仮想環境の依存を使って型を検査します。`python scripts/check_ai_docs.py` は、AI 文書と Skill のリンク、frontmatter、両系統の差分を確かめます。
+pytest は関数群ごとに実行します。`lambda/` で `pytest` を一度に実行すると、関数群どうしの同名モジュールが衝突して失敗します。`pyright` は、有効にした仮想環境の依存を使って型を検査します。
 
 Terraform の `validate` / `plan` では backend の初期化に加え、`.build/firebase_admin_layer.zip` が必要です。リポジトリルートで、CI と同じ AWS SAM Python 3.12 イメージを使ってレイヤーを生成します。
 
@@ -152,11 +151,6 @@ state lock が発生した場合、`-lock=false` や `terraform force-unlock` �
 - dev / prod の `terraform validate` と `terraform plan`
 - サニタイズした plan 結果の PR コメント更新
 
-文書、Skill、Python のツール設定を変えた Pull Request では、AWS に接続しない Docs CI が次を実行します。Docs CI はすべての Pull Request で起動し、対象のパスが変わっていないジョブはスキップします。
-
-- AI 文書と Skill の検証（Markdown、相対リンク、Skill の frontmatter、`.agents` と `.claude` の差分）
-- `pyproject.toml`、`lambda/requirements-dev.txt`、`scripts/` を変えた場合の Ruff、Pyright、`scripts/` のテスト
-
 ### デプロイ
 
 - `develop` への push: dev を plan し、保存した plan を dev へ適用
@@ -171,7 +165,7 @@ state lock が発生した場合、`-lock=false` や `terraform force-unlock` �
 2. GitHub repository variables に `AWS_ACCOUNT_ID` と `TF_STATE_BUCKET` を設定します。
 3. GitHub Environments に `development` と `production` を作成します。
 4. `production` に required reviewers を設定し、デプロイブランチを `main` に限定します。
-5. `main` と `develop` に branch protection を設定し、Pull Request と、Docs CI の `AI Docs Check` と `Python Lint and Type Check` の成功を必須にします。Terraform CI のチェックは、パス条件で起動しない Pull Request で待機のまま残るため、必須にしません。
+5. `main` と `develop` に branch protection を設定し、Pull Request と CI 成功を必須にします。
 6. Terraform が作成した dev / prod の Secrets Manager secret に Firebase サービスアカウント情報を安全な経路で登録します。シークレット値は Terraform や Git に保存しません。
 
 ## セキュリティ原則

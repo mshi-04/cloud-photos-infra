@@ -87,33 +87,6 @@ pytest users/tests/
 pytest -v <function_group>/tests/
 ```
 
-## AI文書
-
-リポジトリルートで、文書とSkillを検証します。AWSへの接続も、追加のパッケージも要りません。
-
-```powershell
-python scripts/check_ai_docs.py
-```
-
-次を確かめます。
-
-- Markdownのコードブロックが閉じていること
-- 相対リンクの参照先が存在すること。見出しへのアンカー（`#` 以降）は確かめません
-- 各 `SKILL.md` のfrontmatterに `name` と `description` があり、`name` がディレクトリ名と一致すること
-- 廃止したSkillの名前が参照されていないこと
-- `AGENTS.md` と `CLAUDE.md`、`.agents/skills/` と `.claude/skills/` が、`.agents/` を `.claude/` に読み替えたうえで一致すること
-
-両系統を意図して変える場合は、[scripts/ai_docs_check.toml](../scripts/ai_docs_check.toml) の許可リストに差分を書きます。Skillを廃止した場合は、同じファイルの `retired_skills` に名前を加えます。
-
-スクリプトを変更した場合は、次も実行します。
-
-```powershell
-ruff check scripts/
-ruff format --check scripts/
-pyright
-pytest scripts/tests/
-```
-
 ## Security
 
 ```powershell
