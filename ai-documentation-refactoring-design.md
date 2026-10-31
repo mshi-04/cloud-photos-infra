@@ -443,7 +443,7 @@ planの結果を判断に使う場合は、CIのPRコメントの切り詰めに
 
 1. 第5章のとおり、`auth-implementation`、`db-implementation`、`test-implementation`の手順と資料を、Lambda Skillへ移す。
 2. 各`SKILL.md`を、目的、作業の選び方、判断、参照条件に絞り、コーディング規約の要点を手順に入れる。
-3. Infra Skillのアドレス変更の手順を`moved`ブロック優先にし、レビューSkillが比較対象のブランチをPR情報から確かめるようにする。
+3. Infra Skillのアドレス変更の手順を`moved`ブロック優先にし（段階1で実施済み）、レビューSkillが比較対象のブランチをPR情報から確かめるようにする。
 4. `AGENTS.md`と`CLAUDE.md`のSkill一覧を3つに更新し、旧Skillを削除する。両系統で同じ変更を行う。
 
 確認: 段階2の検証。旧Skill名の参照が残らず、両系統の差分が許可リストの範囲に収まること。
@@ -545,7 +545,7 @@ ZIPの階層とhandlerを同時に変えるため、適用の途中で短時間�
 - 2026-10-31に、Pyright 1.1.414を`standard`で実行し、指摘が1件であることを確認した。`boto3-stubs`を加えると5件、加えたうえで`strict`にすると883件だった。あわせてTerraformのモジュールを確認し、すべての変数に`type`と`description`があること、モジュールが`required_providers`を宣言していないこと、`media_api`の`aws_region`と`aws_caller_identity`のdata sourceが使われていないことを確認した。
 - GitHub Actionsの記録で、PRのCIの`Lambda Lint`がruff 0.16.1で失敗してplanジョブがスキップされたことと、CDの直近2回がOIDCのロール引受けで失敗したことを確認した。
 - Terraformのvalidate・plan、trivy、tflintは未実施であり、現行の全検証が成功するとは主張しない。
-- 段階1の変更は実装済み。段階2以降のコード・Skill・CIの変更は未実装。設計書を作成したことと、提案した変更を検証したことを区別する。
+- 段階1の変更は実装済み。段階2以降のコード・Skill・CIの変更は、次の1件を除いて未実装。段階3の作業3のうち、Infra Skillのアドレス変更の手順を`moved`ブロック優先にする変更は、新しいコーディング規約との矛盾を避けるため段階1で実施した。設計書を作成したことと、提案した変更を検証したことを区別する。
 
 ## 13. 外部仕様の確認先
 
