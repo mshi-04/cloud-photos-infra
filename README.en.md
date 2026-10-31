@@ -171,7 +171,7 @@ Pull requests that change documents, skills, or Python tool settings also run Do
 2. Configure the `AWS_ACCOUNT_ID` and `TF_STATE_BUCKET` GitHub repository variables.
 3. Create the `development` and `production` GitHub Environments.
 4. Add required reviewers to `production` and restrict its deployment branch to `main`.
-5. Protect `main` and `develop` by requiring pull requests and successful CI checks.
+5. Protect `main` and `develop` by requiring pull requests and successful `AI Docs Check` and `Python Lint and Type Check` jobs from Docs CI. Do not require Terraform CI checks: they stay pending on pull requests that do not match their path filters.
 6. Add Firebase service-account credentials to the dev and prod Secrets Manager secrets created by Terraform through a secure channel. Never store the secret value in Terraform or Git.
 
 ## Security Principles

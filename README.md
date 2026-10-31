@@ -171,7 +171,7 @@ state lock が発生した場合、`-lock=false` や `terraform force-unlock` �
 2. GitHub repository variables に `AWS_ACCOUNT_ID` と `TF_STATE_BUCKET` を設定します。
 3. GitHub Environments に `development` と `production` を作成します。
 4. `production` に required reviewers を設定し、デプロイブランチを `main` に限定します。
-5. `main` と `develop` に branch protection を設定し、Pull Request と CI 成功を必須にします。
+5. `main` と `develop` に branch protection を設定し、Pull Request と、Docs CI の `AI Docs Check` と `Python Lint and Type Check` の成功を必須にします。Terraform CI のチェックは、パス条件で起動しない Pull Request で待機のまま残るため、必須にしません。
 6. Terraform が作成した dev / prod の Secrets Manager secret に Firebase サービスアカウント情報を安全な経路で登録します。シークレット値は Terraform や Git に保存しません。
 
 ## セキュリティ原則

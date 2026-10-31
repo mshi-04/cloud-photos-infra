@@ -59,5 +59,6 @@ IAM権限を広げる場合や `bootstrap/` の変更が必要な場合は、実
 - prod の apply は GitHub の Environment `production` で実行します。承認の要否は Environment の保護設定によります。
 - Terraform CI と CD は、ワークフローの `paths` に当たる変更でだけ起動します。文書だけの変更や、`pyproject.toml` だけの変更では起動しません。
 - Docs CI は、すべての PR で起動します。変更されたパスをジョブの中で判定し、対象がないジョブはスキップします。そのため、ブランチ保護で必須にしても、起動しないまま待ち続けることはありません。
+- ブランチ保護で必須にするチェックは、Docs CI の `AI Docs Check` と `Python Lint and Type Check` です。Terraform CI のチェックは、パス条件で起動しない PR で待機のまま残るため、必須にしません。
 
 ワークフローを変更する場合は、認証方式、対象環境、permissions、secrets参照を確認してください。
