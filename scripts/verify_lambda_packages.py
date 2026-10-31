@@ -29,6 +29,9 @@ from typing import Final
 
 from build_lambda import OUTPUT_DIR, PACKAGE, REPO_ROOT, function_groups
 
+# Lambda adds both python/ and this directory under it to the module search path for each layer.
+LAYER_SITE_PACKAGES: Final = Path("lib") / "python3.12" / "site-packages"
+
 CHILD_CODE: Final = """
 import importlib, json, sys
 config = json.loads(sys.argv[1])
@@ -88,6 +91,8 @@ def verify_group(group: str, zip_path: Path, runtime_deps: Path, layer: Path | N
             if python_dir is None:
                 return [f"{zip_path.name}: layer {layer} has no python/ directory, so Lambda would not load it"]
             paths.append(str(python_dir))
+            if (python_dir / LAYER_SITE_PACKAGES).is_dir():
+                paths.append(str(python_dir / LAYER_SITE_PACKAGES))
         paths.append(str(runtime_deps))
         config = {"paths": paths, "modules": modules, "package_root": str(package_root)}
 

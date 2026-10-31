@@ -101,7 +101,7 @@ python -m pip install --target "$env:TEMP\lambda-runtime-deps" boto3
 python scripts/verify_lambda_packages.py --runtime-deps "$env:TEMP\lambda-runtime-deps" --layer push_notification=.build/firebase_admin_layer.zip
 ```
 
-レイヤーの ZIP がない場合は、`python -m pip install --target <dir>/python -r lambda/layers/firebase_admin/requirements.txt` で作ったディレクトリを `--layer push_notification=<dir>` に渡せます。レイヤーは、Lambda と同じく `python/` の下だけを読み込みます。`python/` がないレイヤーは検証に失敗します。CI はこの方法で確かめます。
+レイヤーの ZIP がない場合は、`python -m pip install --target <dir>/python -r lambda/layers/firebase_admin/requirements.txt` で作ったディレクトリを `--layer push_notification=<dir>` に渡せます。レイヤーは、Lambda と同じく `python/` と `python/lib/python3.12/site-packages/` から読み込みます。`python/` がないレイヤーは検証に失敗します。CI はこの方法で確かめます。
 
 ## Security
 
