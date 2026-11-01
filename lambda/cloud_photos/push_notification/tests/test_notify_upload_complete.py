@@ -3,6 +3,7 @@ from unittest.mock import patch
 
 import pytest
 
+from cloud_photos.push_notification import notify_upload_complete
 from cloud_photos.push_notification.notify_upload_complete import handler
 
 IDENTITY_ID = "ap-northeast-1:test-user-id"
@@ -135,3 +136,36 @@ class TestNotifyUploadComplete:
             ExpressionAttributeValues={":uid": {"S": IDENTITY_ID}},
         )
         assert len(result["Items"]) == 1
+
+
+class _PagedDynamoDB:
+    """Returns the given Query pages in order and records the requests."""
+
+    def __init__(self, pages):
+        self._pages = list(pages)
+        self.requests = []
+
+    def query(self, **params):
+        self.requests.append(params)
+        return self._pages.pop(0)
+
+
+class TestQueryDeviceTokens:
+    def test_follows_last_evaluated_key_across_pages(self):
+        key_1 = {KEY_USER_ID: {"S": IDENTITY_ID}, KEY_DEVICE_TOKEN: {"S": TOKEN_A}}
+        key_2 = {KEY_USER_ID: {"S": IDENTITY_ID}, KEY_DEVICE_TOKEN: {"S": "device-token-zzz"}}
+        dynamodb = _PagedDynamoDB(
+            [
+                {"Items": [{KEY_DEVICE_TOKEN: {"S": TOKEN_A}}], "LastEvaluatedKey": key_1},
+                {"Items": [], "LastEvaluatedKey": key_2},
+                {"Items": [{KEY_DEVICE_TOKEN: {"S": TOKEN_B}}]},
+            ]
+        )
+
+        tokens = notify_upload_complete._query_device_tokens(dynamodb, TABLE_NAME, IDENTITY_ID)
+
+        assert tokens == [TOKEN_A, TOKEN_B]
+        assert [request.get("ExclusiveStartKey") for request in dynamodb.requests] == [None, key_1, key_2]
+        for request in dynamodb.requests:
+            assert request["ExpressionAttributeValues"] == {":uid": {"S": IDENTITY_ID}}
+            assert request["KeyConditionExpression"] == "#uid = :uid"

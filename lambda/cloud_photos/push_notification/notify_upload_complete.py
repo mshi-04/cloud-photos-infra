@@ -35,14 +35,22 @@ def _get_firebase_app() -> firebase_admin.App:
 
 
 def _query_device_tokens(dynamodb, table_name: str, user_id: str) -> List[str]:
-    result = dynamodb.query(
-        TableName=table_name,
-        KeyConditionExpression="#uid = :uid",
-        ExpressionAttributeNames={"#uid": FIELD_USER_ID},
-        ExpressionAttributeValues={":uid": {"S": user_id}},
-        ProjectionExpression=FIELD_DEVICE_TOKEN,
-    )
-    return [item[FIELD_DEVICE_TOKEN]["S"] for item in result.get("Items", [])]
+    params: Dict[str, Any] = {
+        "TableName": table_name,
+        "KeyConditionExpression": "#uid = :uid",
+        "ExpressionAttributeNames": {"#uid": FIELD_USER_ID},
+        "ExpressionAttributeValues": {":uid": {"S": user_id}},
+        "ProjectionExpression": FIELD_DEVICE_TOKEN,
+    }
+    tokens: List[str] = []
+    while True:
+        result = dynamodb.query(**params)
+        tokens.extend(item[FIELD_DEVICE_TOKEN]["S"] for item in result.get("Items", []))
+        # A page can be empty and still have more pages after it.
+        last_evaluated_key = result.get("LastEvaluatedKey")
+        if not last_evaluated_key:
+            return tokens
+        params["ExclusiveStartKey"] = last_evaluated_key
 
 
 def _delete_device_token(dynamodb, table_name: str, user_id: str, token: str) -> None:
