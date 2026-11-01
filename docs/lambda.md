@@ -84,7 +84,7 @@ ZIP は [scripts/build_lambda.py](../scripts/build_lambda.py) が関数群ごと
 | `GET /media/uploads` | `media_uploads/get_upload_records` | 403 | 200 |
 | `POST /media/uploads` | `media_uploads/create_upload_record` | 403 | 201。既存時は 200 |
 | `DELETE /media/uploads/{mediaId}` | `media_uploads/delete_upload_record` | 403 | 200 |
-| `POST /media/uploads/complete` | `push_notification/notify_upload_complete` | 401 | 201。通知先がない場合は 204 |
+| `POST /media/uploads/complete` | `push_notification/notify_upload_complete` | 401 | 201。`successCount` が 0 の場合と、通知先がない場合は 204 |
 | `PUT /devices/token` | `device_tokens/register_device_token` | 403 | 201 |
 | `DELETE /devices/token` | `device_tokens/unregister_device_token` | 403 | 200 |
 | `DELETE /users` | `users/delete_user` | 401 | 200。一部の削除に失敗した場合は 500 |

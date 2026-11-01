@@ -35,14 +35,22 @@ def _get_firebase_app() -> firebase_admin.App:
 
 
 def _query_device_tokens(dynamodb, table_name: str, user_id: str) -> List[str]:
-    result = dynamodb.query(
-        TableName=table_name,
-        KeyConditionExpression="#uid = :uid",
-        ExpressionAttributeNames={"#uid": FIELD_USER_ID},
-        ExpressionAttributeValues={":uid": {"S": user_id}},
-        ProjectionExpression=FIELD_DEVICE_TOKEN,
-    )
-    return [item[FIELD_DEVICE_TOKEN]["S"] for item in result.get("Items", [])]
+    params: Dict[str, Any] = {
+        "TableName": table_name,
+        "KeyConditionExpression": "#uid = :uid",
+        "ExpressionAttributeNames": {"#uid": FIELD_USER_ID},
+        "ExpressionAttributeValues": {":uid": {"S": user_id}},
+        "ProjectionExpression": FIELD_DEVICE_TOKEN,
+    }
+    tokens: List[str] = []
+    while True:
+        result = dynamodb.query(**params)
+        tokens.extend(item[FIELD_DEVICE_TOKEN]["S"] for item in result.get("Items", []))
+        # A page can be empty and still have more pages after it.
+        last_evaluated_key = result.get("LastEvaluatedKey")
+        if not last_evaluated_key:
+            return tokens
+        params["ExclusiveStartKey"] = last_evaluated_key
 
 
 def _delete_device_token(dynamodb, table_name: str, user_id: str, token: str) -> None:
@@ -57,9 +65,12 @@ def _delete_device_token(dynamodb, table_name: str, user_id: str, token: str) ->
 
 def _parse_body(event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     try:
-        return json.loads(event.get("body") or "{}")
+        body = json.loads(event.get("body") or "{}")
     except (json.JSONDecodeError, TypeError):
         return None
+    if not isinstance(body, dict):
+        return None
+    return body
 
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -74,21 +85,34 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         return response.error(400, "Invalid request body")
 
     success_count = body.get("successCount")
-    if not isinstance(success_count, int) or success_count < 0:
+    # bool is a subclass of int, so reject it explicitly.
+    if isinstance(success_count, bool) or not isinstance(success_count, int) or success_count < 0:
         return response.error(400, "successCount must be a non-negative integer")
+
+    masked = auth.mask_identity(user_id)
+    if success_count == 0:
+        logger.info("Nothing uploaded, skipping notification: user=%s", masked)
+        return response.success(204)
 
     table_name = os.environ["TABLE_NAME"]
     dynamodb = boto3.client("dynamodb")
 
-    masked = auth.mask_identity(user_id)
     logger.info("Notifying upload complete: user=%s successCount=%d", masked, success_count)
 
-    tokens = _query_device_tokens(dynamodb, table_name, user_id)
+    try:
+        tokens = _query_device_tokens(dynamodb, table_name, user_id)
+    except Exception:
+        logger.exception("Failed to query device tokens: user=%s", masked)
+        return response.error(500, "Internal server error")
     if not tokens:
         logger.info("No device tokens registered for user=%s", masked)
         return response.success(204)
 
-    _get_firebase_app()
+    try:
+        _get_firebase_app()
+    except Exception:
+        logger.exception("Failed to initialize Firebase: user=%s", masked)
+        return response.error(500, "Internal server error")
 
     notification_body = f"{success_count}件のメディアをアップロードしました"
     notification = messaging.Notification(
@@ -105,7 +129,11 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             logger.info("FCM sent: user=%s token=***%s", masked, token[-4:])
         except messaging.UnregisteredError:
             logger.info("Deleting unregistered token: user=%s token=***%s", masked, token[-4:])
-            _delete_device_token(dynamodb, table_name, user_id, token)
+            try:
+                _delete_device_token(dynamodb, table_name, user_id, token)
+            except Exception:
+                # Keep sending to the other devices; the stale token is retried on the next notification.
+                logger.exception("Failed to delete unregistered token: user=%s token=***%s", masked, token[-4:])
         except Exception as e:
             logger.error("FCM send failed: user=%s token=***%s error=%s", masked, token[-4:], e, exc_info=True)
 
