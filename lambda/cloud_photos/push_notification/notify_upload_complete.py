@@ -57,9 +57,12 @@ def _delete_device_token(dynamodb, table_name: str, user_id: str, token: str) ->
 
 def _parse_body(event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     try:
-        return json.loads(event.get("body") or "{}")
+        body = json.loads(event.get("body") or "{}")
     except (json.JSONDecodeError, TypeError):
         return None
+    if not isinstance(body, dict):
+        return None
+    return body
 
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -74,13 +77,18 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         return response.error(400, "Invalid request body")
 
     success_count = body.get("successCount")
-    if not isinstance(success_count, int) or success_count < 0:
+    # bool is a subclass of int, so reject it explicitly.
+    if isinstance(success_count, bool) or not isinstance(success_count, int) or success_count < 0:
         return response.error(400, "successCount must be a non-negative integer")
+
+    masked = auth.mask_identity(user_id)
+    if success_count == 0:
+        logger.info("Nothing uploaded, skipping notification: user=%s", masked)
+        return response.success(204)
 
     table_name = os.environ["TABLE_NAME"]
     dynamodb = boto3.client("dynamodb")
 
-    masked = auth.mask_identity(user_id)
     logger.info("Notifying upload complete: user=%s successCount=%d", masked, success_count)
 
     tokens = _query_device_tokens(dynamodb, table_name, user_id)

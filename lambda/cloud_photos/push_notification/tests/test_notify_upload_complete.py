@@ -1,6 +1,8 @@
 import json
 from unittest.mock import patch
 
+import pytest
+
 from cloud_photos.push_notification.notify_upload_complete import handler
 
 IDENTITY_ID = "ap-northeast-1:test-user-id"
@@ -55,11 +57,29 @@ class TestNotifyUploadComplete:
         resp = handler(_make_event({"successCount": -1}), None)
         assert resp["statusCode"] == 400
 
-    def test_zero_success_count_is_valid(self, dynamodb_table):
+    def test_zero_success_count_returns_204_without_sending(self, dynamodb_table):
         _seed_token(dynamodb_table, IDENTITY_ID, TOKEN_A)
-        with patch("firebase_admin.messaging.send"):
+        with patch("firebase_admin.messaging.send") as mock_send:
             resp = handler(_make_event({"successCount": 0}), None)
-        assert resp["statusCode"] == 201
+        assert resp["statusCode"] == 204
+        assert resp["body"] == ""
+        mock_send.assert_not_called()
+
+    @pytest.mark.parametrize("raw_body", ["[1, 2]", '"text"', "3", "null"])
+    def test_non_object_json_body_is_invalid(self, dynamodb_table, raw_body):
+        event = {"requestContext": {"identity": {"cognitoIdentityId": IDENTITY_ID}}, "body": raw_body}
+        with patch("firebase_admin.messaging.send") as mock_send:
+            resp = handler(event, None)
+        assert resp["statusCode"] == 400
+        mock_send.assert_not_called()
+
+    @pytest.mark.parametrize("success_count", [True, False, 1.5, 2.0, None])
+    def test_non_integer_success_count_is_invalid(self, dynamodb_table, success_count):
+        _seed_token(dynamodb_table, IDENTITY_ID, TOKEN_A)
+        with patch("firebase_admin.messaging.send") as mock_send:
+            resp = handler(_make_event({"successCount": success_count}), None)
+        assert resp["statusCode"] == 400
+        mock_send.assert_not_called()
 
     def test_no_device_tokens_returns_204(self, dynamodb_table):
         resp = handler(_make_event({"successCount": 3}), None)
