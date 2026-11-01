@@ -35,6 +35,19 @@ class TestDeleteUser:
         assert s3_mock.call_count == 0
         assert ddb_mock.call_count == 0
 
+    @pytest.mark.parametrize("request_context", [None, {"identity": None}], ids=["request_context_null", "identity_null"])
+    def test_unauthorized_null_identity_does_not_touch_storage(self, monkeypatch, request_context):
+        s3_mock = MagicMock()
+        ddb_mock = MagicMock()
+        monkeypatch.setattr(delete_user, "_delete_s3_objects", s3_mock)
+        monkeypatch.setattr(delete_user, "_delete_dynamodb_records", ddb_mock)
+
+        resp = handler({"requestContext": request_context}, None)
+
+        assert resp["statusCode"] == 401
+        assert s3_mock.call_count == 0
+        assert ddb_mock.call_count == 0
+
     def test_returns_200_with_message_when_all_succeed(self, aws_resources, monkeypatch):
         monkeypatch.setattr(delete_user, "_delete_s3_objects", MagicMock())
         monkeypatch.setattr(delete_user, "_delete_dynamodb_records", MagicMock())

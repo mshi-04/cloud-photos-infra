@@ -1,5 +1,6 @@
 import json
 
+import pytest
 from moto import mock_aws
 
 from cloud_photos.media_uploads.create_upload_record import handler
@@ -47,6 +48,12 @@ class TestCreateUploadRecord:
 
     def test_unauthorized_no_identity(self, dynamodb_table):
         event = {"requestContext": {"identity": {}}, "body": json.dumps(_valid_body())}
+        resp = handler(event, None)
+        assert resp["statusCode"] == 403
+
+    @pytest.mark.parametrize("request_context", [None, {"identity": None}], ids=["request_context_null", "identity_null"])
+    def test_unauthorized_null_identity(self, dynamodb_table, request_context):
+        event = {"requestContext": request_context, "body": json.dumps(_valid_body())}
         resp = handler(event, None)
         assert resp["statusCode"] == 403
 

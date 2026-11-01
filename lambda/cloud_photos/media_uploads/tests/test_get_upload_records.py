@@ -1,6 +1,7 @@
 import json
 import os
 
+import pytest
 from moto import mock_aws
 
 from cloud_photos.media_uploads.get_upload_records import handler
@@ -69,6 +70,12 @@ class TestGetUploadRecords:
 
     def test_unauthorized(self, dynamodb_table):
         event = {"requestContext": {"identity": {}}, "queryStringParameters": {}}
+        resp = handler(event, None)
+        assert resp["statusCode"] == 403
+
+    @pytest.mark.parametrize("request_context", [None, {"identity": None}], ids=["request_context_null", "identity_null"])
+    def test_unauthorized_null_identity(self, dynamodb_table, request_context):
+        event = {"requestContext": request_context, "queryStringParameters": {}}
         resp = handler(event, None)
         assert resp["statusCode"] == 403
 

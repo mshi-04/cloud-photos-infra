@@ -41,6 +41,12 @@ class TestNotifyUploadComplete:
         resp = handler(event, None)
         assert resp["statusCode"] == 401
 
+    @pytest.mark.parametrize("request_context", [None, {"identity": None}], ids=["request_context_null", "identity_null"])
+    def test_unauthorized_null_identity(self, dynamodb_table, request_context):
+        event = {"requestContext": request_context, "body": json.dumps({"successCount": 1})}
+        resp = handler(event, None)
+        assert resp["statusCode"] == 401
+
     def test_invalid_json_body(self, dynamodb_table):
         event = {
             "requestContext": {"identity": {"cognitoIdentityId": IDENTITY_ID}},

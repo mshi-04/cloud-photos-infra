@@ -1,6 +1,7 @@
 import json
 import os
 
+import pytest
 from moto import mock_aws
 
 from cloud_photos.media_uploads.delete_upload_record import handler
@@ -54,6 +55,12 @@ class TestDeleteUploadRecord:
 
     def test_unauthorized(self, dynamodb_table):
         event = {"requestContext": {"identity": {}}, "pathParameters": {"mediaId": MEDIA_ID}}
+        resp = handler(event, None)
+        assert resp["statusCode"] == 403
+
+    @pytest.mark.parametrize("request_context", [None, {"identity": None}], ids=["request_context_null", "identity_null"])
+    def test_unauthorized_null_identity(self, dynamodb_table, request_context):
+        event = {"requestContext": request_context, "pathParameters": {"mediaId": MEDIA_ID}}
         resp = handler(event, None)
         assert resp["statusCode"] == 403
 
