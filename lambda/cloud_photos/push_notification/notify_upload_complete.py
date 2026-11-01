@@ -99,12 +99,20 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
     logger.info("Notifying upload complete: user=%s successCount=%d", masked, success_count)
 
-    tokens = _query_device_tokens(dynamodb, table_name, user_id)
+    try:
+        tokens = _query_device_tokens(dynamodb, table_name, user_id)
+    except Exception:
+        logger.exception("Failed to query device tokens: user=%s", masked)
+        return response.error(500, "Internal server error")
     if not tokens:
         logger.info("No device tokens registered for user=%s", masked)
         return response.success(204)
 
-    _get_firebase_app()
+    try:
+        _get_firebase_app()
+    except Exception:
+        logger.exception("Failed to initialize Firebase: user=%s", masked)
+        return response.error(500, "Internal server error")
 
     notification_body = f"{success_count}件のメディアをアップロードしました"
     notification = messaging.Notification(
@@ -121,7 +129,11 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             logger.info("FCM sent: user=%s token=***%s", masked, token[-4:])
         except messaging.UnregisteredError:
             logger.info("Deleting unregistered token: user=%s token=***%s", masked, token[-4:])
-            _delete_device_token(dynamodb, table_name, user_id, token)
+            try:
+                _delete_device_token(dynamodb, table_name, user_id, token)
+            except Exception:
+                # Keep sending to the other devices; the stale token is retried on the next notification.
+                logger.exception("Failed to delete unregistered token: user=%s token=***%s", masked, token[-4:])
         except Exception as e:
             logger.error("FCM send failed: user=%s token=***%s error=%s", masked, token[-4:], e, exc_info=True)
 

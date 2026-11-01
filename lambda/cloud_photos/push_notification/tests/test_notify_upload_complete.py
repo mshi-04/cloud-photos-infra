@@ -1,7 +1,9 @@
 import json
 from unittest.mock import patch
 
+import boto3
 import pytest
+from botocore.exceptions import ClientError
 
 from cloud_photos.push_notification import notify_upload_complete
 from cloud_photos.push_notification.notify_upload_complete import handler
@@ -11,6 +13,7 @@ TOKEN_A = "device-token-aaa"
 TOKEN_B = "device-token-bbb"
 
 TABLE_NAME = "test-device-tokens"
+REGION = "ap-northeast-1"
 KEY_USER_ID = "userId"
 KEY_DEVICE_TOKEN = "deviceToken"
 
@@ -136,6 +139,72 @@ class TestNotifyUploadComplete:
             ExpressionAttributeValues={":uid": {"S": IDENTITY_ID}},
         )
         assert len(result["Items"]) == 1
+
+
+def _client_error(operation):
+    return ClientError({"Error": {"Code": "InternalServerError", "Message": "internal detail"}}, operation)
+
+
+class TestExternalServiceFailures:
+    def test_query_failure_returns_500_without_internal_details(self, dynamodb_table, caplog):
+        with (
+            patch.object(notify_upload_complete, "_query_device_tokens", side_effect=_client_error("Query")),
+            patch("firebase_admin.messaging.send") as mock_send,
+        ):
+            resp = handler(_make_event({"successCount": 1}), None)
+
+        assert resp["statusCode"] == 500
+        assert json.loads(resp["body"]) == {"message": "Internal server error"}
+        mock_send.assert_not_called()
+        assert "Failed to query device tokens" in caplog.text
+        assert IDENTITY_ID not in caplog.text
+
+    def test_secret_fetch_failure_returns_500(self, dynamodb_table, monkeypatch):
+        _seed_token(dynamodb_table, IDENTITY_ID, TOKEN_A)
+        monkeypatch.setattr(notify_upload_complete, "_firebase_app", None)
+        monkeypatch.setenv(
+            "FIREBASE_CREDENTIALS_SECRET_ARN",
+            f"arn:aws:secretsmanager:{REGION}:000000000000:secret:missing-AbCdEf",
+        )
+        with patch("firebase_admin.messaging.send") as mock_send:
+            resp = handler(_make_event({"successCount": 1}), None)
+
+        assert resp["statusCode"] == 500
+        assert json.loads(resp["body"]) == {"message": "Internal server error"}
+        mock_send.assert_not_called()
+        assert notify_upload_complete._firebase_app is None
+
+    def test_invalid_credentials_secret_returns_500(self, dynamodb_table, monkeypatch):
+        _seed_token(dynamodb_table, IDENTITY_ID, TOKEN_A)
+        secret = boto3.client("secretsmanager", region_name=REGION).create_secret(
+            Name="firebase-credentials", SecretString="not-json"
+        )
+        monkeypatch.setattr(notify_upload_complete, "_firebase_app", None)
+        monkeypatch.setenv("FIREBASE_CREDENTIALS_SECRET_ARN", secret["ARN"])
+        with patch("firebase_admin.messaging.send") as mock_send:
+            resp = handler(_make_event({"successCount": 1}), None)
+
+        assert resp["statusCode"] == 500
+        assert json.loads(resp["body"]) == {"message": "Internal server error"}
+        mock_send.assert_not_called()
+
+    def test_delete_failure_still_sends_to_remaining_devices(self, dynamodb_table, caplog):
+        from firebase_admin import messaging
+
+        _seed_token(dynamodb_table, IDENTITY_ID, TOKEN_A)
+        _seed_token(dynamodb_table, IDENTITY_ID, TOKEN_B)
+        with (
+            patch.object(notify_upload_complete, "_delete_device_token", side_effect=_client_error("DeleteItem")),
+            patch("firebase_admin.messaging.send", side_effect=[messaging.UnregisteredError("stale"), "message-id"]) as mock_send,
+        ):
+            resp = handler(_make_event({"successCount": 1}), None)
+
+        assert resp["statusCode"] == 201
+        assert json.loads(resp["body"])["sentCount"] == 1
+        assert [call.args[0].token for call in mock_send.call_args_list] == [TOKEN_A, TOKEN_B]
+        assert "Failed to delete unregistered token" in caplog.text
+        assert IDENTITY_ID not in caplog.text
+        assert TOKEN_A not in caplog.text
 
 
 class _PagedDynamoDB:
