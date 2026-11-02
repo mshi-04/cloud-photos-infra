@@ -11,13 +11,13 @@ output "api_id" {
 output "api_execution_arns" {
   description = "API Gateway 実行 ARN のリスト"
   value = [
-    "${aws_api_gateway_rest_api.media.execution_arn}/*/GET/media/uploads",
-    "${aws_api_gateway_rest_api.media.execution_arn}/*/POST/media/uploads",
-    "${aws_api_gateway_rest_api.media.execution_arn}/*/DELETE/media/uploads/*",
-    "${aws_api_gateway_rest_api.media.execution_arn}/*/PUT/devices/token",
-    "${aws_api_gateway_rest_api.media.execution_arn}/*/DELETE/devices/token",
-    "${aws_api_gateway_rest_api.media.execution_arn}/*/POST/media/uploads/complete",
-    "${aws_api_gateway_rest_api.media.execution_arn}/*/DELETE/users"
+    local.api_execution_arns.get_uploads,
+    local.api_execution_arns.post_uploads,
+    local.api_execution_arns.delete_upload,
+    local.api_execution_arns.put_devices_token,
+    local.api_execution_arns.delete_devices_token,
+    local.api_execution_arns.post_uploads_complete,
+    local.api_execution_arns.delete_user,
   ]
 }
 

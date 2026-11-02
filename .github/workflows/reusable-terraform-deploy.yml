@@ -73,24 +73,15 @@ jobs:
           role-to-assume: ${{ inputs.role_plan }}
           aws-region: ${{ inputs.aws_region }}
 
-      - name: Build Firebase Admin Lambda Layer
-        working-directory: ${{ github.workspace }}
-        run: |
-          mkdir -p .build
-          docker run --rm \
-            -v "${{ github.workspace }}/.build:/out" \
-            -v "${{ github.workspace }}/lambda/layers/firebase_admin:/requirements" \
-            public.ecr.aws/sam/build-python3.12:latest-x86_64 \
-            bash -c "pip install -r /requirements/requirements.txt -t /tmp/python --quiet && cd /tmp && zip -r9 /out/firebase_admin_layer.zip python"
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
       # The ZIPs built here are uploaded with the plan, so apply deploys exactly what plan saw.
-      - name: Build Lambda packages
+      # The layer is installed with the pinned AWS SAM build image, so the same requirements give the same ZIP.
+      - name: Build Lambda packages and layers
         working-directory: ${{ github.workspace }}
-        run: python scripts/build_lambda.py
+        run: python scripts/build_lambda.py --with-layers
 
       - name: Verify Lambda packages
         working-directory: ${{ github.workspace }}

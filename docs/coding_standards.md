@@ -12,7 +12,7 @@
 
 ### 既存コードとの関係
 
-Lambda（Python）の関数群は、すべてこの規約に移行済みです。値オブジェクト、例外、型、キャッシュの書き方は、`common` とどの関数群も同じ形で、手本になります。Terraform には、モジュールが `required_providers` を宣言していないなど、規約と異なる書き方が残っています。
+Lambda（Python）の関数群は、すべてこの規約に移行済みです。値オブジェクト、例外、型、キャッシュの書き方は、`common` とどの関数群も同じ形で、手本になります。Terraform も、各モジュールの `versions.tf` と tflint で規約に揃えています。
 
 - 新しく書くコードは、この規約に従います。
 - 既存のコードを変更する場合は、変更する関数とリソースの範囲だけを規約に合わせます。触れない部分を書き換えないでください。
@@ -20,15 +20,14 @@ Lambda（Python）の関数群は、すべてこの規約に移行済みです�
 
 ### 機械的な確認
 
-判定できる規則は、ツールで確かめます。ツールのバージョンは [lambda/requirements-dev.txt](../lambda/requirements-dev.txt) で固定し、設定は [pyproject.toml](../pyproject.toml) に置きます。コマンドは [commands.md](commands.md) を参照してください。
+判定できる規則は、ツールで確かめます。Python のツール（ruff、Pyright）のバージョンは [lambda/requirements-dev.txt](../lambda/requirements-dev.txt) で固定し、設定は [pyproject.toml](../pyproject.toml) に置きます。Terraform のバージョンは [.terraform-version](../.terraform-version)、tflint のバージョンは CI（[ci-terraform.yml](../.github/workflows/ci-terraform.yml)）の `v0.58.0` で固定し、tflint の設定は [.tflint.hcl](../.tflint.hcl) に置きます。コマンドは [commands.md](commands.md) を参照してください。
 
 | ツール | 現在の設定 | CI |
 |---|---|---|
 | ruff | ruffの従来の既定ルール（`E4`、`E7`、`E9`、`F`）に、下の表の「確かめ方」のルールを加えたもの。`ANN401` を除き、テストでは `ANN` と `PLR2004` を除く。整形は `ruff format` | 実行する |
 | Pyright | `standard`（`off`、`basic`、`standard`、`strict` のうち中間）。boto3 のクライアントは、型スタブ（`boto3-stubs`）で型を付けて確かめる | 実行する |
 | terraform fmt | `terraform fmt -check -recursive` | 実行する |
-
-tflint は、まだ導入していません。導入するまではレビューで確かめます。
+| tflint | 同梱の terraform ルールセットの `recommended` に、`terraform_documented_variables`、`terraform_documented_outputs`、`terraform_naming_convention`、`terraform_standard_module_structure` を加えたもの（[.tflint.hcl](../.tflint.hcl)） | 実行する |
 
 ## Python Lambda
 
@@ -156,16 +155,17 @@ def get_dynamodb_client() -> "DynamoDBClient":
 | 値の導出 | 同じ文字列や計算を繰り返さず、`locals` から導出する | レビュー |
 | 環境差 | モジュールの中で環境名による分岐をせず、ルートモジュールから変数で渡す。コメントアウトしたコードを残さない | レビュー |
 | 未使用の宣言 | 使われていない変数、data source、localsを残さない | tflintの `terraform_unused_declarations` |
-| 命名 | snake_case を使い、resource名にリソースの種別を繰り返さない。既存の名前を変える場合は `moved` ブロックを使う | tflintの `terraform_naming_convention` |
+| 命名 | snake_case を使い、resource名にリソースの種別を繰り返さない。既存の名前を変える場合は `moved` ブロックを使う | tflintの `terraform_naming_convention`（snake_case）、レビュー（種別の繰り返し） |
 | IAM | `jsonencode()` で書き、アクションとARNを限定する | trivy、レビュー |
 
-既存のモジュールは `required_providers` を宣言していません。新しく作るモジュールには `versions.tf` を置いてください。
+各モジュールの `versions.tf` は、Terraform とプロバイダの下限（`>= 1.15.0`、`hashicorp/aws` の `>= 6.0`）を宣言します。ルートモジュール（`envs/*`、`bootstrap`）は、`required_version` とプロバイダのバージョンを完全に固定します。
 
 ### Structure
 
 - ルートモジュールは `envs/<env>/` に置きます。
 - 再利用可能なリソースは `modules/<name>/` に置きます。
-- 標準構成は `main.tf`、`variables.tf`、`outputs.tf` です。新しいモジュールには `versions.tf` も置きます。
+- `modules/` の標準構成は `main.tf`、`variables.tf`、`outputs.tf`、`versions.tf` です。
+- ルートモジュール（`envs/*`、`bootstrap`）は、`terraform` ブロック（バージョンの完全固定）と `provider` ブロックを `main.tf` に置き、`versions.tf` は置きません。入力がなくても、空の `variables.tf` を置きます。
 - モジュール内で `provider` ブロックを定義しないでください。
 - モジュール内に環境分岐を持ち込まないでください。差異は `envs/*` から変数として渡します。
 

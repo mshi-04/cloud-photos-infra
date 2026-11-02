@@ -57,7 +57,7 @@
 - `aws_api_gateway_resource.path_part` 変更 → 下流 method / integration の置換
 - リソース名・モジュールパスの変更 → `moved` ブロックがあるか。手作業の `terraform state mv` を前提にしていないか
 - `deletion_protection_enabled` / `force_destroy` / `noncurrent_version_expiration_days` の変更 → データ保護の後退
-- `aws_api_gateway_deployment.media` の `triggers.redeployment` に新しい id が入っているか
+- 新しい method / integration / レスポンスが `api_gateway.tf` の `local.api_*` に入り、API の動作に影響する新しい属性が `local.api_deployment_inputs` に入っているか（`scripts/check_api_deployment_inputs.py`）
 
 ## コード品質
 

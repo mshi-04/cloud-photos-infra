@@ -35,16 +35,28 @@
    `aws_lambda_permission` の 3 点セットを作る。
    `source_arn` はメソッドとパスまで絞る。
 
+   メソッドとパスは `api_gateway.tf` の `local.api_routes` に1行で定義し、method の `http_method` と
+   permission の `source_arn` はそこから導出します。
+
    ```hcl
-   source_arn = "${aws_api_gateway_rest_api.media.execution_arn}/*/GET/media/uploads"
+   get_uploads = { method = "GET", path = "media/uploads" }
    ```
 
-7. `outputs.tf` の `api_execution_arns` に同じ ARN を足す。これが Identity Pool の
+   ```hcl
+   http_method = local.api_routes.get_uploads.method
+   source_arn  = local.api_execution_arns.get_uploads
+   ```
+
+7. `outputs.tf` の `api_execution_arns` に `local.api_execution_arns.<key>` を足す。これが Identity Pool の
    `execute-api:Invoke` の範囲になるため、漏らすとクライアントから 403 になります。
-8. `aws_api_gateway_deployment.media` の `triggers.redeployment` に新しい method と integration の
-   id を足す。漏らすとリソースは作られてもステージへ反映されません。
+8. 新しい method と integration を、`api_gateway.tf` の `local.api_methods` と `local.api_integrations` に足す。
+   `aws_api_gateway_deployment.media` は、これらの id と設定（`authorization`、integration の `type`、
+   `integration_http_method`、`uri`、`request_templates`）が変わると置き換えられ、ステージへ反映されます。
+   漏らすと、リソースは作られてもステージへ反映されません。`python scripts/check_api_deployment_inputs.py` で確かめます。
 9. ブラウザからの利用を想定するパスなら `OPTIONS`（`authorization = "NONE"`）と
-   `method_response` / `integration_response` を追加し、これらの id も `triggers` に足す。
+   `method_response` / `integration_response` を追加し、`local.api_method_responses` と
+   `local.api_integration_responses` にも足す。API の動作に影響する属性を新しく設定する場合は、
+   `local.api_deployment_inputs` にもその属性を加える。
 
 ## 変数と環境差
 
@@ -68,6 +80,8 @@
 
 ```powershell
 terraform fmt -recursive
+tflint --recursive --config "$PWD/.tflint.hcl"
+python scripts/check_api_deployment_inputs.py
 ```
 
 ```powershell
@@ -76,7 +90,7 @@ terraform validate
 terraform plan
 ```
 
-`validate` / `plan` には、`python scripts/build_lambda.py` で作る Lambda の ZIP、`.build/firebase_admin_layer.zip`、backend の初期化が必要です。手順は
+`validate` / `plan` には、`python scripts/build_lambda.py --with-layers` で作る Lambda とレイヤーの ZIP と、backend の初期化が必要です。手順は
 [README.md](../../../../README.md) のローカル開発を参照します。実行できない場合は
 `Not executed` と理由を報告します。
 

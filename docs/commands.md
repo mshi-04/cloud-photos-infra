@@ -31,6 +31,18 @@ terraform fmt -recursive
 terraform fmt -check -recursive
 ```
 
+規約は tflint で確かめます。設定は [.tflint.hcl](../.tflint.hcl) で、tflint に同梱された terraform ルールセットだけを使うため、プラグインの取得や AWS の認証情報は要りません。CI と同じ v0.58.0 を使ってください。
+
+```powershell
+tflint --recursive --config "$PWD/.tflint.hcl"
+```
+
+`media_api` の method、integration、レスポンス、Gateway Response が、API の再デプロイの判定にすべて含まれているかを確かめます。CI も同じスクリプトを実行します。
+
+```powershell
+python scripts/check_api_deployment_inputs.py
+```
+
 環境ごとの検証とプランです。
 
 ```powershell
@@ -94,6 +106,19 @@ Pop-Location
 python scripts/build_lambda.py
 ```
 
+Firebase のレイヤーの ZIP（`.build/firebase_admin_layer.zip`）も作る場合は `--with-layers` を付けます。CI と CD と同じく、タグとダイジェストを固定した AWS SAM のビルドイメージで依存を入れるため、Docker が必要です。依存はバイトコードにせず、ZIP の時刻と権限も固定するため、同じ依存の定義からは同じハッシュの ZIP ができます。
+
+```powershell
+python scripts/build_lambda.py --with-layers
+```
+
+Docker を使えない場合は、`pip install --target` で入れたディレクトリを `--layer-from` に渡してレイヤーの ZIP を作れます。ビルドイメージと pip のバージョンが違うため、CD が作る ZIP とハッシュは一致しません。
+
+```powershell
+python -m pip install --no-compile --target "$env:TEMP\firebase-layer" -r lambda/layers/firebase_admin/requirements.txt
+python scripts/build_lambda.py --layer-from "firebase_admin=$env:TEMP\firebase-layer"
+```
+
 ZIP から各 handler を読み込めるかを確かめます。検証は、ソースツリーや開発環境の依存を使わない別のプロセスで行います。boto3 は Lambda ランタイムと同じく ZIP の外から読み込むため、`.build/` の外に入れます。`push_notification` には Firebase のレイヤーが必要です。
 
 ```powershell
@@ -101,7 +126,19 @@ python -m pip install --target "$env:TEMP\lambda-runtime-deps" boto3
 python scripts/verify_lambda_packages.py --runtime-deps "$env:TEMP\lambda-runtime-deps" --layer push_notification=.build/firebase_admin_layer.zip
 ```
 
-レイヤーの ZIP がない場合は、`python -m pip install --target <dir>/python -r lambda/layers/firebase_admin/requirements.txt` で作ったディレクトリを `--layer push_notification=<dir>` に渡せます。レイヤーは、Lambda と同じく `python/` と `python/lib/python3.12/site-packages/` から読み込みます。`python/` がないレイヤーは検証に失敗します。CI はこの方法で確かめます。
+レイヤーは、Lambda と同じく `python/` と `python/lib/python3.12/site-packages/` から読み込みます。`python/` がないレイヤーは検証に失敗します。CI は、CD と同じく `--with-layers` で作ったレイヤーの ZIP で確かめます。あわせて、ZIP を2回作ってハッシュが一致することも確かめます。
+
+### Firebase のレイヤーの依存
+
+[lambda/layers/firebase_admin/requirements.txt](../lambda/layers/firebase_admin/requirements.txt) は、`firebase-admin` と、その依存をすべてバージョン固定で並べます。依存まで固定するのは、同じ定義から同じレイヤーを作り、plan に不要な差分を出さないためです。[lambda/requirements-dev.txt](../lambda/requirements-dev.txt) はこのファイルを読み込むため、テストもレイヤーと同じバージョンを使います。
+
+`firebase-admin` を更新する場合は、Lambda と同じ Linux の Python 3.12 環境（WSL など）で、空の仮想環境に新しいバージョンを入れ、`pip freeze` の出力で依存の行を置き換えます。Windows で解決すると、プラットフォームによって依存が変わる場合があります。ファイル先頭のコメントと `firebase-admin` の行は残してください。
+
+```bash
+python3.12 -m venv /tmp/layer-lock
+/tmp/layer-lock/bin/pip install firebase-admin==<version>
+/tmp/layer-lock/bin/pip freeze
+```
 
 ## Security
 
