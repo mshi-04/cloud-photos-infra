@@ -1,3 +1,3 @@
-from cloud_photos.common.auth import get_identity_id, mask_identity
+from cloud_photos.common.auth import IdentityId
 
-__all__ = ["get_identity_id", "mask_identity"]
+__all__ = ["IdentityId"]

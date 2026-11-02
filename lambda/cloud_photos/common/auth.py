@@ -1,7 +1,15 @@
-from typing import Any, Dict, Optional
+from collections.abc import Mapping
+from dataclasses import dataclass
+from typing import Any, Final, Self
+
+from cloud_photos.common.errors import ValidationError
+
+# Values up to this length are masked entirely, so that no part of a short value is logged.
+FULLY_MASKED_MAX_LENGTH: Final = 8
+MASK: Final = "***"
 
 
-def get_identity_id(event: Dict[str, Any]) -> Optional[str]:
+def get_identity_id(event: Mapping[str, Any]) -> str | None:
     """Return the Cognito Identity ID, or None when the request carries no usable one.
 
     API Gateway can send requestContext or identity as null, so missing, null and
@@ -19,8 +27,33 @@ def get_identity_id(event: Dict[str, Any]) -> Optional[str]:
     return identity_id
 
 
-def mask_identity(identity_id: Optional[str]) -> str:
+def mask_identity(identity_id: str | None) -> str:
     """Masks an identity ID, showing only the first 4 and last 4 characters for logging."""
-    if not identity_id:
-        return "***"
-    return f"{identity_id[:4]}***{identity_id[-4:]}" if len(identity_id) > 8 else "***"
+    if not identity_id or len(identity_id) <= FULLY_MASKED_MAX_LENGTH:
+        return MASK
+    return f"{identity_id[:4]}{MASK}{identity_id[-4:]}"
+
+
+@dataclass(frozen=True, slots=True)
+class IdentityId:
+    """The caller's Cognito Identity ID. It masks itself when converted to text, so it is safe to log."""
+
+    value: str
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.value, str) or not self.value:
+            raise ValidationError("identity id is required")
+
+    @classmethod
+    def from_event(cls, event: Mapping[str, Any]) -> Self | None:
+        """Return the caller's Identity ID, or None when the request is unauthenticated."""
+        identity_id = get_identity_id(event)
+        if identity_id is None:
+            return None
+        return cls(identity_id)
+
+    def __str__(self) -> str:
+        return mask_identity(self.value)
+
+    def __repr__(self) -> str:
+        return f"IdentityId({mask_identity(self.value)})"

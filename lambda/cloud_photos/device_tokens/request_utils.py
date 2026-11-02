@@ -1,8 +1,10 @@
 import json
-from typing import Any, Dict, Optional
+from collections.abc import Mapping
+from typing import Any
 
 
-def parse_body(event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def parse_body(event: Mapping[str, Any]) -> dict[str, Any] | None:
+    """Return the JSON object in the request body, or None when the body is not a JSON object."""
     try:
         body = json.loads(event.get("body") or "{}")
     except (json.JSONDecodeError, TypeError):

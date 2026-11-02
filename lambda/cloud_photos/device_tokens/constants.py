@@ -1,11 +1,8 @@
-# DynamoDB field names
-FIELD_USER_ID = "userId"
-FIELD_DEVICE_TOKEN = "deviceToken"
-FIELD_PLATFORM = "platform"
-FIELD_REGISTERED_AT = "registeredAt"
-FIELD_UPDATED_AT = "updatedAt"
+from typing import Final
 
-# Platform values
-PLATFORM_ANDROID = "android"
-PLATFORM_IOS = "ios"
-VALID_PLATFORMS = (PLATFORM_ANDROID, PLATFORM_IOS)
+# DynamoDB field names
+FIELD_USER_ID: Final = "userId"
+FIELD_DEVICE_TOKEN: Final = "deviceToken"
+FIELD_PLATFORM: Final = "platform"
+FIELD_REGISTERED_AT: Final = "registeredAt"
+FIELD_UPDATED_AT: Final = "updatedAt"

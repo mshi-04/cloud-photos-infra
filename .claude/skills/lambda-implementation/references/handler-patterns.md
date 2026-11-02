@@ -4,7 +4,33 @@
 
 ## 骨格
 
-`create_upload_record.py` が最も標準的な形です。
+規約に移行済みの `device_tokens/register_device_token.py` が手本です。
+
+```python
+def handler(event: Mapping[str, Any], _context: object) -> dict[str, Any]:
+    identity_id = IdentityId.from_event(event)
+    if identity_id is None:
+        return error(HTTPStatus.FORBIDDEN, "Unauthorized")
+
+    body = parse_body(event)
+    if body is None:
+        return error(HTTPStatus.BAD_REQUEST, "Invalid JSON body")
+
+    try:
+        request = RegisterDeviceTokenRequest.parse(body)
+    except ValidationError as e:
+        return error(HTTPStatus.BAD_REQUEST, str(e))
+
+    try:
+        save_device_token(identity_id, request.device_token, request.platform)
+    except (BotoCoreError, ClientError):
+        logger.exception("Failed to register device token: userId=%s", identity_id)
+        return error(HTTPStatus.INTERNAL_SERVER_ERROR, "Internal server error")
+
+    return success(HTTPStatus.CREATED, {"message": "registered"})
+```
+
+移行前の関数群では、`create_upload_record.py` が同じ順序の形です。所有者確認を含む例として示します。
 
 ```python
 def handler(event: Dict[str, Any], _context: Any) -> Dict[str, Any]:
@@ -71,7 +97,7 @@ except ClientError as e:
 ## ログ
 
 - `logger = logging.getLogger(__name__)` をモジュールスコープに置きます。
-- identity は必ず `mask_identity` を通します。生の `cognitoIdentityId`、`deviceToken`、
+- identity は、伏せ字にする `IdentityId` を渡すか、`mask_identity` を通します。生の `cognitoIdentityId`、`deviceToken`、
   リクエストボディをログに出しません。FCM トークンは `token[-4:]` のみです。
 - AWS 呼び出し失敗は `logger.exception` で操作名と対象キーを記録します。
 
