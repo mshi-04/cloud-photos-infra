@@ -25,9 +25,9 @@ API 応答のステータスと本文の形式は、[docs/lambda.md](../../../do
 ## 実装手順
 
 1. 変更する関数群と handler を特定し、近い既存の実装を読む。
-2. 新しく受け取る入力や概念は、値オブジェクト（`@dataclass(frozen=True, slots=True)`）で表し、検証を `__post_init__` に置く。既存の `models.py` の `from_dict` を直す場合は、変更する範囲だけを規約に合わせる。
+2. 新しく受け取る入力や概念は、値オブジェクト（`@dataclass(frozen=True, slots=True)`）で表し、検証を `__post_init__` に置く。移行前の関数群（`users`）を直す場合は、変更する範囲だけを規約に合わせる。
 3. handler は、認証、本文の解析、入力の検証、所有者確認、永続化、応答の順に組む。前提条件はガード節で先に返し、`return` の後に `else` を書かない。
-4. Identity ID は `auth.py` の `IdentityId.from_event` で取り出す（移行前の関数群は `get_identity_id`）。所有者確認は永続化より前に行い、クライアントから来たパスやページングキーをそのまま key に使わない。
+4. Identity ID は `auth.py` の `IdentityId.from_event` で取り出す（移行前の `users` は `get_identity_id`）。所有者確認は永続化より前に行い、クライアントから来たパスやページングキーをそのまま key に使わない。
 5. DynamoDB の値は `serialize_item`（読み出しは `deserialize_item`）を通し、フィールド名は `constants.py` から取る。条件式の失敗は、操作ごとに応答の意味を決める。
 6. ログの識別子は、伏せ字にする値オブジェクト（`IdentityId`、`DeviceToken`）か `mask_identity` を通す。生のトークン、リクエストの本文、認証情報を出さない。
 7. 動作を変えたら、テストを追加・更新する。未認証、IDOR、入力の不正、AWS 呼び出しの失敗を含める。既存の失敗を隠すためにテストを弱めない。

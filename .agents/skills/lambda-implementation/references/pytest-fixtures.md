@@ -37,11 +37,10 @@ from cloud_photos.media_uploads.create_upload_record import handler
 
 ```python
 @pytest.fixture
-def dynamodb_table():
+def dynamodb_table(monkeypatch):
+    monkeypatch.setenv("AWS_DEFAULT_REGION", REGION)
+    monkeypatch.setenv("TABLE_NAME", TABLE_NAME)
     with mock_aws():
-        os.environ["AWS_DEFAULT_REGION"] = REGION
-        os.environ["TABLE_NAME"] = TABLE_NAME
-
         client = boto3.client("dynamodb", region_name=REGION)
         client.create_table(
             TableName=TABLE_NAME,
@@ -56,27 +55,27 @@ def dynamodb_table():
             BillingMode="PAY_PER_REQUEST",
         )
 
-        db._reset_for_testing()
+        # Recreate the cached client and table name inside the moto mock.
+        db.get_dynamodb_client.cache_clear()
+        db.get_table_name.cache_clear()
 
         yield client
 
-        db._reset_for_testing()
-        del os.environ["TABLE_NAME"]
-        del os.environ["AWS_DEFAULT_REGION"]
+        db.get_dynamodb_client.cache_clear()
+        db.get_table_name.cache_clear()
 ```
 
 ### device_tokens
 
 `media_uploads` と同じ形で、RANGE key だけが `deviceToken` です。`KeySchema` と
 `AttributeDefinitions` の `mediaId` を `deviceToken` に置き換えます。`mediaId` の定義を流用しません。
-環境変数は `monkeypatch.setenv` で設定し、キャッシュは `_reset_for_testing()` の代わりに
-`db.get_dynamodb_client.cache_clear()` と `db.get_table_name.cache_clear()` で `yield` の前後に破棄します。
+
+`db.py` はクライアントとテーブル名を `functools.cache` でキャッシュします。
+`cache_clear()` を `yield` の前後で呼ばないと、前のテストのキャッシュや実 AWS を向きます。
+環境変数は `monkeypatch.setenv` で設定し、テストの終了時に元へ戻します。
 値オブジェクト（`models.py`）は、AWS のモックを使わずに `test_models.py` で直接テストします。
 
-`db.py` はクライアントとテーブル名をモジュールスコープにキャッシュします。
-`_reset_for_testing()` を `yield` の前後で呼ばないと、前のテストのキャッシュや実 AWS を向きます。
-
-`db.py` を持たない関数（`users/delete_user.py`）は、そのモジュールの `_reset_for_testing()` を呼びます。
+`db.py` を持たない移行前の関数（`users/delete_user.py`）は、そのモジュールの `_reset_for_testing()` を呼びます。
 
 ## conftest（S3 + 複数テーブル）
 
@@ -148,9 +147,10 @@ class TestCreateUploadRecord:
 | 不正 JSON・型不正・列挙外 | 400 |
 | 対象なし（条件式失敗） | 404 |
 | AWS 呼び出し失敗 | 500 |
+| 想定外の例外（環境変数の欠落など） | 規約に移行した関数群では handler から送出される（`pytest.raises`） |
 | 冪等性（二重実行） | `create_upload_record` は 200 skipped |
 
-AWS 失敗は `unittest.mock` の `side_effect` でクライアントメソッドを差し替えて再現します。
+AWS 失敗は、moto のテーブルを削除するか、`unittest.mock` の `side_effect` でクライアントメソッドを差し替えて再現します。
 実リソースは作りません。
 
 既存の失敗を隠す方向にテストを緩めないでください。

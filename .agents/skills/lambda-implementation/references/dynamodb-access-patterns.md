@@ -15,17 +15,17 @@
 
 ## db.py
 
-`media_uploads/db.py` の関数です。
+`media_uploads/db.py` の関数です。`device_tokens/db.py` と `push_notification/db.py` も同じ形で、読み出した値をそのまま返さないため `deserialize_item` は持ちません。
 
 | 関数 | 役割 |
 |---|---|
-| `get_dynamodb_client()` | クライアントをモジュールスコープにキャッシュ |
-| `get_table_name()` | `os.environ["TABLE_NAME"]` をキャッシュ |
+| `get_dynamodb_client()` | クライアントを `functools.cache` でキャッシュ |
+| `get_table_name()` | `os.environ["TABLE_NAME"]` を `functools.cache` でキャッシュ |
 | `serialize_item(item)` | `TypeSerializer` で `{"S": ...}` 形式へ |
 | `deserialize_item(item)` | `TypeDeserializer` + `Decimal` を int / float へ変換 |
-| `_reset_for_testing()` | キャッシュを破棄。テストの fixture から呼ぶ |
+| `put_upload_record` / `mark_upload_record_deleted` / `query_upload_records` | 操作ごとの DynamoDB の呼び出し |
 
-規約に移行した `device_tokens/db.py` と `push_notification/db.py` は、`get_dynamodb_client()` と `get_table_name()` を `functools.cache` でキャッシュし、テストでは `cache_clear()` を呼びます。読み出しがないため `deserialize_item` は持ちません。DynamoDB の呼び出しは `save_device_token`、`query_device_tokens`、`delete_device_token` などの関数に分け、値オブジェクトを受け取って、呼び出しの直前に生の値を取り出します。
+テストでは `get_dynamodb_client.cache_clear()` と `get_table_name.cache_clear()` を呼びます。DynamoDB の呼び出しは操作ごとの関数に分け、値オブジェクトを受け取って、呼び出しの直前に生の値を取り出します。条件式の失敗は関数の中で `bool` に変え、それ以外の `ClientError` はそのまま送出します。応答への変換は handler が行います。
 
 low-level client（`boto3.client("dynamodb")`）を使うため、値は必ず AttributeValue 形式です。
 `serialize_item` は `ExpressionAttributeValues` にも使えます。
@@ -39,33 +39,38 @@ low-level client（`boto3.client("dynamodb")`）を使うため、値は必ず A
 
 ## Query とページネーション
 
-`get_upload_records.py`。
+`media_uploads/db.py` の `query_upload_records`。
 
 ```python
-query_params: Dict[str, Any] = {
+params: dict[str, Any] = {
     "TableName": get_table_name(),
     "KeyConditionExpression": f"{FIELD_USER_ID} = :user_id",
-    "ExpressionAttributeValues": serialize_item({":user_id": identity_id}),
-    "Limit": request_data.limit,
+    "ExpressionAttributeValues": serialize_item({":user_id": identity_id.value}),
+    "Limit": limit.value,
 }
-
-if request_data.last_evaluated_key_user_id and request_data.last_evaluated_key_media_id:
-    query_params["ExclusiveStartKey"] = serialize_item({...})
+if cursor is not None:
+    params["ExclusiveStartKey"] = _key(cursor.identity_id, cursor.media_id)
 ```
 
-`limit` は `max(1, min(limit, MAX_LIMIT))` で丸めます（`DEFAULT_LIMIT = 100`、`MAX_LIMIT = 500`）。
-`ExclusiveStartKey` は検証済み identity から組み直します。
+`limit` は値オブジェクト `PageLimit` が `MIN_LIMIT` から `MAX_LIMIT` の範囲に丸めます（`DEFAULT_LIMIT = 100`、`MAX_LIMIT = 500`）。
+`ExclusiveStartKey` は、所有者を確認済みの `PageCursor` から組み直します。
 
 ## 条件付き PutItem
 
-`create_upload_record.py`。重複作成を例外にせず 200 で吸収します。
+`media_uploads/db.py` の `put_upload_record`。重複作成を例外にせず `False` を返し、handler が 200 に変換します。
 
 ```python
-condition = f"attribute_not_exists({FIELD_USER_ID}) AND attribute_not_exists({FIELD_MEDIA_ID})"
 try:
-    client.put_item(TableName=get_table_name(), Item=serialize_item(item), ConditionExpression=condition)
-except client.exceptions.ConditionalCheckFailedException:
-    return success(HTTPStatus.OK, {"message": "Record already exists, skipped"})
+    get_dynamodb_client().put_item(
+        TableName=get_table_name(),
+        Item=serialize_item(item),
+        ConditionExpression=f"attribute_not_exists({FIELD_USER_ID}) AND attribute_not_exists({FIELD_MEDIA_ID})",
+    )
+except ClientError as e:
+    if _is_conditional_check_failure(e):
+        return False
+    raise
+return True
 ```
 
 ## UpdateItem と if_not_exists
@@ -82,16 +87,20 @@ ExpressionAttributeValues=serialize_item({":platform": platform, ":now": now}),
 
 ## 論理削除
 
-`delete_upload_record.py`。物理削除ではなく `isDeleted` と `updatedAt` を立てます。
+`media_uploads/db.py` の `mark_upload_record_deleted`。物理削除ではなく `isDeleted` と `updatedAt` を立てます。
 
 ```python
-UpdateExpression=f"SET {FIELD_IS_DELETED} = :val, {FIELD_UPDATED_AT} = :time",
-ExpressionAttributeValues={":val": {"BOOL": True}, ":time": {"N": str(updated_at)}},
-ConditionExpression=f"attribute_exists({FIELD_USER_ID})",
+get_dynamodb_client().update_item(
+    TableName=get_table_name(),
+    Key=_key(identity_id, media_id),
+    UpdateExpression=f"SET {FIELD_IS_DELETED} = :val, {FIELD_UPDATED_AT} = :time",
+    ExpressionAttributeValues=serialize_item({":val": True, ":time": updated_at}),
+    ConditionExpression=f"attribute_exists({FIELD_USER_ID})",
+)
 ```
 
 `ConditionExpression` が無いと存在しない key に対して upsert してしまい、404 を返せません。
-条件失敗は `ClientError` のコードで判定して 404 に変換します。
+条件失敗は `ClientError` のコードで判定して `False` を返し、handler が 404 に変換します。
 
 タイムスタンプは全実装で `int(time.time() * 1000)`（ミリ秒）です。
 

@@ -1,49 +1,44 @@
 import logging
-import time
+from collections.abc import Mapping
 from http import HTTPStatus
-from typing import Any, Dict
-from botocore.exceptions import ClientError
+from typing import Any
 
-from cloud_photos.media_uploads.auth import get_identity_id, mask_identity
-from cloud_photos.media_uploads.constants import FIELD_IS_DELETED, FIELD_MEDIA_ID, FIELD_UPDATED_AT, FIELD_USER_ID
-from cloud_photos.media_uploads.db import get_dynamodb_client, get_table_name, serialize_item
+from botocore.exceptions import BotoCoreError, ClientError
+
+from cloud_photos.media_uploads.auth import IdentityId
+from cloud_photos.media_uploads.constants import FIELD_MEDIA_ID
+from cloud_photos.media_uploads.db import mark_upload_record_deleted
+from cloud_photos.media_uploads.models import MediaId
 from cloud_photos.media_uploads.response import error, success
 
 logger = logging.getLogger(__name__)
 
 
-def handler(event: Dict[str, Any], _context: Any) -> Dict[str, Any]:
-    identity_id = get_identity_id(event)
-    if not identity_id:
+def _media_id_from_path(event: Mapping[str, Any]) -> MediaId | None:
+    path_parameters = event.get("pathParameters")
+    if not isinstance(path_parameters, Mapping):
+        return None
+    media_id = path_parameters.get(FIELD_MEDIA_ID)
+    if not isinstance(media_id, str) or not media_id:
+        return None
+    return MediaId(media_id)
+
+
+def handler(event: Mapping[str, Any], _context: object) -> dict[str, Any]:
+    identity_id = IdentityId.from_event(event)
+    if identity_id is None:
         return error(HTTPStatus.FORBIDDEN, "Unauthorized")
 
-    media_id = (event.get("pathParameters") or {}).get(FIELD_MEDIA_ID)
-    if not media_id:
+    media_id = _media_id_from_path(event)
+    if media_id is None:
         return error(HTTPStatus.BAD_REQUEST, "Missing mediaId")
 
-    key = {
-        FIELD_USER_ID: identity_id,
-        FIELD_MEDIA_ID: media_id,
-    }
-
-    updated_at = int(time.time() * 1000)
-
     try:
-        get_dynamodb_client().update_item(
-            TableName=get_table_name(),
-            Key=serialize_item(key),
-            UpdateExpression=f"SET {FIELD_IS_DELETED} = :val, {FIELD_UPDATED_AT} = :time",
-            ExpressionAttributeValues={":val": {"BOOL": True}, ":time": {"N": str(updated_at)}},
-            ConditionExpression=f"attribute_exists({FIELD_USER_ID})",
-        )
-    except ClientError as e:
-        error_code = e.response.get("Error", {}).get("Code")
-        if error_code == "ConditionalCheckFailedException":
-            return error(HTTPStatus.NOT_FOUND, "Media not found")
-        logger.exception("Failed to logically delete item: userId=%s, mediaId=%s", mask_identity(identity_id), media_id)
-        return error(HTTPStatus.INTERNAL_SERVER_ERROR, "Internal server error")
-    except Exception:
-        logger.exception("Failed to logically delete item: userId=%s, mediaId=%s", mask_identity(identity_id), media_id)
+        deleted = mark_upload_record_deleted(identity_id, media_id)
+    except (BotoCoreError, ClientError):
+        logger.exception("Failed to logically delete item: userId=%s, mediaId=%s", identity_id, media_id.value)
         return error(HTTPStatus.INTERNAL_SERVER_ERROR, "Internal server error")
 
+    if not deleted:
+        return error(HTTPStatus.NOT_FOUND, "Media not found")
     return success(HTTPStatus.OK, {"message": "logically deleted"})

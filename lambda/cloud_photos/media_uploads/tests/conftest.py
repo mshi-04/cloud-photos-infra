@@ -1,6 +1,3 @@
-import os
-
-
 import boto3
 import pytest
 from moto import mock_aws
@@ -12,11 +9,10 @@ REGION = "ap-northeast-1"
 
 
 @pytest.fixture
-def dynamodb_table():
+def dynamodb_table(monkeypatch):
+    monkeypatch.setenv("AWS_DEFAULT_REGION", REGION)
+    monkeypatch.setenv("TABLE_NAME", TABLE_NAME)
     with mock_aws():
-        os.environ["AWS_DEFAULT_REGION"] = REGION
-        os.environ["TABLE_NAME"] = TABLE_NAME
-
         client = boto3.client("dynamodb", region_name=REGION)
         client.create_table(
             TableName=TABLE_NAME,
@@ -31,10 +27,11 @@ def dynamodb_table():
             BillingMode="PAY_PER_REQUEST",
         )
 
-        db._reset_for_testing()
+        # Recreate the cached client and table name inside the moto mock.
+        db.get_dynamodb_client.cache_clear()
+        db.get_table_name.cache_clear()
 
         yield client
 
-        db._reset_for_testing()
-        del os.environ["TABLE_NAME"]
-        del os.environ["AWS_DEFAULT_REGION"]
+        db.get_dynamodb_client.cache_clear()
+        db.get_table_name.cache_clear()

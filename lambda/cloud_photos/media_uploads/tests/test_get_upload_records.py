@@ -4,6 +4,7 @@ import os
 import pytest
 from moto import mock_aws
 
+from cloud_photos.media_uploads import db
 from cloud_photos.media_uploads.get_upload_records import handler
 
 IDENTITY_ID = "ap-northeast-1:test-user-id"
@@ -87,3 +88,50 @@ class TestGetUploadRecords:
         key = json.dumps({"userId": "other-user", "mediaId": "media-000"})
         resp = handler(_make_event({"lastEvaluatedKey": key}), None)
         assert resp["statusCode"] == 403
+
+    def test_returns_only_callers_records(self, dynamodb_table):
+        _seed_records(dynamodb_table, IDENTITY_ID, 2)
+        _seed_records(dynamodb_table, "ap-northeast-1:other-user-id", 3)
+
+        resp = handler(_make_event(), None)
+
+        records = json.loads(resp["body"])["records"]
+        assert len(records) == 2
+        assert {r["userId"] for r in records} == {IDENTITY_ID}
+
+    def test_returns_numbers_as_plain_json(self, dynamodb_table):
+        _seed_records(dynamodb_table, IDENTITY_ID, 1)
+
+        resp = handler(_make_event(), None)
+
+        assert json.loads(resp["body"])["records"][0]["uploadedAt"] == 1700000000000
+
+    @pytest.mark.parametrize("params", [None, {}], ids=["params_null", "params_empty"])
+    def test_without_query_parameters(self, dynamodb_table, params):
+        event = {"requestContext": {"identity": {"cognitoIdentityId": IDENTITY_ID}}, "queryStringParameters": params}
+        resp = handler(event, None)
+        assert resp["statusCode"] == 200
+
+    @pytest.mark.parametrize("raw", ["not-json", "[" * 100_000 + "]" * 100_000], ids=["not_json", "deeply_nested"])
+    def test_invalid_last_evaluated_key(self, dynamodb_table, raw):
+        resp = handler(_make_event({"lastEvaluatedKey": raw}), None)
+        assert resp["statusCode"] == 400
+
+    def test_dynamodb_failure_returns_500_without_internal_details(self, dynamodb_table, caplog):
+        dynamodb_table.delete_table(TableName=os.environ["TABLE_NAME"])
+
+        resp = handler(_make_event(), None)
+
+        assert resp["statusCode"] == 500
+        assert json.loads(resp["body"]) == {"message": "Internal server error"}
+        assert "Failed to query upload records" in caplog.text
+        assert IDENTITY_ID not in caplog.text
+
+    def test_unexpected_error_is_not_turned_into_500(self, dynamodb_table, monkeypatch):
+        # Only AWS call failures become 500. A configuration error propagates as a Lambda error,
+        # which API Gateway returns as 502.
+        monkeypatch.delenv("TABLE_NAME")
+        db.get_table_name.cache_clear()
+
+        with pytest.raises(KeyError, match="TABLE_NAME"):
+            handler(_make_event(), None)

@@ -64,7 +64,7 @@
 - `auth.py` / `response.py` / `db.py` のパターンに従っているか。ヘルパーを迂回していないか
 - フィールド名・列挙値が `constants.py` に集約されているか。文字列直書きが無いか
 - 型ヒントが付いているか（Python 3.12）
-- 条件式失敗を操作別に扱っているか。`create_upload_record.py` の重複は 200、`delete_upload_record.py` の対象不存在は 404、その他の例外は 500
+- 条件式失敗を操作別に扱っているか。`create_upload_record.py` の重複は 200、`delete_upload_record.py` の対象不存在は 404、その他の AWS 呼び出しの失敗は 500。想定外の例外を 500 に変えていないか
 - 動作変更に対応するテストが追加・更新されているか
 - import が `cloud_photos.<function_group>.<module>` の修飾付きか。トップレベル名の import や `sys.path` の操作を足していないか
 - ファイルや共有処理を追加・移動した場合、ビルドした ZIP から各 handler を読み込めることを確かめたか
