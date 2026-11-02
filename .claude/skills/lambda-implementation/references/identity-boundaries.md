@@ -18,6 +18,8 @@
 `device_tokens/auth.py` と `push_notification/auth.py` はこれを re-export します。
 `media_uploads/auth.py` と `users/auth.py` は同等実装のコピーです。新規は re-export に揃えます。
 
+`requestContext`、`identity`、`cognitoIdentityId` の欠落・null・想定外の型は、例外にせず `None` を返します。handler は `None` を未認証として扱います。コピーを直す場合は、正本と同じ扱いにしてください。
+
 ## 境界チェックの実装
 
 | リソース | 境界 | 実装箇所 |
