@@ -20,7 +20,7 @@ Lambda（Python）の関数群は、すべてこの規約に移行済みです�
 
 ### 機械的な確認
 
-判定できる規則は、ツールで確かめます。ツールのバージョンは [lambda/requirements-dev.txt](../lambda/requirements-dev.txt) で固定し、設定は [pyproject.toml](../pyproject.toml) に置きます。コマンドは [commands.md](commands.md) を参照してください。
+判定できる規則は、ツールで確かめます。Python のツール（ruff、Pyright）のバージョンは [lambda/requirements-dev.txt](../lambda/requirements-dev.txt) で固定し、設定は [pyproject.toml](../pyproject.toml) に置きます。Terraform のバージョンは [.terraform-version](../.terraform-version)、tflint のバージョンは CI（[ci-terraform.yml](../.github/workflows/ci-terraform.yml)）の `v0.58.0` で固定し、tflint の設定は [.tflint.hcl](../.tflint.hcl) に置きます。コマンドは [commands.md](commands.md) を参照してください。
 
 | ツール | 現在の設定 | CI |
 |---|---|---|
@@ -155,7 +155,7 @@ def get_dynamodb_client() -> "DynamoDBClient":
 | 値の導出 | 同じ文字列や計算を繰り返さず、`locals` から導出する | レビュー |
 | 環境差 | モジュールの中で環境名による分岐をせず、ルートモジュールから変数で渡す。コメントアウトしたコードを残さない | レビュー |
 | 未使用の宣言 | 使われていない変数、data source、localsを残さない | tflintの `terraform_unused_declarations` |
-| 命名 | snake_case を使い、resource名にリソースの種別を繰り返さない。既存の名前を変える場合は `moved` ブロックを使う | tflintの `terraform_naming_convention` |
+| 命名 | snake_case を使い、resource名にリソースの種別を繰り返さない。既存の名前を変える場合は `moved` ブロックを使う | tflintの `terraform_naming_convention`（snake_case）、レビュー（種別の繰り返し） |
 | IAM | `jsonencode()` で書き、アクションとARNを限定する | trivy、レビュー |
 
 各モジュールの `versions.tf` は、Terraform とプロバイダの下限（`>= 1.15.0`、`hashicorp/aws` の `>= 6.0`）を宣言します。ルートモジュール（`envs/*`、`bootstrap`）は、`required_version` とプロバイダのバージョンを完全に固定します。
@@ -164,7 +164,8 @@ def get_dynamodb_client() -> "DynamoDBClient":
 
 - ルートモジュールは `envs/<env>/` に置きます。
 - 再利用可能なリソースは `modules/<name>/` に置きます。
-- 標準構成は `main.tf`、`variables.tf`、`outputs.tf`、`versions.tf` です。入力のないルートモジュールにも、空の `variables.tf` を置きます。
+- `modules/` の標準構成は `main.tf`、`variables.tf`、`outputs.tf`、`versions.tf` です。
+- ルートモジュール（`envs/*`、`bootstrap`）は、`terraform` ブロック（バージョンの完全固定）と `provider` ブロックを `main.tf` に置き、`versions.tf` は置きません。入力がなくても、空の `variables.tf` を置きます。
 - モジュール内で `provider` ブロックを定義しないでください。
 - モジュール内に環境分岐を持ち込まないでください。差異は `envs/*` から変数として渡します。
 

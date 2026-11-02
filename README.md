@@ -115,13 +115,13 @@ trivy conf .
 
 pytest は `lambda/` で全体を一度に実行します。1 つの関数群だけを実行する場合は `pytest cloud_photos/<function_group>/tests/` を使います。`pyright` は、有効にした仮想環境の依存を使って型を検査します。
 
-Terraform の `validate` / `plan` では backend の初期化に加え、`.build/` に Lambda の ZIP と `firebase_admin_layer.zip` が必要です。どちらも、リポジトリルートで次のスクリプトを実行して作ります。CI と CD も同じスクリプトを使います。
+Terraform の `validate` / `plan` では backend の初期化に加え、`.build/` に Lambda の ZIP と `firebase_admin_layer.zip` が必要です。どちらも `scripts/build_lambda.py` で作り、CI と CD も同じスクリプトを使います。リポジトリルートで次を実行すると、関数群ごとの ZIP だけを作ります。
 
 ```powershell
 python scripts/build_lambda.py
 ```
 
-Firebase のレイヤーの ZIP も作る場合は `--with-layers` を付けます。CI と CD と同じく、タグとダイジェストを固定した AWS SAM Python 3.12 のビルドイメージで依存を入れるため、Docker が必要です。同じ依存の定義からは、同じハッシュの ZIP ができます。
+Terraform に必要な ZIP をすべて作るには、`--with-layers` を付けてレイヤーの ZIP も作ります。CI と CD と同じく、タグとダイジェストを固定した AWS SAM Python 3.12 のビルドイメージで依存を入れるため、Docker が必要です。同じ依存の定義からは、同じハッシュの ZIP ができます。
 
 ```powershell
 python scripts/build_lambda.py --with-layers

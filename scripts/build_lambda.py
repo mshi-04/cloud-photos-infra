@@ -43,6 +43,8 @@ LAYERS_DIR: Final = SOURCE_ROOT / "layers"
 # Lambda adds python/ of each layer to the module search path.
 LAYER_PYTHON_DIR: Final = "python"
 # The build image is pinned by tag and digest, so that the same requirements install the same files.
+# Pulling the image and installing the requirements normally take a few minutes.
+LAYER_INSTALL_TIMEOUT_SECONDS: Final = 20 * 60
 BUILD_IMAGE: Final = (
     "public.ecr.aws/sam/build-python3.12:1.170.0-x86_64@sha256:4eda3c4611584d96724726d0569ad9334084291cc4ea5e9416026dcb28054f25"
 )
@@ -162,7 +164,10 @@ def install_layer(name: str, target: Path) -> None:
         "--target",
         "/out",
     ]
-    subprocess.run(command, check=True)
+    try:
+        subprocess.run(command, check=True, timeout=LAYER_INSTALL_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired:
+        raise SystemExit(f"Installing layer {name} did not finish in {LAYER_INSTALL_TIMEOUT_SECONDS // 60} minutes") from None
 
 
 def build_layer(name: str, installed_dir: Path, output_dir: Path) -> Path:

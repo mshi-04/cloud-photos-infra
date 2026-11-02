@@ -35,16 +35,12 @@ def declared_names(source: str, resource_type: str) -> set[str]:
     return set(re.findall(pattern, source, flags=re.MULTILINE))
 
 
-def listed_names(source: str, local_name: str, resource_type: str) -> set[str] | None:
-    """Return the resources listed in a locals map, or None when the map is missing."""
+def listed_entries(source: str, local_name: str, resource_type: str) -> list[tuple[str, str]] | None:
+    """Return the (key, resource name) pairs listed in a locals map, or None when the map is missing."""
     match = re.search(rf"^\s*{local_name}\s*=\s*\{{(.*?)^\s*\}}", source, flags=re.MULTILINE | re.DOTALL)
     if match is None:
         return None
-    entries = re.findall(rf"^\s*(\w+)\s*=\s*aws_api_gateway_{resource_type}\.(\w+)\s*$", match.group(1), flags=re.MULTILINE)
-    mismatched = [key for key, name in entries if key != name]
-    if mismatched:
-        print(f"{local_name}: keys must match the resource names: {', '.join(mismatched)}", file=sys.stderr)
-    return {name for _, name in entries}
+    return re.findall(rf"^\s*(\w+)\s*=\s*aws_api_gateway_{resource_type}\.(\w+)\s*$", match.group(1), flags=re.MULTILINE)
 
 
 def main() -> int:
@@ -52,18 +48,22 @@ def main() -> int:
     failed = False
     for resource_type, local_name in TRACKED_TYPES.items():
         declared = declared_names(source, resource_type)
-        listed = listed_names(source, local_name, resource_type)
-        if listed is None:
+        entries = listed_entries(source, local_name, resource_type)
+        if entries is None:
             print(f"local.{local_name} is missing from {MODULE_DIR.relative_to(REPO_ROOT)}", file=sys.stderr)
             failed = True
             continue
+        listed = {name for _, name in entries}
         missing = sorted(declared - listed)
         unknown = sorted(listed - declared)
+        mismatched = sorted(key for key, name in entries if key != name)
         if missing:
             print(f"local.{local_name} does not list aws_api_gateway_{resource_type}: {', '.join(missing)}", file=sys.stderr)
         if unknown:
             print(f"local.{local_name} lists undeclared aws_api_gateway_{resource_type}: {', '.join(unknown)}", file=sys.stderr)
-        if missing or unknown:
+        if mismatched:
+            print(f"local.{local_name}: keys must match the resource names: {', '.join(mismatched)}", file=sys.stderr)
+        if missing or unknown or mismatched:
             failed = True
             continue
         print(f"OK aws_api_gateway_{resource_type}: {len(declared)} resource(s) in local.{local_name}")
