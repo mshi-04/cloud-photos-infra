@@ -102,16 +102,13 @@ jobs:
         working-directory: lambda
         run: pytest
 
-      # Build the ZIPs twice from separate installs of the layer's requirements, without Docker.
+      # Build the ZIPs twice with the pinned SAM image, the same path as CD.
       # The same inputs must give the same hashes, so that plan shows no change for unchanged code.
       - name: Build Lambda packages and layers twice
         if: ${{ !cancelled() }}
         run: |
           for build in 1 2; do
-            pip install --quiet --no-compile --no-cache-dir --target "$RUNNER_TEMP/layer-$build" \
-              -r lambda/layers/firebase_admin/requirements.txt
-            python scripts/build_lambda.py --output-dir "$RUNNER_TEMP/build-$build" \
-              --layer-from "firebase_admin=$RUNNER_TEMP/layer-$build"
+            python scripts/build_lambda.py --output-dir "$RUNNER_TEMP/build-$build" --with-layers
           done
           diff <(cd "$RUNNER_TEMP/build-1" && sha256sum *.zip) <(cd "$RUNNER_TEMP/build-2" && sha256sum *.zip)
 

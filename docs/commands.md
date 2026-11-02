@@ -126,7 +126,7 @@ python -m pip install --target "$env:TEMP\lambda-runtime-deps" boto3
 python scripts/verify_lambda_packages.py --runtime-deps "$env:TEMP\lambda-runtime-deps" --layer push_notification=.build/firebase_admin_layer.zip
 ```
 
-レイヤーは、Lambda と同じく `python/` と `python/lib/python3.12/site-packages/` から読み込みます。`python/` がないレイヤーは検証に失敗します。CI は、`--layer-from` で作ったレイヤーの ZIP で確かめます。あわせて、ZIP を2回作ってハッシュが一致することも確かめます。
+レイヤーは、Lambda と同じく `python/` と `python/lib/python3.12/site-packages/` から読み込みます。`python/` がないレイヤーは検証に失敗します。CI は、CD と同じく `--with-layers` で作ったレイヤーの ZIP で確かめます。あわせて、ZIP を2回作ってハッシュが一致することも確かめます。
 
 ### Firebase のレイヤーの依存
 
