@@ -13,9 +13,10 @@
 
 ## identity の取得
 
-`get_identity_id` と `mask_identity` の正本は [lambda/cloud_photos/common/auth.py](../../../../lambda/cloud_photos/common/auth.py) です。
+`IdentityId`、`get_identity_id`、`mask_identity` の正本は [lambda/cloud_photos/common/auth.py](../../../../lambda/cloud_photos/common/auth.py) です。
+`IdentityId` は Identity ID の値オブジェクトで、`from_event` で event から生成し、`str()` と `repr()` では伏せ字になります。生の値は `.value` で、AWS を呼び出す直前にだけ取り出します。
 
-`device_tokens/auth.py` と `push_notification/auth.py` はこれを re-export します。
+`device_tokens/auth.py` は `IdentityId` を、`push_notification/auth.py` は `get_identity_id` と `mask_identity` を re-export します。
 `media_uploads/auth.py` と `users/auth.py` は同等実装のコピーです。新規は re-export に揃えます。
 
 `requestContext`、`identity`、`cognitoIdentityId` の欠落・null・想定外の型は、例外にせず `None` を返します。handler は `None` を未認証として扱います。コピーを直す場合は、正本と同じ扱いにしてください。

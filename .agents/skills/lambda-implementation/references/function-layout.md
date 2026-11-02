@@ -12,13 +12,14 @@ lambda/
     __init__.py
     common/
       __init__.py
-      auth.py                    get_identity_id / mask_identity の正本
+      auth.py                    IdentityId / get_identity_id / mask_identity の正本
+      errors.py                  ValidationError
     media_uploads/
       __init__.py  auth.py  constants.py  db.py  models.py  response.py
       get_upload_records.py  create_upload_record.py  delete_upload_record.py
       tests/
     device_tokens/
-      __init__.py  auth.py  constants.py  db.py  request_utils.py  response.py
+      __init__.py  auth.py  constants.py  db.py  models.py  request_utils.py  response.py
       register_device_token.py  unregister_device_token.py
       tests/
     push_notification/

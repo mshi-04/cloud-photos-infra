@@ -1,51 +1,59 @@
+import functools
 import os
-from collections.abc import Mapping, Sequence
-from decimal import Decimal
-from typing import Any, Dict
+import time
+from typing import Any
 
 import boto3
-from boto3.dynamodb.types import TypeDeserializer, TypeSerializer
+from boto3.dynamodb.types import TypeSerializer
+from botocore.client import BaseClient
 
-_dynamodb_client = None
-_table_name = None
+from cloud_photos.common.auth import IdentityId
+from cloud_photos.device_tokens.constants import (
+    FIELD_DEVICE_TOKEN,
+    FIELD_PLATFORM,
+    FIELD_REGISTERED_AT,
+    FIELD_UPDATED_AT,
+    FIELD_USER_ID,
+)
+from cloud_photos.device_tokens.models import DeviceToken, Platform
 
-serializer = TypeSerializer()
-deserializer = TypeDeserializer()
+_serializer = TypeSerializer()
 
 
-def get_dynamodb_client():
-    global _dynamodb_client
-    if _dynamodb_client is None:
-        _dynamodb_client = boto3.client("dynamodb")
-    return _dynamodb_client
+@functools.cache
+def get_dynamodb_client() -> BaseClient:
+    return boto3.client("dynamodb")
 
 
+@functools.cache
 def get_table_name() -> str:
-    global _table_name
-    if _table_name is None:
-        _table_name = os.environ["TABLE_NAME"]
-    return _table_name
+    return os.environ["TABLE_NAME"]
 
 
-def _reset_for_testing():
-    global _dynamodb_client, _table_name
-    _dynamodb_client = None
-    _table_name = None
+def serialize_item(item: dict[str, Any]) -> dict[str, Any]:
+    return {k: _serializer.serialize(v) for k, v in item.items()}
 
 
-def serialize_item(item: Dict[str, Any]) -> Dict[str, Any]:
-    return {k: serializer.serialize(v) for k, v in item.items()}
+def _key(identity_id: IdentityId, device_token: DeviceToken) -> dict[str, Any]:
+    # The raw values are taken out only here, right before the DynamoDB call.
+    return serialize_item({FIELD_USER_ID: identity_id.value, FIELD_DEVICE_TOKEN: device_token.value})
 
 
-def _convert_decimals(value: Any) -> Any:
-    if isinstance(value, Decimal):
-        return int(value) if value == int(value) else float(value)
-    if isinstance(value, Mapping):
-        return {k: _convert_decimals(v) for k, v in value.items()}
-    if isinstance(value, Sequence) and not isinstance(value, str):
-        return [_convert_decimals(v) for v in value]
-    return value
+def save_device_token(identity_id: IdentityId, device_token: DeviceToken, platform: Platform) -> None:
+    """Create the token, or update its platform while keeping the first registration time."""
+    now = int(time.time() * 1000)
+    get_dynamodb_client().update_item(
+        TableName=get_table_name(),
+        Key=_key(identity_id, device_token),
+        UpdateExpression="SET #platform = :platform, #registeredAt = if_not_exists(#registeredAt, :now), #updatedAt = :now",
+        ExpressionAttributeNames={
+            "#platform": FIELD_PLATFORM,
+            "#registeredAt": FIELD_REGISTERED_AT,
+            "#updatedAt": FIELD_UPDATED_AT,
+        },
+        ExpressionAttributeValues=serialize_item({":platform": platform.value, ":now": now}),
+    )
 
 
-def deserialize_item(item: Dict[str, Any]) -> Dict[str, Any]:
-    return {k: _convert_decimals(deserializer.deserialize(v)) for k, v in item.items()}
+def delete_device_token(identity_id: IdentityId, device_token: DeviceToken) -> None:
+    get_dynamodb_client().delete_item(TableName=get_table_name(), Key=_key(identity_id, device_token))

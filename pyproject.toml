@@ -1,5 +1,7 @@
 [tool.ruff]
 line-length = 130
+# Lambda code is imported as cloud_photos.<group>, with lambda/ as the import root.
+src = ["lambda"]
 
 [tool.ruff.lint]
 # Pin the rule set explicitly so that ruff upgrades do not change it.

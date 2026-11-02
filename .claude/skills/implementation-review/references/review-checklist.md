@@ -28,7 +28,7 @@
 
 ## ログ衛生
 
-- identity は `mask_identity` を通しているか
+- identity は `mask_identity` を通すか、伏せ字にする値オブジェクト（`IdentityId`、`DeviceToken`）で渡しているか
 - 生の `cognitoIdentityId`、`deviceToken`、リクエストボディ、認証情報が出ていないか
   （FCM トークンは `token[-4:]` のみが既存の扱い）
 - 例外の詳細をレスポンス本文へ載せていないか。500 の本文は `"Internal server error"` 固定か

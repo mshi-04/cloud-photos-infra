@@ -42,7 +42,7 @@ ZIP は [scripts/build_lambda.py](../scripts/build_lambda.py) が関数群ごと
 認証は API Gateway の IAM 認証で行い、Lambda は所有者確認を行います。Lambda で JWT を検証する処理はありません。
 
 - 業務用のメソッドは `authorization = "AWS_IAM"` です。クライアントは Cognito Identity Pool が発行した一時認証情報で SigV4 署名し、API Gateway が署名を検証します。`authorization = "NONE"` は CORS の `OPTIONS` だけです。
-- Lambda は `event.requestContext.identity.cognitoIdentityId` を、呼び出したユーザーの Identity ID として使います。取得には各関数群の `auth.py` の `get_identity_id` を使います。`requestContext`、`identity`、`cognitoIdentityId` のどれかが欠けている、null である、または型が想定と違う場合、`get_identity_id` は `None` を返し、handler は未認証として扱います（401 または 403）。
+- Lambda は `event.requestContext.identity.cognitoIdentityId` を、呼び出したユーザーの Identity ID として使います。取得には各関数群の `auth.py` を使います。規約に移行した関数群（`device_tokens`）は値オブジェクトの `IdentityId.from_event` を、ほかの関数群は `get_identity_id` を使います。`requestContext`、`identity`、`cognitoIdentityId` のどれかが欠けている、null である、または型が想定と違う場合、どちらも `None` を返し、handler は未認証として扱います（401 または 403）。
 - 認証済みでも、操作するリソースが本人のものかを Lambda で確認します。S3 は `private/<identity_id>/` のプレフィックス、DynamoDB はパーティションキーの `userId`、ページングは `lastEvaluatedKey.userId` で確かめます。
 - 業務メソッドの `authorization` を変えると、Lambda のコードを変えずに認証が外れます。Terraform の変更では、この設定を必ず確認してください。
 

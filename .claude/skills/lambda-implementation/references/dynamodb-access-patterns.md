@@ -15,7 +15,7 @@
 
 ## db.py
 
-`media_uploads/db.py` と `device_tokens/db.py` は同一内容です。
+`media_uploads/db.py` の関数です。
 
 | 関数 | 役割 |
 |---|---|
@@ -24,6 +24,8 @@
 | `serialize_item(item)` | `TypeSerializer` で `{"S": ...}` 形式へ |
 | `deserialize_item(item)` | `TypeDeserializer` + `Decimal` を int / float へ変換 |
 | `_reset_for_testing()` | キャッシュを破棄。テストの fixture から呼ぶ |
+
+規約に移行した `device_tokens/db.py` は、`get_dynamodb_client()` と `get_table_name()` を `functools.cache` でキャッシュし、テストでは `cache_clear()` を呼びます。読み出しがないため `deserialize_item` は持ちません。DynamoDB の呼び出しは `save_device_token` と `delete_device_token` に分け、値オブジェクトを受け取って、呼び出しの直前に生の値を取り出します。
 
 low-level client（`boto3.client("dynamodb")`）を使うため、値は必ず AttributeValue 形式です。
 `serialize_item` は `ExpressionAttributeValues` にも使えます。

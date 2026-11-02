@@ -69,6 +69,9 @@ def dynamodb_table():
 
 `media_uploads` と同じ形で、RANGE key だけが `deviceToken` です。`KeySchema` と
 `AttributeDefinitions` の `mediaId` を `deviceToken` に置き換えます。`mediaId` の定義を流用しません。
+環境変数は `monkeypatch.setenv` で設定し、キャッシュは `_reset_for_testing()` の代わりに
+`db.get_dynamodb_client.cache_clear()` と `db.get_table_name.cache_clear()` で `yield` の前後に破棄します。
+値オブジェクト（`models.py`）は、AWS のモックを使わずに `test_models.py` で直接テストします。
 
 `db.py` はクライアントとテーブル名をモジュールスコープにキャッシュします。
 `_reset_for_testing()` を `yield` の前後で呼ばないと、前のテストのキャッシュや実 AWS を向きます。
