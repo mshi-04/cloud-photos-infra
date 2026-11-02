@@ -112,8 +112,9 @@ class TestGetUploadRecords:
         resp = handler(event, None)
         assert resp["statusCode"] == 200
 
-    def test_invalid_last_evaluated_key(self, dynamodb_table):
-        resp = handler(_make_event({"lastEvaluatedKey": "not-json"}), None)
+    @pytest.mark.parametrize("raw", ["not-json", "[" * 100_000 + "]" * 100_000], ids=["not_json", "deeply_nested"])
+    def test_invalid_last_evaluated_key(self, dynamodb_table, raw):
+        resp = handler(_make_event({"lastEvaluatedKey": raw}), None)
         assert resp["statusCode"] == 400
 
     def test_dynamodb_failure_returns_500_without_internal_details(self, dynamodb_table, caplog):

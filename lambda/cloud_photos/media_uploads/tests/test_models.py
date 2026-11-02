@@ -101,6 +101,14 @@ class TestFileSize:
         with pytest.raises(ValidationError, match=r"^fileSize must be non-negative$"):
             FileSize.parse(-1)
 
+    def test_accepts_upper_limit(self):
+        assert FileSize.parse(2**63 - 1) == FileSize(2**63 - 1)
+
+    @pytest.mark.parametrize("raw", [2**63, 10**40, 1e300])
+    def test_parse_rejects_value_over_upper_limit(self, raw):
+        with pytest.raises(ValidationError, match=r"^fileSize must be at most 9223372036854775807$"):
+            FileSize.parse(raw)
+
     @pytest.mark.parametrize("value", [True, 1.0])
     def test_direct_construction_requires_int(self, value):
         with pytest.raises(ValidationError, match=r"^fileSize must be an integer$"):
@@ -137,6 +145,11 @@ class TestPageCursor:
     def test_parse_rejects_invalid_json(self, raw):
         with pytest.raises(ValidationError, match=r"^Invalid lastEvaluatedKey parameter$"):
             PageCursor.parse(raw, IDENTITY_ID)
+
+    def test_parse_rejects_deeply_nested_json(self):
+        depth = 100_000
+        with pytest.raises(ValidationError, match=r"^Invalid lastEvaluatedKey parameter$"):
+            PageCursor.parse("[" * depth + "]" * depth, IDENTITY_ID)
 
     def test_parse_rejects_non_object(self):
         with pytest.raises(ValidationError, match=r"^lastEvaluatedKey must be an object$"):

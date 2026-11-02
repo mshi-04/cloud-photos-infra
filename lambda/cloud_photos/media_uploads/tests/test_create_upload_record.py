@@ -82,6 +82,11 @@ class TestCreateUploadRecord:
         resp = handler(_make_event(_valid_body(mediaType="GIF")), None)
         assert resp["statusCode"] == 400
 
+    @pytest.mark.parametrize("file_size", [10**40, 1e300])
+    def test_file_size_out_of_dynamodb_range_is_rejected(self, dynamodb_table, file_size):
+        resp = handler(_make_event(_valid_body(fileSize=file_size)), None)
+        assert resp["statusCode"] == 400
+
     def test_with_file_size(self, dynamodb_table):
         resp = handler(_make_event(_valid_body(fileSize=512000)), None)
         assert resp["statusCode"] == 201

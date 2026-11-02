@@ -14,6 +14,7 @@ from cloud_photos.media_uploads.constants import (
     FIELD_MEDIA_ID,
     FIELD_MEDIA_TYPE,
     FIELD_USER_ID,
+    MAX_FILE_SIZE,
     MAX_LIMIT,
     MIN_LIMIT,
     PARAM_LAST_EVALUATED_KEY,
@@ -104,6 +105,8 @@ class FileSize:
             raise ValidationError(f"{FIELD_FILE_SIZE} must be an integer")
         if self.value < 0:
             raise ValidationError(f"{FIELD_FILE_SIZE} must be non-negative")
+        if self.value > MAX_FILE_SIZE:
+            raise ValidationError(f"{FIELD_FILE_SIZE} must be at most {MAX_FILE_SIZE}")
 
     @classmethod
     def parse(cls, raw: object) -> Self:
@@ -153,7 +156,8 @@ class PageCursor:
             raise ValidationError(f"Invalid {PARAM_LAST_EVALUATED_KEY} parameter")
         try:
             key = json.loads(raw)
-        except json.JSONDecodeError:
+        except (json.JSONDecodeError, RecursionError):
+            # A deeply nested value exhausts the parser's recursion limit; it is still just invalid input.
             raise ValidationError(f"Invalid {PARAM_LAST_EVALUATED_KEY} parameter") from None
 
         if not isinstance(key, dict):

@@ -22,3 +22,6 @@ PRIVATE_PATH_PREFIX: Final = "private/"
 MIN_LIMIT: Final = 1
 DEFAULT_LIMIT: Final = 100
 MAX_LIMIT: Final = 500
+
+# File size: the largest signed 64-bit integer, well within the DynamoDB number range
+MAX_FILE_SIZE: Final = 2**63 - 1
