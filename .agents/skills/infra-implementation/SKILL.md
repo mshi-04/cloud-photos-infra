@@ -28,7 +28,7 @@ description: Terraform / AWS インフラ（modules・envs・IAM・Cognito・API
 6. IAM は `jsonencode()` で書き、アクションと ARN を限定する。`"Action": "*"` と `"Resource": "*"` を避ける。CloudWatch Logs の event write は、限定した log group ARN に必要な `:*` の suffix を許容する。
 7. 名前は snake_case にし、resource 名にリソースの種別を繰り返さない。名前やモジュールのパスを変える場合は、`moved` ブロックで state を移し、plan で移動を確かめる。手作業の `terraform state mv` は使わない。
 
-書き方の詳細は [docs/coding_standards.md](../../../docs/coding_standards.md) の Terraform の原則に従う。既存のモジュールは `required_providers` を宣言していないため、変更する範囲だけを規約に合わせる。
+書き方の詳細は [docs/coding_standards.md](../../../docs/coding_standards.md) の Terraform の原則に従い、`tflint --recursive` で確かめる。
 
 ## 判断が必要な場面
 

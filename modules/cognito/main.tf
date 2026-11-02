@@ -32,10 +32,6 @@ resource "aws_cognito_user_pool" "main" {
   }
 
   # TODO: 本番環境のメール送信（SES連携）
-  # email_configuration {
-  #   email_sending_account = var.env == "prod" ? "DEVELOPER" : "COGNITO_DEFAULT"
-  #   source_arn            = var.env == "prod" ? aws_ses_domain_identity.main.arn : null
-  # }
 }
 
 resource "aws_cognito_user_pool_client" "main" {

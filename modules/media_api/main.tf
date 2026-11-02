@@ -1,6 +1,3 @@
-data "aws_region" "current" {}
-data "aws_caller_identity" "current" {}
-
 locals {
   function_prefix = "${var.project_name}-${var.env}"
   lambda_functions = {

@@ -2,7 +2,7 @@
 
 - 作成日: 2026-10-30
 - 更新日: 2026-10-31。レビュー指摘の反映、コーディング規約の章の追加、型検査とlintの厳しさの決定、段階ごとの作業とブランチの追加、PRのレビュー指摘の反映、段階0の省略と段階1の実施、段階2の省略、段階3から段階5の実施
-- 状態: 段階1（契約と規約の確定）、段階3（Skillの再編）、段階4（Terraformのファイル分割）、段階5（Lambda基盤）、段階6（Lambdaの規約への移行）を実施。段階0と段階2は行わない。段階7以降は未実施。
+- 状態: 段階1（契約と規約の確定）、段階3（Skillの再編）、段階4（Terraformのファイル分割）、段階5（Lambda基盤）、段階6（Lambdaの規約への移行）、段階7（Terraformの改善）を実施。段階0と段階2は行わない。段階8は未実施。
 - 設計の起点: `develop` の `e4dfb2d`
 - 本設計書のブランチ: `feature/ai-documentation-refactoring`。各段階のブランチは第10.1節に記す
 
@@ -564,7 +564,13 @@ ZIPの階層とhandlerを同時に変えるため、適用の途中で短時間�
 - 2026-11-02に、段階6の2つ目の単位として`push_notification`の移行を確認した。`DeviceToken`と本文の解析を`common`へ移し、`device_tokens`と共有した。既存のhandlerのテストは、patchの対象と準備だけを変え、期待値を変えずに成功した。`lambda/`での一括実行で250件（`push_notification`は59件）がすべて成功し、第8.4節のruffの中間のルールを`common`、`device_tokens`、`push_notification`に当てて指摘は0件だった。既定のruff、`ruff format --check`、Pyright（`standard`）も指摘なしで、4つのZIPから7つのhandlerを読み込めた。
 - 2026-11-02に、段階6の3つ目の単位として`media_uploads`の移行を確認した。メディアID、保存パス、メディア種別、ファイルサイズ、件数の上限、ページング位置を値オブジェクトにし、保存パスの所有者確認を`CloudStoragePath.belongs_to`へ、継続キーの所有者確認を`PageCursor.parse`へ移した。`AuthorizationError`は`common`へ移した。既存のhandlerのテストは期待値を変えずに成功した。応答メッセージと検証の順序は保った。AWS呼び出しの失敗だけを500にし、`TABLE_NAME`の欠落など想定外の例外は送出するテストを加えた。DynamoDBの数値の範囲を超える`fileSize`と、深くネストした`lastEvaluatedKey`は400にした。`lambda/`での一括実行で325件（`media_uploads`は170件）がすべて成功し、第8.4節のruffの中間のルールを`common`、`media_uploads`、`device_tokens`、`push_notification`に当てて指摘は0件だった。既定のruff、`ruff format --check`、Pyright（`standard`）も指摘なしで、4つのZIPから7つのhandlerを読み込めた。
 - 2026-11-02に、段階6の最後の単位として`users`の移行を確認した。`auth.py`を`IdentityId`のre-exportにし、`delete_user.py`のクライアントのキャッシュを`functools.cache`に、ステータスを`HTTPStatus`にした。保存先ごとの削除は、1つの失敗で残りを止めないため、`except Exception`で記録して続ける形を保った。環境変数は削除の前にすべて読むようにし、欠けている場合は何も削除せずに送出する。既存のhandlerのテストは、パッチの対象と引数の準備だけを変え、期待値を変えずに成功した。`boto3-stubs`（DynamoDB・S3・Secrets Manager用）を開発用の依存に加えると、Pyrightの指摘は第8.4節の見込みの4件ではなく13件だった。内訳は、`delete_user.py`で省略可能なキーを直接参照している4件、移行済みの関数群でクライアントの戻り値を`BaseClient`と注釈していたために操作が見つからない8件、`push_notification/db.py`で省略可能なキーを直接参照している1件である。クライアントの戻り値を型スタブの型にし、省略可能なキーは`get`で読むようにして、すべて直した。第8.4節のruffの中間のルールを`pyproject.toml`で有効にし、`lambda/`と`scripts/`で指摘は0件だった。`lambda/`での一括実行で331件（`users`は44件）がすべて成功し、`ruff format --check`とPyright（`standard`）も指摘なしで、4つのZIPから7つのhandlerを読み込めた。
-- 段階1、段階3、段階4、段階5、段階6の変更は実装済み。段階2は行わない。段階3の作業3のうち、Infra Skillのアドレス変更の手順を`moved`ブロック優先にする変更は、新しいコーディング規約との矛盾を避けるため段階1で実施した。段階7以降のコード・Skill・CIの変更は未実装。設計書を作成したことと、提案した変更を検証したことを区別する。
+- 2026-11-02に段階7を確認した。AWSを動かしていないため、Terraformのplanとapplyは実行していない。
+  - 更新判定: `media_api`のmethod、integration、method response、integration response、Gateway Responseを`locals`の一覧に集め、第7.2節の表の属性とidから`triggers.redeployment`を作るようにした。一覧に入っていないリソースを検出する`scripts/check_api_deployment_inputs.py`を加え、CIで実行する。method 12、integration 12、method response 5、integration response 5、Gateway Response 2がすべて含まれることを確かめ、1つを外すと失敗することも確かめた。適用時にはdeploymentが1回置き換えられる。
+  - 実行可能ARN: 業務APIのメソッドとパスを`local.api_routes`にまとめ、methodの`http_method`、permissionの`source_arn`、出力の`api_execution_arns`をそこから導出した。値と出力の順序は変えていない。
+  - レイヤー: `scripts/build_lambda.py`に、固定したSAMイメージ（`1.170.0-x86_64`のタグとダイジェスト）で依存を入れる`--with-layers`と、入れ済みのディレクトリを使う`--layer-from`を加え、CIとCDの`docker run`の重複をなくした。依存はバイトコードにせず、ZIPの時刻と権限を固定する。`firebase-admin`の依存36個をすべてバージョン固定し、`requirements-dev.txt`はこのファイルを読み込むようにした。Dependabotのpipの対象を`/lambda`に直した。レビュー環境では別々に2回`pip install --target`してZIPにし、4つのLambdaのZIPとレイヤーのZIPのハッシュが一致した。SAMイメージでのビルドは、Dockerがないため実行していない。
+  - モジュール: 7つのモジュールに`versions.tf`を置き、`media_api`の使われていないdata source 2つと、`cognito`のコメントアウトしたコードを削除した。tflintの指摘に合わせ、`bootstrap`の`terraform`・`provider`・dataを`main.tf`へ、出力を説明付きで`outputs.tf`へ移し、`envs/*`と`bootstrap`に空の`variables.tf`を置いた。いずれもリソースのアドレスは変えていない。
+  - tflint: v0.58.0の同梱ルールセットで設定を置き、CIに加えた。初回の指摘22件はすべて直し、0件になった。`terraform fmt -check`と、3つのルートモジュールの`terraform validate`（`init -backend=false`）も成功した。
+- 段階1、段階3、段階4、段階5、段階6、段階7の変更は実装済み。段階2は行わない。段階3の作業3のうち、Infra Skillのアドレス変更の手順を`moved`ブロック優先にする変更は、新しいコーディング規約との矛盾を避けるため段階1で実施した。段階8は未実施。設計書を作成したことと、提案した変更を検証したことを区別する。
 
 ## 13. 外部仕様の確認先
 

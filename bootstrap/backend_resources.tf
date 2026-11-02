@@ -1,27 +1,3 @@
-terraform {
-  required_version = "1.15.6"
-
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "6.32.1"
-    }
-  }
-}
-
-provider "aws" {
-  region = "ap-northeast-1"
-  default_tags {
-    tags = {
-      Project   = "cloud-photos"
-      ManagedBy = "Terraform-Bootstrap"
-    }
-  }
-}
-
-data "aws_caller_identity" "current" {}
-data "aws_region" "current" {}
-
 # ==========================================
 # S3 Bucket for Terraform State
 # ==========================================
@@ -165,8 +141,4 @@ resource "aws_s3_bucket_lifecycle_configuration" "terraform_state" {
       noncurrent_days = 90
     }
   }
-}
-
-output "state_bucket_name" {
-  value = aws_s3_bucket.terraform_state.bucket
 }

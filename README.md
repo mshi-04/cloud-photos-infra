@@ -83,6 +83,7 @@ docs/               実装、検証、セキュリティ、運用ルール
 - Python `3.12`
 - Docker（Firebase Admin Lambda Layer のビルドに使用）
 - Ruff、Pyright、pytest（[lambda/requirements-dev.txt](lambda/requirements-dev.txt) から入れます。Ruff と Pyright は CI と同じバージョンに固定し、pytest は `~=8.0` の互換リリース指定です）
+- TFLint `v0.58.0`（Terraform の規約の検査。CI と同じバージョン）
 - 任意: Trivy（IaC セキュリティスキャン）
 - `terraform plan` を行う場合のみ、対象環境の `gh-terraform-plan-<env>` ロール相当の AWS 権限と state bucket 名。リソースの参照に加え、state の KMS 復号と S3 lockfile の読み書き権限が必要です
 
@@ -101,6 +102,8 @@ python -m pip install -r lambda/requirements-dev.txt
 
 ```powershell
 terraform fmt -check -recursive
+tflint --recursive --config "$PWD/.tflint.hcl"
+python scripts/check_api_deployment_inputs.py
 ruff check lambda/ scripts/
 ruff format --check lambda/ scripts/
 pyright
@@ -112,23 +115,19 @@ trivy conf .
 
 pytest は `lambda/` で全体を一度に実行します。1 つの関数群だけを実行する場合は `pytest cloud_photos/<function_group>/tests/` を使います。`pyright` は、有効にした仮想環境の依存を使って型を検査します。
 
-Terraform の `validate` / `plan` では backend の初期化に加え、`.build/` に Lambda の ZIP と `firebase_admin_layer.zip` が必要です。Lambda の ZIP は、リポジトリルートで次のスクリプトを実行して作ります。CI と CD も同じスクリプトを使います。
+Terraform の `validate` / `plan` では backend の初期化に加え、`.build/` に Lambda の ZIP と `firebase_admin_layer.zip` が必要です。どちらも、リポジトリルートで次のスクリプトを実行して作ります。CI と CD も同じスクリプトを使います。
 
 ```powershell
 python scripts/build_lambda.py
 ```
 
-レイヤーは、リポジトリルートで、CI と同じ AWS SAM Python 3.12 イメージを使って生成します。
+Firebase のレイヤーの ZIP も作る場合は `--with-layers` を付けます。CI と CD と同じく、タグとダイジェストを固定した AWS SAM Python 3.12 のビルドイメージで依存を入れるため、Docker が必要です。同じ依存の定義からは、同じハッシュの ZIP ができます。
 
 ```powershell
-New-Item -ItemType Directory -Force .build | Out-Null
-$repositoryRoot = (Get-Location).Path
-docker run --rm `
-  --mount "type=bind,source=$repositoryRoot\.build,target=/out" `
-  --mount "type=bind,source=$repositoryRoot\lambda\layers\firebase_admin,target=/requirements,readonly" `
-  public.ecr.aws/sam/build-python3.12:latest-x86_64 `
-  bash -c "pip install -r /requirements/requirements.txt -t /tmp/python --quiet && cd /tmp && zip -r9 /out/firebase_admin_layer.zip python"
+python scripts/build_lambda.py --with-layers
 ```
+
+Docker を使えない場合の手順は [docs/commands.md](docs/commands.md) にあります。
 
 ZIP から各 handler を読み込めるかは、次のように確かめます。boto3 は、Lambda ランタイムと同じく ZIP の外から読み込みます。`.build/` の外に入れてください。
 
@@ -155,9 +154,9 @@ state lock が発生した場合、`-lock=false` や `terraform force-unlock` �
 
 `main` または `develop` 向けの Pull Request で対象パスが変更されると、次を実行します。
 
-- Terraform format check
+- Terraform format check、tflint、API の再デプロイ判定の確認
 - Ruff lint / format check と Pyright の型検査
-- Lambda unit tests
+- Lambda unit tests と、ZIP（レイヤーを含む）を2回作ってハッシュが一致することの確認
 - Trivy IaC scan と SARIF アップロード
 - dev / prod の `terraform validate` と `terraform plan`
 - サニタイズした plan 結果の PR コメント更新

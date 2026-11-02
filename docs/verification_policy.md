@@ -20,7 +20,7 @@
 | 変更対象 | 必須検証 |
 |---|---|
 | ドキュメントのみ | Markdownの整合性、リンク対象の存在確認 |
-| Terraform | `terraform fmt -recursive`、影響環境の `terraform validate`、可能なら `terraform plan` |
+| Terraform | `terraform fmt -recursive`、`tflint --recursive`、影響環境の `terraform validate`、可能なら `terraform plan`。`media_api` の API を変えた場合は `python scripts/check_api_deployment_inputs.py` |
 | IAM / security | Terraform検証に加え、権限差分レビュー、可能なら `trivy conf .` |
 | Lambda | `ruff check`、`ruff format --check`、`pyright`、`pytest`。ファイルや共有処理を追加・移動した場合は、ZIP のビルドと読み込み検証 |
 | CI/CD | ワークフロー構文と影響するコマンドの確認 |
@@ -32,6 +32,7 @@
 
 ```powershell
 terraform fmt -recursive
+tflint --recursive --config "$PWD/.tflint.hcl"
 ```
 
 影響を受ける環境で検証します。

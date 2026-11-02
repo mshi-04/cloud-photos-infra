@@ -1,1 +1,40 @@
+# Dependencies of the Firebase Admin SDK Lambda layer (Python 3.12, x86_64).
+# firebase-admin is the direct dependency. The rest are its dependencies, pinned so that the same file
+# always installs the same packages and the layer ZIP keeps the same hash. To update, change the
+# firebase-admin version and regenerate the list as described in docs/commands.md.
+# lambda/requirements-dev.txt includes this file, so the tests use the same versions.
 firebase-admin==7.3.0
+anyio==4.16.0
+CacheControl==0.14.4
+certifi==2026.10.23
+cffi==2.1.1
+charset-normalizer==3.5.2
+cryptography==50.0.2
+google-api-core==2.43.2
+google-auth==2.62.0
+google-cloud-core==2.8.0
+google-cloud-firestore==2.34.1
+google-cloud-storage==3.17.1
+google-crc32c==1.9.0
+google-resumable-media==2.11.0
+googleapis-common-protos==1.76.0
+grpcio==1.85.1
+grpcio-status==1.85.1
+h11==0.16.0
+h2==4.4.1
+hpack==4.2.0
+httpcore==1.0.9
+httpx==0.28.1
+hyperframe==6.1.0
+idna==3.20
+msgpack==1.2.4
+opentelemetry-api==1.45.2
+proto-plus==1.29.0
+protobuf==7.36.2
+pyasn1==0.6.5
+pyasn1_modules==0.4.2
+pycparser==3.12
+PyJWT==2.15.1
+requests==2.34.2
+typing_extensions==4.16.0
+urllib3==2.8.0
