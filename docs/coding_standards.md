@@ -12,13 +12,11 @@
 
 ### 既存コードとの関係
 
-既存のコードには、この規約と異なる書き方が残っています。例えば、関数群ごとに import の形式や HTTP ステータスの書き方が2通りあり、クライアントのキャッシュは `global` 文で実装されています。
+Lambda（Python）の関数群は、すべてこの規約に移行済みです。値オブジェクト、例外、型、キャッシュの書き方は、`common` とどの関数群も同じ形で、手本になります。Terraform には、モジュールが `required_providers` を宣言していないなど、規約と異なる書き方が残っています。
 
 - 新しく書くコードは、この規約に従います。
 - 既存のコードを変更する場合は、変更する関数とリソースの範囲だけを規約に合わせます。触れない部分を書き換えないでください。
-- 同じモジュールの既存の仕組みと組み合わせる必要がある場合は、既存の仕組みを優先します。例えば、`users/delete_user.py` のクライアントのキャッシュとテスト用の `_reset_for_testing()` は、まとめて移行するまで既存の形を使います。
-
-規約への移行は関数群ごとに進めています。移行済みの関数群は `media_uploads`、`device_tokens`、`push_notification`（共有の `common` を含む）で、値オブジェクト、例外、型、キャッシュの書き方の手本です。
+- 同じモジュールの既存の仕組みと組み合わせる必要がある場合は、既存の仕組みを優先します。
 
 ### 機械的な確認
 
@@ -26,11 +24,11 @@
 
 | ツール | 現在の設定 | CI |
 |---|---|---|
-| ruff | `E4`、`E7`、`E9`、`F`（ruffの従来の既定ルール）と、`ruff format` | 実行する |
-| Pyright | `standard`（`off`、`basic`、`standard`、`strict` のうち中間） | 実行する |
+| ruff | ruffの従来の既定ルール（`E4`、`E7`、`E9`、`F`）に、下の表の「確かめ方」のルールを加えたもの。`ANN401` を除き、テストでは `ANN` と `PLR2004` を除く。整形は `ruff format` | 実行する |
+| Pyright | `standard`（`off`、`basic`、`standard`、`strict` のうち中間）。boto3 のクライアントは、型スタブ（`boto3-stubs`）で型を付けて確かめる | 実行する |
 | terraform fmt | `terraform fmt -check -recursive` | 実行する |
 
-以下の表の「確かめ方」に挙げたruffのルールのうち、上の表にないものと、tflintは、まだ導入していません。導入するまではレビューで確かめます。
+tflint は、まだ導入していません。導入するまではレビューで確かめます。
 
 ## Python Lambda
 
@@ -85,7 +83,7 @@ class DeviceToken:
 
 ```python
 def handler(event: dict[str, Any], _context: object) -> dict[str, Any]:
-    identity_id = get_identity_id(event)
+    identity_id = IdentityId.from_event(event)
     if identity_id:
         body = parse_body(event)
         if body is not None:
@@ -100,7 +98,7 @@ def handler(event: dict[str, Any], _context: object) -> dict[str, Any]:
 
 ```python
 def handler(event: dict[str, Any], _context: object) -> dict[str, Any]:
-    identity_id = get_identity_id(event)
+    identity_id = IdentityId.from_event(event)
     if identity_id is None:
         return error(HTTPStatus.FORBIDDEN, "Unauthorized")
 
@@ -114,16 +112,23 @@ def handler(event: dict[str, Any], _context: object) -> dict[str, Any]:
 ### 例: 状態の保持
 
 ```python
+if TYPE_CHECKING:
+    # The stubs are a development dependency; the Lambda runtime never imports them.
+    from mypy_boto3_dynamodb import DynamoDBClient
+
+
 @functools.cache
-def get_dynamodb_client() -> BaseClient:
+def get_dynamodb_client() -> "DynamoDBClient":
     return boto3.client("dynamodb")
 ```
 
 テストでは `get_dynamodb_client.cache_clear()` で、moto のモックに向いたクライアントを作り直します。`global` 文と、リセット用の関数を別に用意する必要がありません。
 
+戻り値の型は、`boto3-stubs` のクライアントの型にします。`botocore.client.BaseClient` にすると、`put_item` などの操作が型検査で見つからないと指摘されます。型スタブは開発用の依存のため、`TYPE_CHECKING` の中で import し、Lambda の実行時には読み込みません。
+
 ### API Behavior
 
-- 認証は API Gateway の IAM 認証で行い、Lambda は `auth.py` の `IdentityId.from_event`（移行前の `users` は `get_identity_id`）で Identity ID を取り出して所有者を確認します。Lambda で JWT は検証しません。
+- 認証は API Gateway の IAM 認証で行い、Lambda は `auth.py` の `IdentityId.from_event`で Identity ID を取り出して所有者を確認します。Lambda で JWT は検証しません。
 - レスポンスは各関数群の `response.py` の `success` と `error` で作ります。
 - ステータスと本文の形式は、[lambda.md](lambda.md) の API 応答の契約に従います。
 - 既存のAPI契約を変える場合は、テストとドキュメントを更新します。

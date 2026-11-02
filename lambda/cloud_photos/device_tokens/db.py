@@ -1,11 +1,10 @@
 import functools
 import os
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import boto3
 from boto3.dynamodb.types import TypeSerializer
-from botocore.client import BaseClient
 
 from cloud_photos.common.auth import IdentityId
 from cloud_photos.common.device_token import DeviceToken
@@ -18,11 +17,15 @@ from cloud_photos.device_tokens.constants import (
 )
 from cloud_photos.device_tokens.models import Platform
 
+if TYPE_CHECKING:
+    # The stubs are a development dependency; the Lambda runtime never imports them.
+    from mypy_boto3_dynamodb import DynamoDBClient
+
 _serializer = TypeSerializer()
 
 
 @functools.cache
-def get_dynamodb_client() -> BaseClient:
+def get_dynamodb_client() -> "DynamoDBClient":
     return boto3.client("dynamodb")
 
 

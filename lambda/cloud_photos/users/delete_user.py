@@ -1,66 +1,86 @@
+from __future__ import annotations
+
+import functools
+import itertools
 import logging
 import os
 import time
-from typing import Any, Dict, List
+from collections.abc import Callable, Mapping, Sequence
+from http import HTTPStatus
+from typing import TYPE_CHECKING, Any
 
 import boto3
 
-from cloud_photos.users import auth
-from cloud_photos.users import constants
-from cloud_photos.users import response
+from cloud_photos.users.auth import IdentityId
+from cloud_photos.users.constants import (
+    BATCH_WRITE_BASE_WAIT_SECONDS,
+    DYNAMODB_BATCH_WRITE_SIZE,
+    FIELD_DEVICE_TOKEN,
+    FIELD_MEDIA_ID,
+    FIELD_USER_ID,
+    MAX_BATCH_WRITE_RETRIES,
+    PRIVATE_PATH_PREFIX,
+    S3_DELETE_BATCH_SIZE,
+    SUBSYSTEM_DEVICE_TOKENS,
+    SUBSYSTEM_S3,
+    SUBSYSTEM_UPLOAD_RECORDS,
+)
+from cloud_photos.users.response import error, success
+
+if TYPE_CHECKING:
+    # The stubs are a development dependency; the Lambda runtime never imports them.
+    from mypy_boto3_dynamodb import DynamoDBClient
+    from mypy_boto3_dynamodb.type_defs import AttributeValueTypeDef, WriteRequestTypeDef
+    from mypy_boto3_s3 import S3Client
+    from mypy_boto3_s3.type_defs import DeleteMarkerEntryTypeDef, ObjectIdentifierTypeDef, ObjectVersionTypeDef
 
 logger = logging.getLogger(__name__)
+# The deletion of a user's data is recorded even when the runtime's default level is WARNING.
 logger.setLevel(logging.INFO)
 
-_s3 = None
-_dynamodb = None
+
+@functools.cache
+def get_s3_client() -> S3Client:
+    return boto3.client("s3")
 
 
-def _get_s3():
-    global _s3
-    if _s3 is None:
-        _s3 = boto3.client("s3")
-    return _s3
+@functools.cache
+def get_dynamodb_client() -> DynamoDBClient:
+    return boto3.client("dynamodb")
 
 
-def _get_dynamodb():
-    global _dynamodb
-    if _dynamodb is None:
-        _dynamodb = boto3.client("dynamodb")
-    return _dynamodb
-
-
-def _reset_for_testing():
-    global _s3, _dynamodb
-    _s3 = None
-    _dynamodb = None
-
-
-def _flush_s3_batch(s3, bucket: str, objects_to_delete: List[Dict[str, str]]) -> None:
+def _flush_s3_batch(s3: S3Client, bucket: str, objects_to_delete: list[ObjectIdentifierTypeDef]) -> None:
     result = s3.delete_objects(Bucket=bucket, Delete={"Objects": objects_to_delete, "Quiet": True})
     errors = result.get("Errors")
     if errors:
-        codes = [e.get("Code") or e.get("StatusCode") for e in errors]
+        codes = [e.get("Code") for e in errors]
         raise RuntimeError(f"s3.delete_objects failed for bucket {bucket}: {len(errors)} object(s) failed, error_codes={codes}")
 
 
-def _delete_s3_objects(identity_id: str) -> None:
-    s3 = _get_s3()
-    bucket = os.environ["S3_BUCKET_NAME"]
-    prefix = f"private/{identity_id}/"
+def _object_identifier(entry: ObjectVersionTypeDef | DeleteMarkerEntryTypeDef) -> ObjectIdentifierTypeDef | None:
+    """Return the identifier that deletes this version, or None for an entry without a key."""
+    key = entry.get("Key")
+    if key is None:
+        return None
+    version_id = entry.get("VersionId")
+    if version_id is None:
+        return {"Key": key}
+    return {"Key": key, "VersionId": version_id}
 
-    objects_to_delete: List[Dict[str, str]] = []
-    paginator = s3.get_paginator("list_object_versions")
 
-    for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
-        for version in page.get("Versions", []):
-            objects_to_delete.append({"Key": version["Key"], "VersionId": version["VersionId"]})
-            if len(objects_to_delete) == 1000:
-                _flush_s3_batch(s3, bucket, objects_to_delete)
-                objects_to_delete = []
-        for marker in page.get("DeleteMarkers", []):
-            objects_to_delete.append({"Key": marker["Key"], "VersionId": marker["VersionId"]})
-            if len(objects_to_delete) == 1000:
+def _delete_s3_objects(bucket: str, identity_id: IdentityId) -> None:
+    """Delete every version and delete marker under the user's private prefix."""
+    s3 = get_s3_client()
+    prefix = f"{PRIVATE_PATH_PREFIX}{identity_id.value}/"
+
+    objects_to_delete: list[ObjectIdentifierTypeDef] = []
+    for page in s3.get_paginator("list_object_versions").paginate(Bucket=bucket, Prefix=prefix):
+        for entry in itertools.chain(page.get("Versions", []), page.get("DeleteMarkers", [])):
+            identifier = _object_identifier(entry)
+            if identifier is None:
+                continue
+            objects_to_delete.append(identifier)
+            if len(objects_to_delete) == S3_DELETE_BATCH_SIZE:
                 _flush_s3_batch(s3, bucket, objects_to_delete)
                 objects_to_delete = []
 
@@ -68,96 +88,98 @@ def _delete_s3_objects(identity_id: str) -> None:
         _flush_s3_batch(s3, bucket, objects_to_delete)
 
 
-def _batch_delete_items(dynamodb, table_name: str, items: List[Dict], sort_key_name: str) -> None:
-    for i in range(0, len(items), 25):
-        chunk = items[i : i + 25]
-        requests = [
-            {
-                "DeleteRequest": {
-                    "Key": {
-                        constants.FIELD_USER_ID: item[constants.FIELD_USER_ID],
-                        sort_key_name: item[sort_key_name],
-                    }
-                }
-            }
-            for item in chunk
-        ]
-        unprocessed = {table_name: requests}
-        max_retries = 5
-        for attempt in range(max_retries + 1):
-            result = dynamodb.batch_write_item(RequestItems=unprocessed)
-            unprocessed = result.get("UnprocessedItems", {})
-            if not unprocessed:
-                break
-            if attempt < max_retries:
-                wait = 0.1 * (2**attempt)
-                logger.warning(
-                    "UnprocessedItems in %s, retrying in %.1fs (attempt %d/%d)",
-                    table_name,
-                    wait,
-                    attempt + 1,
-                    max_retries,
-                )
-                time.sleep(wait)
-            else:
-                raise RuntimeError(
-                    f"batch_write_item still had UnprocessedItems after {max_retries} retries for table {table_name}"
-                )
-
-
-def _delete_dynamodb_records(table_name: str, identity_id: str, sort_key_name: str) -> None:
-    dynamodb = _get_dynamodb()
-
-    result = dynamodb.query(
-        TableName=table_name,
-        KeyConditionExpression=f"{constants.FIELD_USER_ID} = :uid",
-        ExpressionAttributeValues={":uid": {"S": identity_id}},
-        ProjectionExpression=f"{constants.FIELD_USER_ID}, {sort_key_name}",
-    )
-    _batch_delete_items(dynamodb, table_name, result.get("Items", []), sort_key_name)
-
-    while "LastEvaluatedKey" in result:
-        result = dynamodb.query(
-            TableName=table_name,
-            KeyConditionExpression=f"{constants.FIELD_USER_ID} = :uid",
-            ExpressionAttributeValues={":uid": {"S": identity_id}},
-            ProjectionExpression=f"{constants.FIELD_USER_ID}, {sort_key_name}",
-            ExclusiveStartKey=result["LastEvaluatedKey"],
+def _write_with_retries(dynamodb: DynamoDBClient, table_name: str, requests: Sequence[WriteRequestTypeDef]) -> None:
+    """Run batch_write_item, retrying UnprocessedItems with exponential backoff."""
+    unprocessed: Mapping[str, Sequence[Any]] = {table_name: requests}
+    for attempt in range(MAX_BATCH_WRITE_RETRIES + 1):
+        result = dynamodb.batch_write_item(RequestItems=unprocessed)
+        unprocessed = result.get("UnprocessedItems", {})
+        if not unprocessed:
+            return
+        if attempt == MAX_BATCH_WRITE_RETRIES:
+            break
+        wait = BATCH_WRITE_BASE_WAIT_SECONDS * (2**attempt)
+        logger.warning(
+            "UnprocessedItems in %s, retrying in %.1fs (attempt %d/%d)",
+            table_name,
+            wait,
+            attempt + 1,
+            MAX_BATCH_WRITE_RETRIES,
         )
+        time.sleep(wait)
+    raise RuntimeError(
+        f"batch_write_item still had UnprocessedItems after {MAX_BATCH_WRITE_RETRIES} retries for table {table_name}"
+    )
+
+
+def _batch_delete_items(
+    dynamodb: DynamoDBClient,
+    table_name: str,
+    items: Sequence[Mapping[str, AttributeValueTypeDef]],
+    sort_key_name: str,
+) -> None:
+    for start in range(0, len(items), DYNAMODB_BATCH_WRITE_SIZE):
+        chunk = items[start : start + DYNAMODB_BATCH_WRITE_SIZE]
+        requests: list[WriteRequestTypeDef] = [
+            {"DeleteRequest": {"Key": {FIELD_USER_ID: item[FIELD_USER_ID], sort_key_name: item[sort_key_name]}}} for item in chunk
+        ]
+        _write_with_retries(dynamodb, table_name, requests)
+
+
+def _delete_dynamodb_records(table_name: str, identity_id: IdentityId, sort_key_name: str) -> None:
+    """Delete every item of the user in the table, following LastEvaluatedKey across pages."""
+    dynamodb = get_dynamodb_client()
+    params: dict[str, Any] = {
+        "TableName": table_name,
+        "KeyConditionExpression": f"{FIELD_USER_ID} = :uid",
+        "ExpressionAttributeValues": {":uid": {"S": identity_id.value}},
+        "ProjectionExpression": f"{FIELD_USER_ID}, {sort_key_name}",
+    }
+    while True:
+        result = dynamodb.query(**params)
         _batch_delete_items(dynamodb, table_name, result.get("Items", []), sort_key_name)
+        last_evaluated_key = result.get("LastEvaluatedKey")
+        if last_evaluated_key is None:
+            return
+        params = {**params, "ExclusiveStartKey": last_evaluated_key}
 
 
-def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
-    identity_id = auth.get_identity_id(event)
-    if not identity_id:
-        return response.error(401, "Unauthorized")
+def _try_delete(subsystem: str, identity_id: IdentityId, delete: Callable[[], None]) -> bool:
+    """Run one store's deletion and return whether it succeeded."""
+    try:
+        delete()
+    except Exception:
+        # Each store is deleted independently, so that a failure in one does not keep the user's data in the others.
+        logger.exception("Failed to delete %s data for %s", subsystem, identity_id)
+        return False
+    return True
 
-    logger.info("Deleting user data for %s", auth.mask_identity(identity_id))
 
+def handler(event: Mapping[str, Any], _context: object) -> dict[str, Any]:
+    identity_id = IdentityId.from_event(event)
+    if identity_id is None:
+        return error(HTTPStatus.UNAUTHORIZED, "Unauthorized")
+
+    # Read the whole configuration first, so that a missing variable stops the request before anything is deleted.
+    bucket = os.environ["S3_BUCKET_NAME"]
     upload_records_table = os.environ["UPLOAD_RECORDS_TABLE_NAME"]
     device_tokens_table = os.environ["DEVICE_TOKENS_TABLE_NAME"]
 
-    failed_subsystems: List[str] = []
+    logger.info("Deleting user data for %s", identity_id)
 
-    try:
-        _delete_s3_objects(identity_id)
-    except Exception as e:
-        logger.error("Failed to delete S3 objects for %s: %s", auth.mask_identity(identity_id), e)
-        failed_subsystems.append("S3")
-
-    try:
-        _delete_dynamodb_records(upload_records_table, identity_id, constants.FIELD_MEDIA_ID)
-    except Exception as e:
-        logger.error("Failed to delete upload records for %s: %s", auth.mask_identity(identity_id), e)
-        failed_subsystems.append("DynamoDB/upload_records")
-
-    try:
-        _delete_dynamodb_records(device_tokens_table, identity_id, constants.FIELD_DEVICE_TOKEN)
-    except Exception as e:
-        logger.error("Failed to delete device tokens for %s: %s", auth.mask_identity(identity_id), e)
-        failed_subsystems.append("DynamoDB/device_tokens")
+    deletions: list[tuple[str, Callable[[], None]]] = [
+        (SUBSYSTEM_S3, functools.partial(_delete_s3_objects, bucket, identity_id)),
+        (
+            SUBSYSTEM_UPLOAD_RECORDS,
+            functools.partial(_delete_dynamodb_records, upload_records_table, identity_id, FIELD_MEDIA_ID),
+        ),
+        (
+            SUBSYSTEM_DEVICE_TOKENS,
+            functools.partial(_delete_dynamodb_records, device_tokens_table, identity_id, FIELD_DEVICE_TOKEN),
+        ),
+    ]
+    failed_subsystems = [subsystem for subsystem, delete in deletions if not _try_delete(subsystem, identity_id, delete)]
 
     if failed_subsystems:
-        return response.error(500, f"Failed to delete data from: {', '.join(failed_subsystems)}")
-
-    return response.success(200, {"message": "User data deleted"})
+        return error(HTTPStatus.INTERNAL_SERVER_ERROR, f"Failed to delete data from: {', '.join(failed_subsystems)}")
+    return success(HTTPStatus.OK, {"message": "User data deleted"})

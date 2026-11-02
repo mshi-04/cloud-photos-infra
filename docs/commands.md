@@ -58,7 +58,7 @@ terraform apply -lock=false
 
 ## Lambda
 
-ruff と Pyright は、[lambda/requirements-dev.txt](../lambda/requirements-dev.txt) で CI と同じバージョンに固定しています。pytest と moto は互換リリース指定（`~=`）のため、入るバージョンが CI と異なる場合があります。仮想環境を有効にしてから、依存を入れてください。
+ruff と Pyright、Pyright が使う boto3 の型スタブ（`boto3-stubs`）は、[lambda/requirements-dev.txt](../lambda/requirements-dev.txt) で CI と同じバージョンに固定しています。pytest と moto は互換リリース指定（`~=`）のため、入るバージョンが CI と異なる場合があります。仮想環境を有効にしてから、依存を入れてください。
 
 ```powershell
 python -m venv .venv

@@ -4,11 +4,10 @@ import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
 import boto3
 from boto3.dynamodb.types import TypeDeserializer, TypeSerializer
-from botocore.client import BaseClient
 from botocore.exceptions import ClientError
 
 from cloud_photos.common.auth import IdentityId
@@ -25,6 +24,10 @@ from cloud_photos.media_uploads.constants import (
 )
 from cloud_photos.media_uploads.models import CreateUploadRecordRequest, MediaId, PageCursor, PageLimit
 
+if TYPE_CHECKING:
+    # The stubs are a development dependency; the Lambda runtime never imports them.
+    from mypy_boto3_dynamodb import DynamoDBClient
+
 CONDITIONAL_CHECK_FAILED: Final = "ConditionalCheckFailedException"
 
 _serializer = TypeSerializer()
@@ -32,7 +35,7 @@ _deserializer = TypeDeserializer()
 
 
 @functools.cache
-def get_dynamodb_client() -> BaseClient:
+def get_dynamodb_client() -> "DynamoDBClient":
     return boto3.client("dynamodb")
 
 

@@ -1,17 +1,20 @@
 import functools
 import os
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import boto3
-from botocore.client import BaseClient
 
 from cloud_photos.common.auth import IdentityId
 from cloud_photos.common.device_token import DeviceToken
 from cloud_photos.push_notification.constants import FIELD_DEVICE_TOKEN, FIELD_USER_ID
 
+if TYPE_CHECKING:
+    # The stubs are a development dependency; the Lambda runtime never imports them.
+    from mypy_boto3_dynamodb import DynamoDBClient
+
 
 @functools.cache
-def get_dynamodb_client() -> BaseClient:
+def get_dynamodb_client() -> "DynamoDBClient":
     return boto3.client("dynamodb")
 
 
@@ -32,7 +35,7 @@ def query_device_tokens(identity_id: IdentityId) -> list[DeviceToken]:
     tokens: list[DeviceToken] = []
     while True:
         result = get_dynamodb_client().query(**params)
-        tokens.extend(DeviceToken(item[FIELD_DEVICE_TOKEN]["S"]) for item in result.get("Items", []))
+        tokens.extend(DeviceToken.parse(item[FIELD_DEVICE_TOKEN].get("S")) for item in result.get("Items", []))
         # A page can be empty and still have more pages after it.
         last_evaluated_key = result.get("LastEvaluatedKey")
         if not last_evaluated_key:

@@ -1,10 +1,12 @@
 import json
 import os
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 
 from cloud_photos.users import delete_user
+from cloud_photos.users.auth import IdentityId
 from cloud_photos.users.delete_user import handler
 
 IDENTITY_ID = "ap-northeast-1:test-user-id"
@@ -191,8 +193,35 @@ class TestDeleteUser:
         )
         assert result["Count"] == 0
 
+    def test_failure_in_one_store_does_not_skip_the_others(self, aws_resources, monkeypatch, caplog):
+        ddb_mock = MagicMock()
+        monkeypatch.setattr(delete_user, "_delete_s3_objects", MagicMock(side_effect=RuntimeError("boom")))
+        monkeypatch.setattr(delete_user, "_delete_dynamodb_records", ddb_mock)
 
-def _make_items(count):
+        resp = handler(_make_event(), None)
+
+        assert resp["statusCode"] == 500
+        assert ddb_mock.call_count == 2
+        assert "Failed to delete S3 data" in caplog.text
+        assert IDENTITY_ID not in caplog.text
+
+    @pytest.mark.parametrize("variable", ["S3_BUCKET_NAME", "UPLOAD_RECORDS_TABLE_NAME", "DEVICE_TOKENS_TABLE_NAME"])
+    def test_missing_configuration_stops_before_deleting(self, aws_resources, monkeypatch, variable):
+        # A configuration error propagates as a Lambda error, which API Gateway returns as 502.
+        s3_mock = MagicMock()
+        ddb_mock = MagicMock()
+        monkeypatch.setattr(delete_user, "_delete_s3_objects", s3_mock)
+        monkeypatch.setattr(delete_user, "_delete_dynamodb_records", ddb_mock)
+        monkeypatch.delenv(variable)
+
+        with pytest.raises(KeyError, match=variable):
+            handler(_make_event(), None)
+
+        assert s3_mock.call_count == 0
+        assert ddb_mock.call_count == 0
+
+
+def _make_items(count) -> list[dict[str, Any]]:
     return [{"userId": {"S": IDENTITY_ID}, "mediaId": {"S": f"media-{i:03d}"}} for i in range(count)]
 
 
@@ -253,7 +282,7 @@ class TestFlushS3Batch:
 
 
 class TestDeleteS3Objects:
-    def test_flushes_at_1000_for_versions_and_markers_then_remainder(self, aws_resources, monkeypatch):
+    def test_flushes_at_1000_for_versions_and_markers_then_remainder(self, monkeypatch):
         fake_s3 = MagicMock()
         fake_s3.delete_objects.return_value = {}
         versions = [{"Key": f"k{i}", "VersionId": f"v{i}"} for i in range(1100)]
@@ -261,9 +290,9 @@ class TestDeleteS3Objects:
         paginator = MagicMock()
         paginator.paginate.return_value = [{"Versions": versions, "DeleteMarkers": markers}]
         fake_s3.get_paginator.return_value = paginator
-        monkeypatch.setattr(delete_user, "_get_s3", lambda: fake_s3)
+        monkeypatch.setattr(delete_user, "get_s3_client", lambda: fake_s3)
 
-        delete_user._delete_s3_objects(IDENTITY_ID)
+        delete_user._delete_s3_objects("bucket", IdentityId(IDENTITY_ID))
 
         batches = [call.kwargs["Delete"]["Objects"] for call in fake_s3.delete_objects.call_args_list]
         assert [len(b) for b in batches] == [1000, 1000, 100]
@@ -280,9 +309,9 @@ class TestDeleteDynamodbRecords:
             {"Items": [{"userId": {"S": IDENTITY_ID}, "mediaId": {"S": "m2"}}]},
         ]
         fake.batch_write_item.return_value = {"UnprocessedItems": {}}
-        monkeypatch.setattr(delete_user, "_get_dynamodb", lambda: fake)
+        monkeypatch.setattr(delete_user, "get_dynamodb_client", lambda: fake)
 
-        delete_user._delete_dynamodb_records("tbl", IDENTITY_ID, "mediaId")
+        delete_user._delete_dynamodb_records("tbl", IdentityId(IDENTITY_ID), "mediaId")
 
         assert fake.query.call_count == 2
         assert fake.query.call_args_list[1].kwargs["ExclusiveStartKey"] == {
@@ -290,3 +319,14 @@ class TestDeleteDynamodbRecords:
             "mediaId": {"S": "m1"},
         }
         assert fake.batch_write_item.call_count == 2
+
+
+class TestObjectIdentifier:
+    def test_returns_key_and_version(self):
+        assert delete_user._object_identifier({"Key": "k1", "VersionId": "v1"}) == {"Key": "k1", "VersionId": "v1"}
+
+    def test_returns_key_only_without_version(self):
+        assert delete_user._object_identifier({"Key": "k1"}) == {"Key": "k1"}
+
+    def test_returns_none_without_key(self):
+        assert delete_user._object_identifier({"VersionId": "v1"}) is None
