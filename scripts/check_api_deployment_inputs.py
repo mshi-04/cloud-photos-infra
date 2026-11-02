@@ -40,7 +40,9 @@ def listed_entries(source: str, local_name: str, resource_type: str) -> list[tup
     match = re.search(rf"^\s*{local_name}\s*=\s*\{{(.*?)^\s*\}}", source, flags=re.MULTILINE | re.DOTALL)
     if match is None:
         return None
-    return re.findall(rf"^\s*(\w+)\s*=\s*aws_api_gateway_{resource_type}\.(\w+)\s*$", match.group(1), flags=re.MULTILINE)
+    # An entry may end with a comment (`#` or `//`).
+    pattern = rf"^\s*(\w+)\s*=\s*aws_api_gateway_{resource_type}\.(\w+)\s*(?:(?:#|//).*)?$"
+    return re.findall(pattern, match.group(1), flags=re.MULTILINE)
 
 
 def main() -> int:

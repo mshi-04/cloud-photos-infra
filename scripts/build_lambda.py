@@ -35,7 +35,6 @@ EXCLUDED_DIRS: Final = frozenset({"tests", "__pycache__", ".pytest_cache", ".ruf
 EXCLUDED_SUFFIXES: Final = frozenset({".pyc", ".pyo"})
 FIXED_DATE_TIME: Final = (1980, 1, 1, 0, 0, 0)
 FILE_MODE: Final = 0o100644
-EXECUTABLE_FILE_MODE: Final = 0o100755
 UNIX_SYSTEM: Final = 3
 COMPRESS_LEVEL: Final = 9
 
@@ -112,10 +111,11 @@ def required_packages(group: str) -> list[str]:
     return sorted(required)
 
 
-def write_entry(archive: zipfile.ZipFile, name: str, data: bytes, *, executable: bool = False) -> None:
+def write_entry(archive: zipfile.ZipFile, name: str, data: bytes) -> None:
     info = zipfile.ZipInfo(name, date_time=FIXED_DATE_TIME)
     info.create_system = UNIX_SYSTEM
-    info.external_attr = (EXECUTABLE_FILE_MODE if executable else FILE_MODE) << 16
+    # The same mode for every entry, so that the hash does not depend on the host's file permissions.
+    info.external_attr = FILE_MODE << 16
     info.compress_type = zipfile.ZIP_DEFLATED
     archive.writestr(info, data, compresslevel=COMPRESS_LEVEL)
 
@@ -185,7 +185,7 @@ def build_layer(name: str, installed_dir: Path, output_dir: Path) -> Path:
     with zipfile.ZipFile(output, "w") as archive:
         for path in files:
             name_in_zip = f"{LAYER_PYTHON_DIR}/{path.relative_to(installed_dir).as_posix()}"
-            write_entry(archive, name_in_zip, path.read_bytes(), executable=os.access(path, os.X_OK))
+            write_entry(archive, name_in_zip, path.read_bytes())
     return output
 
 
