@@ -246,6 +246,11 @@ class TestGetUploadRecordsRequest:
         req = GetUploadRecordsRequest.parse({"limit": "50"}, IDENTITY_ID)
         assert req.limit == PageLimit(50)
 
+    @pytest.mark.parametrize(("raw", "expected"), [("0", 1), ("501", 500), ("9999", 500)])
+    def test_limit_is_clamped(self, raw, expected):
+        req = GetUploadRecordsRequest.parse({"limit": raw}, IDENTITY_ID)
+        assert req.limit == PageLimit(expected)
+
     def test_invalid_limit(self):
         with pytest.raises(ValidationError, match="limit"):
             GetUploadRecordsRequest.parse({"limit": "abc"}, IDENTITY_ID)
