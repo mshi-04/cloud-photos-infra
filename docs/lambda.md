@@ -71,8 +71,8 @@ ZIP は [scripts/build_lambda.py](../scripts/build_lambda.py) が関数群ごと
 | 認証情報（Identity ID）がない | 403。既存の `users` と `push_notification` は 401 |
 | 本人のものではないリソースを指定した（IDOR） | 403 |
 | 対象が存在しない | 404 |
-| AWS 呼び出しの失敗 | 500 |
-| 想定外の例外（環境変数の欠落など、設定や実装の誤り） | 規約に移行した関数群（`device_tokens`）は捕捉せず、Lambda のエラーとして送出する。API Gateway の Lambda プロキシ統合が 502 を返す。移行前の関数群は 500 |
+| AWS 呼び出しの失敗 | 500。API ごとの例外は「現在の API」の表に記載 |
+| 想定外の例外（環境変数の欠落など、設定や実装の誤り） | 規約に移行した関数群（`device_tokens`）は捕捉せず、Lambda のエラーとして送出する。API Gateway の Lambda プロキシ統合が 502 を返す。移行前の関数群は、`except Exception` の範囲の中で起きた場合だけ 500 になり、範囲の外（handler の冒頭での環境変数の読み取りなど）では 502 になる |
 
 新しい API の未認証応答は 403 にします。API Gateway の IAM 認証に失敗したときの応答も 403 のためです。`users`（`DELETE /users`）と `push_notification`（`POST /media/uploads/complete`）の 401 は、クライアントとの互換性のために維持します。401 を 403 に変える場合は、API 互換性の変更として扱い、テストとクライアントへの影響を確認してください。
 
@@ -85,7 +85,7 @@ ZIP は [scripts/build_lambda.py](../scripts/build_lambda.py) が関数群ごと
 | `GET /media/uploads` | `media_uploads/get_upload_records` | 403 | 200 |
 | `POST /media/uploads` | `media_uploads/create_upload_record` | 403 | 201。既存時は 200 |
 | `DELETE /media/uploads/{mediaId}` | `media_uploads/delete_upload_record` | 403 | 200 |
-| `POST /media/uploads/complete` | `push_notification/notify_upload_complete` | 401 | 201。`successCount` が 0 の場合と、通知先がない場合は 204 |
+| `POST /media/uploads/complete` | `push_notification/notify_upload_complete` | 401 | 201。`successCount` が 0 の場合と、通知先がない場合は 204。登録解除済みトークンの削除に失敗しても、記録して残りの端末へ送信し、201 を返す |
 | `PUT /devices/token` | `device_tokens/register_device_token` | 403 | 201 |
 | `DELETE /devices/token` | `device_tokens/unregister_device_token` | 403 | 200 |
 | `DELETE /users` | `users/delete_user` | 401 | 200。一部の削除に失敗した場合は 500 |
