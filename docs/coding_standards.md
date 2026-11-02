@@ -16,9 +16,9 @@
 
 - 新しく書くコードは、この規約に従います。
 - 既存のコードを変更する場合は、変更する関数とリソースの範囲だけを規約に合わせます。触れない部分を書き換えないでください。
-- 同じモジュールの既存の仕組みと組み合わせる必要がある場合は、既存の仕組みを優先します。例えば、`media_uploads/db.py` のクライアントのキャッシュとテスト用の `_reset_for_testing()` は、まとめて移行するまで既存の形を使います。
+- 同じモジュールの既存の仕組みと組み合わせる必要がある場合は、既存の仕組みを優先します。例えば、`users/delete_user.py` のクライアントのキャッシュとテスト用の `_reset_for_testing()` は、まとめて移行するまで既存の形を使います。
 
-規約への移行は関数群ごとに進めています。移行済みの関数群は `device_tokens` と `push_notification`（共有の `common` を含む）で、値オブジェクト、例外、型、キャッシュの書き方の手本です。
+規約への移行は関数群ごとに進めています。移行済みの関数群は `media_uploads`、`device_tokens`、`push_notification`（共有の `common` を含む）で、値オブジェクト、例外、型、キャッシュの書き方の手本です。
 
 ### 機械的な確認
 
@@ -123,7 +123,7 @@ def get_dynamodb_client() -> BaseClient:
 
 ### API Behavior
 
-- 認証は API Gateway の IAM 認証で行い、Lambda は `auth.py` の `IdentityId.from_event`（移行前の関数群は `get_identity_id`）で Identity ID を取り出して所有者を確認します。Lambda で JWT は検証しません。
+- 認証は API Gateway の IAM 認証で行い、Lambda は `auth.py` の `IdentityId.from_event`（移行前の `users` は `get_identity_id`）で Identity ID を取り出して所有者を確認します。Lambda で JWT は検証しません。
 - レスポンスは各関数群の `response.py` の `success` と `error` で作ります。
 - ステータスと本文の形式は、[lambda.md](lambda.md) の API 応答の契約に従います。
 - 既存のAPI契約を変える場合は、テストとドキュメントを更新します。

@@ -1,7 +1,11 @@
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from enum import StrEnum
+from typing import Self
 
+from cloud_photos.common.auth import MASK, IdentityId
+from cloud_photos.common.errors import AuthorizationError, ValidationError
 from cloud_photos.media_uploads.constants import (
     DEFAULT_LIMIT,
     FIELD_CLOUD_STORAGE_PATH,
@@ -11,124 +15,195 @@ from cloud_photos.media_uploads.constants import (
     FIELD_MEDIA_TYPE,
     FIELD_USER_ID,
     MAX_LIMIT,
-    VALID_MEDIA_TYPES,
+    MIN_LIMIT,
+    PARAM_LAST_EVALUATED_KEY,
+    PARAM_LIMIT,
+    PRIVATE_PATH_PREFIX,
 )
 
 
-class ValidationError(Exception):
-    pass
+def _non_empty_message(field: str) -> str:
+    return f"{field} must be a non-empty string"
 
 
-class AuthorizationError(Exception):
-    pass
+def _required_text(raw: object, field: str) -> str:
+    """Return the stripped value of a required text field."""
+    if raw is None:
+        raise ValidationError(f"Missing required field: {field}")
+    if not isinstance(raw, str) or not raw.strip():
+        raise ValidationError(_non_empty_message(field))
+    return raw.strip()
 
 
-@dataclass
-class CreateUploadRecordRequest:
-    media_id: str
-    cloud_storage_path: str
-    content_type: str
-    media_type: str
-    file_size: Optional[int] = None
+@dataclass(frozen=True, slots=True)
+class MediaId:
+    value: str
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.value, str) or not self.value:
+            raise ValidationError(_non_empty_message(FIELD_MEDIA_ID))
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "CreateUploadRecordRequest":
-        if not isinstance(data, dict):
-            raise ValidationError("Request body must be an object")
+    def parse(cls, raw: object) -> Self:
+        return cls(_required_text(raw, FIELD_MEDIA_ID))
 
-        media_id = data.get(FIELD_MEDIA_ID)
-        cloud_storage_path = data.get(FIELD_CLOUD_STORAGE_PATH)
-        content_type = data.get(FIELD_CONTENT_TYPE)
-        media_type = data.get(FIELD_MEDIA_TYPE)
-        file_size = data.get(FIELD_FILE_SIZE)
 
-        if media_id is None:
-            raise ValidationError(f"Missing required field: {FIELD_MEDIA_ID}")
-        if not isinstance(media_id, str) or not media_id.strip():
-            raise ValidationError(f"{FIELD_MEDIA_ID} must be a non-empty string")
+@dataclass(frozen=True, slots=True)
+class CloudStoragePath:
+    """An S3 object key. It contains the owner's Identity ID, so it is masked when converted to text."""
 
-        if cloud_storage_path is None:
-            raise ValidationError(f"Missing required field: {FIELD_CLOUD_STORAGE_PATH}")
-        if not isinstance(cloud_storage_path, str) or not cloud_storage_path.strip():
-            raise ValidationError(f"{FIELD_CLOUD_STORAGE_PATH} must be a non-empty string")
+    value: str
 
-        if content_type is None:
-            raise ValidationError(f"Missing required field: {FIELD_CONTENT_TYPE}")
-        if not isinstance(content_type, str) or not content_type.strip():
-            raise ValidationError(f"{FIELD_CONTENT_TYPE} must be a non-empty string")
+    def __post_init__(self) -> None:
+        if not isinstance(self.value, str) or not self.value:
+            raise ValidationError(_non_empty_message(FIELD_CLOUD_STORAGE_PATH))
 
-        if media_type is None:
+    @classmethod
+    def parse(cls, raw: object) -> Self:
+        return cls(_required_text(raw, FIELD_CLOUD_STORAGE_PATH))
+
+    def belongs_to(self, identity_id: IdentityId) -> bool:
+        """Return whether the path is under the caller's private prefix."""
+        return self.value.startswith(f"{PRIVATE_PATH_PREFIX}{identity_id.value}/")
+
+    def __str__(self) -> str:
+        return MASK
+
+    def __repr__(self) -> str:
+        return f"CloudStoragePath({MASK})"
+
+
+class MediaType(StrEnum):
+    IMAGE = "IMAGE"
+    VIDEO = "VIDEO"
+
+    @classmethod
+    def parse(cls, raw: object) -> Self:
+        if raw is None:
             raise ValidationError(f"Missing required field: {FIELD_MEDIA_TYPE}")
-        if not isinstance(media_type, str):
-            raise ValidationError(f"{FIELD_MEDIA_TYPE} must be IMAGE or VIDEO")
-        media_type = media_type.strip()
-        if media_type not in VALID_MEDIA_TYPES:
-            raise ValidationError(f"{FIELD_MEDIA_TYPE} must be IMAGE or VIDEO")
-
-        if file_size is not None:
-            if isinstance(file_size, bool) or not isinstance(file_size, (int, float)):
-                raise ValidationError(f"{FIELD_FILE_SIZE} must be a number")
-            if isinstance(file_size, float) and not file_size.is_integer():
-                raise ValidationError(f"{FIELD_FILE_SIZE} must be an integer")
-            file_size = int(file_size)
-            if file_size < 0:
-                raise ValidationError(f"{FIELD_FILE_SIZE} must be non-negative")
-
-        return cls(
-            media_id=media_id.strip(),
-            cloud_storage_path=cloud_storage_path.strip(),
-            content_type=content_type.strip(),
-            media_type=media_type,
-            file_size=file_size,
-        )
+        if not isinstance(raw, str):
+            raise ValidationError(_media_type_message())
+        try:
+            return cls(raw.strip())
+        except ValueError:
+            raise ValidationError(_media_type_message()) from None
 
 
-@dataclass
-class GetUploadRecordsRequest:
-    limit: int
-    last_evaluated_key_user_id: Optional[str] = None
-    last_evaluated_key_media_id: Optional[str] = None
+def _media_type_message() -> str:
+    return f"{FIELD_MEDIA_TYPE} must be {' or '.join(MediaType)}"
+
+
+@dataclass(frozen=True, slots=True)
+class FileSize:
+    """The size of the uploaded file in bytes."""
+
+    value: int
+
+    def __post_init__(self) -> None:
+        if isinstance(self.value, bool) or not isinstance(self.value, int):
+            raise ValidationError(f"{FIELD_FILE_SIZE} must be an integer")
+        if self.value < 0:
+            raise ValidationError(f"{FIELD_FILE_SIZE} must be non-negative")
 
     @classmethod
-    def from_dict(cls, params: Optional[Dict[str, Any]], identity_id: str) -> "GetUploadRecordsRequest":
-        if params is None:
-            params = {}
-        elif not isinstance(params, dict):
-            raise ValidationError("params must be a dict")
-        raw_limit = params.get("limit", DEFAULT_LIMIT)
-        if isinstance(raw_limit, bool):
+    def parse(cls, raw: object) -> Self:
+        # JSON has a single number type, so a whole float such as 100.0 is accepted.
+        if isinstance(raw, bool) or not isinstance(raw, int | float):
+            raise ValidationError(f"{FIELD_FILE_SIZE} must be a number")
+        if isinstance(raw, float) and not raw.is_integer():
+            raise ValidationError(f"{FIELD_FILE_SIZE} must be an integer")
+        return cls(int(raw))
+
+
+@dataclass(frozen=True, slots=True)
+class PageLimit:
+    """The number of records to return in one page."""
+
+    value: int
+
+    def __post_init__(self) -> None:
+        if isinstance(self.value, bool) or not isinstance(self.value, int):
+            raise ValidationError("Invalid limit parameter")
+        if not MIN_LIMIT <= self.value <= MAX_LIMIT:
+            raise ValidationError(f"limit must be between {MIN_LIMIT} and {MAX_LIMIT}")
+
+    @classmethod
+    def parse(cls, raw: object) -> Self:
+        """Parse the limit parameter and clamp it to the allowed range."""
+        if isinstance(raw, bool) or not isinstance(raw, str | int | float):
             raise ValidationError("Invalid limit parameter")
         try:
-            limit = int(raw_limit)
-            limit = max(1, min(limit, MAX_LIMIT))
-        except (ValueError, TypeError):
+            limit = int(raw)
+        except (ValueError, OverflowError):
             raise ValidationError("Invalid limit parameter") from None
+        return cls(max(MIN_LIMIT, min(limit, MAX_LIMIT)))
 
-        last_evaluated_key_user_id = None
-        last_evaluated_key_media_id = None
 
-        last_key = params.get("lastEvaluatedKey")
-        if last_key:
-            try:
-                exclusive_start_key = json.loads(last_key)
-            except (json.JSONDecodeError, TypeError):
-                raise ValidationError("Invalid lastEvaluatedKey parameter") from None
+@dataclass(frozen=True, slots=True)
+class PageCursor:
+    """The position to continue a query from. It always belongs to the caller."""
 
-            if not isinstance(exclusive_start_key, dict):
-                raise ValidationError("lastEvaluatedKey must be an object")
+    identity_id: IdentityId
+    media_id: MediaId
 
-            if exclusive_start_key.get(FIELD_USER_ID) != identity_id:
-                raise AuthorizationError("lastEvaluatedKey does not match your identity")
+    @classmethod
+    def parse(cls, raw: object, identity_id: IdentityId) -> Self:
+        """Parse a lastEvaluatedKey returned earlier, rejecting one that belongs to another user."""
+        if not isinstance(raw, str | bytes | bytearray):
+            raise ValidationError(f"Invalid {PARAM_LAST_EVALUATED_KEY} parameter")
+        try:
+            key = json.loads(raw)
+        except json.JSONDecodeError:
+            raise ValidationError(f"Invalid {PARAM_LAST_EVALUATED_KEY} parameter") from None
 
-            media_id_key = exclusive_start_key.get(FIELD_MEDIA_ID)
-            if not isinstance(media_id_key, str) or not media_id_key.strip():
-                raise ValidationError("lastEvaluatedKey.mediaId must be a non-empty string")
+        if not isinstance(key, dict):
+            raise ValidationError(f"{PARAM_LAST_EVALUATED_KEY} must be an object")
+        if key.get(FIELD_USER_ID) != identity_id.value:
+            raise AuthorizationError(f"{PARAM_LAST_EVALUATED_KEY} does not match your identity")
 
-            last_evaluated_key_user_id = identity_id
-            last_evaluated_key_media_id = media_id_key.strip()
+        media_id = key.get(FIELD_MEDIA_ID)
+        if not isinstance(media_id, str) or not media_id.strip():
+            raise ValidationError(_non_empty_message(f"{PARAM_LAST_EVALUATED_KEY}.{FIELD_MEDIA_ID}"))
+        return cls(identity_id=identity_id, media_id=MediaId(media_id.strip()))
 
+
+@dataclass(frozen=True, slots=True)
+class CreateUploadRecordRequest:
+    media_id: MediaId
+    cloud_storage_path: CloudStoragePath
+    content_type: str
+    media_type: MediaType
+    file_size: FileSize | None = None
+
+    @classmethod
+    def parse(cls, body: object) -> Self:
+        if not isinstance(body, Mapping):
+            raise ValidationError("Request body must be an object")
+
+        raw_file_size = body.get(FIELD_FILE_SIZE)
         return cls(
-            limit=limit,
-            last_evaluated_key_user_id=last_evaluated_key_user_id,
-            last_evaluated_key_media_id=last_evaluated_key_media_id,
+            media_id=MediaId.parse(body.get(FIELD_MEDIA_ID)),
+            cloud_storage_path=CloudStoragePath.parse(body.get(FIELD_CLOUD_STORAGE_PATH)),
+            content_type=_required_text(body.get(FIELD_CONTENT_TYPE), FIELD_CONTENT_TYPE),
+            media_type=MediaType.parse(body.get(FIELD_MEDIA_TYPE)),
+            file_size=None if raw_file_size is None else FileSize.parse(raw_file_size),
         )
+
+
+@dataclass(frozen=True, slots=True)
+class GetUploadRecordsRequest:
+    limit: PageLimit
+    cursor: PageCursor | None = None
+
+    @classmethod
+    def parse(cls, params: object, identity_id: IdentityId) -> Self:
+        if params is None:
+            params = {}
+        if not isinstance(params, Mapping):
+            raise ValidationError("params must be a dict")
+
+        limit = PageLimit.parse(params.get(PARAM_LIMIT, DEFAULT_LIMIT))
+        raw_cursor = params.get(PARAM_LAST_EVALUATED_KEY)
+        # A missing or empty lastEvaluatedKey means the first page.
+        cursor = PageCursor.parse(raw_cursor, identity_id) if raw_cursor else None
+        return cls(limit=limit, cursor=cursor)

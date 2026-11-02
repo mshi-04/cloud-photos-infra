@@ -13,7 +13,7 @@ lambda/
     common/
       __init__.py
       auth.py                    IdentityId / get_identity_id / mask_identity の正本
-      errors.py                  ValidationError
+      errors.py                  ValidationError / AuthorizationError
       device_token.py            DeviceToken（device_tokens と push_notification で共有）
       request.py                 parse_body（本文の JSON オブジェクトを取り出す）
     media_uploads/
@@ -40,7 +40,7 @@ lambda/
 import は、本番とテストのどちらでも修飾付きで書きます。トップレベル名（`from auth import ...`）は使いません。
 
 ```python
-from cloud_photos.media_uploads.auth import get_identity_id
+from cloud_photos.media_uploads.auth import IdentityId
 from cloud_photos.users import auth
 ```
 
@@ -48,9 +48,9 @@ from cloud_photos.users import auth
 
 | 関数グループ | `auth.py` の実体 |
 |---|---|
+| `media_uploads` | `from cloud_photos.common.auth import ...` の re-export |
 | `device_tokens` | `from cloud_photos.common.auth import ...` の re-export |
 | `push_notification` | `from cloud_photos.common.auth import ...` の re-export |
-| `media_uploads` | 同等実装のコピー |
 | `users` | 同等実装のコピー（`requestContext` / `identity` の None を明示的に処理） |
 
 新規関数は `cloud_photos/common/auth.py` を re-export する形を採ります。コピーを増やしません。
@@ -67,7 +67,7 @@ ZIP は [scripts/build_lambda.py](../../../../scripts/build_lambda.py) が作り
 関数群ごとに `.build/<function_group>.zip` を出力します。
 
 - ZIP には `cloud_photos/__init__.py`、関数群のパッケージ、そこから `cloud_photos.<package>` として import している共有パッケージが入ります。
-  `device_tokens` と `push_notification` の ZIP には `common/` が入ります。
+  `media_uploads`、`device_tokens`、`push_notification` の ZIP には `common/` が入ります。
 - `tests/` とキャッシュは入りません。
 - エントリの順序、更新時刻、権限を固定しているため、同じソースからは同じハッシュの ZIP ができます。
 

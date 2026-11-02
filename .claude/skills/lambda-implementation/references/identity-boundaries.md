@@ -16,8 +16,8 @@
 `IdentityId`、`get_identity_id`、`mask_identity` の正本は [lambda/cloud_photos/common/auth.py](../../../../lambda/cloud_photos/common/auth.py) です。
 `IdentityId` は Identity ID の値オブジェクトで、`from_event` で event から生成し、`str()` と `repr()` では伏せ字になります。生の値は `.value` で、AWS を呼び出す直前にだけ取り出します。
 
-`device_tokens/auth.py` と `push_notification/auth.py` は `IdentityId` を re-export します。
-`media_uploads/auth.py` と `users/auth.py` は同等実装のコピーです。新規は re-export に揃えます。
+`media_uploads/auth.py`、`device_tokens/auth.py`、`push_notification/auth.py` は `IdentityId` を re-export します。
+`users/auth.py` は同等実装のコピーです。新規は re-export に揃えます。
 
 `requestContext`、`identity`、`cognitoIdentityId` の欠落・null・想定外の型は、例外にせず `None` を返します。handler は `None` を未認証として扱います。コピーを直す場合は、正本と同じ扱いにしてください。
 
@@ -25,30 +25,37 @@
 
 | リソース | 境界 | 実装箇所 |
 |---|---|---|
-| S3 オブジェクト | `private/<identity_id>/` プレフィックス一致 | `create_upload_record.py`（書き込み前）、`delete_user.py`（削除対象の列挙） |
+| S3 オブジェクト | `private/<identity_id>/` プレフィックス一致 | `models.CloudStoragePath.belongs_to`（`create_upload_record.py` が書き込み前に呼ぶ）、`delete_user.py`（削除対象の列挙） |
 | DynamoDB（upload records） | HASH key `userId` に identity_id | `get_upload_records.py`、`create_upload_record.py`、`delete_upload_record.py` |
 | DynamoDB（device tokens） | HASH key `userId` に identity_id | `register_device_token.py`、`unregister_device_token.py` |
-| ページネーション継続キー | `lastEvaluatedKey.userId == identity_id` | `models.GetUploadRecordsRequest.from_dict` |
+| ページネーション継続キー | `lastEvaluatedKey.userId == identity_id` | `models.PageCursor.parse` |
 
 クライアントから来た値を、そのまま key やパスに使わないでください。
 `cloudStoragePath` と `lastEvaluatedKey` は攻撃者が自由に指定できます。
 
 ### クライアント由来のパス
 
+所有者の判定は、保存パスの値オブジェクト `CloudStoragePath` が持ちます。handler は判定を呼び、結果を 403 に変換します。
+保存パスには Identity ID が含まれるため、`CloudStoragePath` は `str()` と `repr()` で伏せ字になります。
+
 ```python
-expected_prefix = f"{PRIVATE_PATH_PREFIX}{identity_id}/"
-if not request_data.cloud_storage_path.startswith(expected_prefix):
+def belongs_to(self, identity_id: IdentityId) -> bool:
+    return self.value.startswith(f"{PRIVATE_PATH_PREFIX}{identity_id.value}/")
+```
+
+```python
+if not request.cloud_storage_path.belongs_to(identity_id):
     return error(HTTPStatus.FORBIDDEN, "cloudStoragePath does not match your identity")
 ```
 
 ### クライアント由来の継続キー
 
-`models.py` は境界違反を `AuthorizationError` として投げ、handler が 403 に変換します。
+`models.PageCursor.parse` は境界違反を `AuthorizationError`（`common/errors.py`）として投げ、handler が 403 に変換します。
 検証エラー（`ValidationError` → 400）と混ぜません。
 
 ```python
-if exclusive_start_key.get(FIELD_USER_ID) != identity_id:
-    raise AuthorizationError("lastEvaluatedKey does not match your identity")
+if key.get(FIELD_USER_ID) != identity_id.value:
+    raise AuthorizationError(f"{PARAM_LAST_EVALUATED_KEY} does not match your identity")
 ```
 
 ```python
@@ -58,7 +65,7 @@ except AuthorizationError as e:
     return error(HTTPStatus.FORBIDDEN, str(e))
 ```
 
-`ExclusiveStartKey` は検証済みの `identity_id` から組み直します。受け取った dict をそのまま渡しません。
+`ExclusiveStartKey` は、検証済みの `PageCursor`（`IdentityId` と `MediaId`）から `db.py` で組み直します。受け取った dict をそのまま渡しません。
 
 ## Identity Pool 側の境界
 

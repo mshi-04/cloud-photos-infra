@@ -4,6 +4,7 @@ import os
 import pytest
 from moto import mock_aws
 
+from cloud_photos.media_uploads import db
 from cloud_photos.media_uploads.delete_upload_record import handler
 
 IDENTITY_ID = "ap-northeast-1:test-user-id"
@@ -71,3 +72,43 @@ class TestDeleteUploadRecord:
         }
         resp = handler(event, None)
         assert resp["statusCode"] == 400
+
+    @pytest.mark.parametrize("path_parameters", [None, {"mediaId": ""}], ids=["path_parameters_null", "media_id_empty"])
+    def test_missing_or_empty_media_id(self, dynamodb_table, path_parameters):
+        event = {
+            "requestContext": {"identity": {"cognitoIdentityId": IDENTITY_ID}},
+            "pathParameters": path_parameters,
+        }
+        resp = handler(event, None)
+        assert resp["statusCode"] == 400
+
+    def test_other_users_record_is_not_deleted(self, dynamodb_table):
+        _seed_record(dynamodb_table, identity_id="ap-northeast-1:other-user-id")
+
+        resp = handler(_make_event(), None)
+
+        assert resp["statusCode"] == 404
+        item = dynamodb_table.get_item(
+            TableName=os.environ["TABLE_NAME"],
+            Key={"userId": {"S": "ap-northeast-1:other-user-id"}, "mediaId": {"S": MEDIA_ID}},
+        )["Item"]
+        assert "isDeleted" not in item
+
+    def test_dynamodb_failure_returns_500_without_internal_details(self, dynamodb_table, caplog):
+        dynamodb_table.delete_table(TableName=os.environ["TABLE_NAME"])
+
+        resp = handler(_make_event(), None)
+
+        assert resp["statusCode"] == 500
+        assert json.loads(resp["body"]) == {"message": "Internal server error"}
+        assert "Failed to logically delete item" in caplog.text
+        assert IDENTITY_ID not in caplog.text
+
+    def test_unexpected_error_is_not_turned_into_500(self, dynamodb_table, monkeypatch):
+        # Only AWS call failures become 500. A configuration error propagates as a Lambda error,
+        # which API Gateway returns as 502.
+        monkeypatch.delenv("TABLE_NAME")
+        db.get_table_name.cache_clear()
+
+        with pytest.raises(KeyError, match="TABLE_NAME"):
+            handler(_make_event(), None)
