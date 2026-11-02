@@ -6,10 +6,10 @@ from typing import Any
 from botocore.exceptions import BotoCoreError, ClientError
 
 from cloud_photos.common.errors import ValidationError
+from cloud_photos.common.request import parse_body
 from cloud_photos.device_tokens.auth import IdentityId
 from cloud_photos.device_tokens.db import save_device_token
 from cloud_photos.device_tokens.models import RegisterDeviceTokenRequest
-from cloud_photos.device_tokens.request_utils import parse_body
 from cloud_photos.device_tokens.response import error, success
 
 logger = logging.getLogger(__name__)

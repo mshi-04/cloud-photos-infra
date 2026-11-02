@@ -64,8 +64,8 @@ def handler(event: Dict[str, Any], _context: Any) -> Dict[str, Any]:
 
 ステータスの規則と、現在の API ごとの未認証応答・成功時の応答は、[docs/lambda.md](../../../../docs/lambda.md) の API 応答の契約が正本です。ここには書き写しません。
 
-`HTTPStatus` を使う実装（`media_uploads` / `device_tokens`）と、数値リテラルを使う実装
-（`users` / `push_notification`）が混在します。新規実装は `HTTPStatus` を使います。
+`HTTPStatus` を使う実装（`media_uploads` / `device_tokens` / `push_notification`）と、数値リテラルを使う実装
+（`users`）が混在します。新規実装は `HTTPStatus` を使います。
 
 ## 冪等性
 
@@ -98,7 +98,7 @@ except ClientError as e:
 
 - `logger = logging.getLogger(__name__)` をモジュールスコープに置きます。
 - identity は、伏せ字にする `IdentityId` を渡すか、`mask_identity` を通します。生の `cognitoIdentityId`、`deviceToken`、
-  リクエストボディをログに出しません。FCM トークンは `token[-4:]` のみです。
+  リクエストボディをログに出しません。FCM トークンは `DeviceToken` で渡し、末尾 4 文字より多くは出しません。
 - AWS 呼び出し失敗は `logger.exception` で操作名と対象キーを記録します。
 
 ## 参考資料

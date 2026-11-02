@@ -97,13 +97,11 @@ s3.put_bucket_versioning(Bucket=S3_BUCKET_NAME, VersioningConfiguration={"Status
 ```python
 @pytest.fixture(autouse=True)
 def mock_firebase(monkeypatch):
-    from cloud_photos.push_notification import notify_upload_complete
-
-    monkeypatch.setattr(notify_upload_complete, "_firebase_app", MagicMock())
+    monkeypatch.setattr(notify_upload_complete, "get_firebase_app", MagicMock())
 ```
 
-環境変数の退避と復元も行います（`os.environ.get` で元の値を保持し、`yield` 後に戻す）。
-他のテストと同じプロセスで環境変数が衝突する場合はこの形にします。
+初期化の失敗を確かめるテストは、`real_firebase_init` fixture で本物の `fcm.get_firebase_app` に戻し、
+`functools.cache` のキャッシュを前後で `cache_clear()` します。環境変数は `monkeypatch.setenv` で設定し、自動で元に戻します。
 
 ## event のひな形
 

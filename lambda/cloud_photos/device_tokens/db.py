@@ -8,6 +8,7 @@ from boto3.dynamodb.types import TypeSerializer
 from botocore.client import BaseClient
 
 from cloud_photos.common.auth import IdentityId
+from cloud_photos.common.device_token import DeviceToken
 from cloud_photos.device_tokens.constants import (
     FIELD_DEVICE_TOKEN,
     FIELD_PLATFORM,
@@ -15,7 +16,7 @@ from cloud_photos.device_tokens.constants import (
     FIELD_UPDATED_AT,
     FIELD_USER_ID,
 )
-from cloud_photos.device_tokens.models import DeviceToken, Platform
+from cloud_photos.device_tokens.models import Platform
 
 _serializer = TypeSerializer()
 
