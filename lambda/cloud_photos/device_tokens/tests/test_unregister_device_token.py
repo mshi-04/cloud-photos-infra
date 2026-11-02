@@ -74,3 +74,14 @@ class TestUnregisterDeviceToken:
         }
         resp = handler(event, None)
         assert resp["statusCode"] == 400
+
+    def test_dynamodb_failure_returns_500_without_internal_details(self, dynamodb_table, caplog):
+        dynamodb_table.delete_table(TableName=os.environ["TABLE_NAME"])
+
+        resp = handler(_make_event({"deviceToken": DEVICE_TOKEN}), None)
+
+        assert resp["statusCode"] == 500
+        assert json.loads(resp["body"]) == {"message": "Internal server error"}
+        assert "Failed to unregister device token" in caplog.text
+        assert IDENTITY_ID not in caplog.text
+        assert DEVICE_TOKEN not in caplog.text
