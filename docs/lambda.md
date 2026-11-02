@@ -71,7 +71,8 @@ ZIP は [scripts/build_lambda.py](../scripts/build_lambda.py) が関数群ごと
 | 認証情報（Identity ID）がない | 403。既存の `users` と `push_notification` は 401 |
 | 本人のものではないリソースを指定した（IDOR） | 403 |
 | 対象が存在しない | 404 |
-| AWS 呼び出しの失敗、想定外の例外 | 500 |
+| AWS 呼び出しの失敗 | 500 |
+| 想定外の例外（環境変数の欠落など、設定や実装の誤り） | 規約に移行した関数群（`device_tokens`）は捕捉せず、Lambda のエラーとして送出する。API Gateway の Lambda プロキシ統合が 502 を返す。移行前の関数群は 500 |
 
 新しい API の未認証応答は 403 にします。API Gateway の IAM 認証に失敗したときの応答も 403 のためです。`users`（`DELETE /users`）と `push_notification`（`POST /media/uploads/complete`）の 401 は、クライアントとの互換性のために維持します。401 を 403 に変える場合は、API 互換性の変更として扱い、テストとクライアントへの影響を確認してください。
 

@@ -4,6 +4,7 @@ import os
 import pytest
 from moto import mock_aws
 
+from cloud_photos.device_tokens import db
 from cloud_photos.device_tokens.unregister_device_token import handler
 
 IDENTITY_ID = "ap-northeast-1:test-user-id"
@@ -85,3 +86,12 @@ class TestUnregisterDeviceToken:
         assert "Failed to unregister device token" in caplog.text
         assert IDENTITY_ID not in caplog.text
         assert DEVICE_TOKEN not in caplog.text
+
+    def test_unexpected_error_is_not_turned_into_500(self, dynamodb_table, monkeypatch):
+        # Only AWS call failures become 500. A configuration error propagates as a Lambda error,
+        # which API Gateway returns as 502.
+        monkeypatch.delenv("TABLE_NAME")
+        db.get_table_name.cache_clear()
+
+        with pytest.raises(KeyError, match="TABLE_NAME"):
+            handler(_make_event({"deviceToken": DEVICE_TOKEN}), None)
