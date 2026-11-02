@@ -14,16 +14,18 @@ lambda/
       __init__.py
       auth.py                    IdentityId / get_identity_id / mask_identity の正本
       errors.py                  ValidationError
+      device_token.py            DeviceToken（device_tokens と push_notification で共有）
+      request.py                 parse_body（本文の JSON オブジェクトを取り出す）
     media_uploads/
       __init__.py  auth.py  constants.py  db.py  models.py  response.py
       get_upload_records.py  create_upload_record.py  delete_upload_record.py
       tests/
     device_tokens/
-      __init__.py  auth.py  constants.py  db.py  models.py  request_utils.py  response.py
+      __init__.py  auth.py  constants.py  db.py  models.py  response.py
       register_device_token.py  unregister_device_token.py
       tests/
     push_notification/
-      __init__.py  auth.py  constants.py  response.py
+      __init__.py  auth.py  constants.py  db.py  fcm.py  models.py  response.py
       notify_upload_complete.py
       tests/
     users/

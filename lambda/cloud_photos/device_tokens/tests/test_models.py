@@ -1,12 +1,8 @@
 import pytest
 
+from cloud_photos.common.device_token import DeviceToken
 from cloud_photos.common.errors import ValidationError
-from cloud_photos.device_tokens.models import (
-    DeviceToken,
-    Platform,
-    RegisterDeviceTokenRequest,
-    UnregisterDeviceTokenRequest,
-)
+from cloud_photos.device_tokens.models import Platform, RegisterDeviceTokenRequest, UnregisterDeviceTokenRequest
 
 DEVICE_TOKEN = "test-device-token-abc123"
 

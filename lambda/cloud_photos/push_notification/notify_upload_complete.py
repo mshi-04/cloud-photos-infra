@@ -1,141 +1,89 @@
-import json
 import logging
-import os
-from typing import Any, Dict, List, Optional
+from collections.abc import Mapping
+from http import HTTPStatus
+from typing import Any
 
-import firebase_admin
-from firebase_admin import credentials, messaging
+from botocore.exceptions import BotoCoreError, ClientError
+from firebase_admin import messaging
 
-from cloud_photos.push_notification import auth
-from cloud_photos.push_notification import response
-from cloud_photos.push_notification.constants import FIELD_DEVICE_TOKEN, FIELD_USER_ID
+from cloud_photos.common.device_token import DeviceToken
+from cloud_photos.common.errors import ValidationError
+from cloud_photos.common.request import parse_body
+from cloud_photos.push_notification.auth import IdentityId
+from cloud_photos.push_notification.constants import FIELD_SUCCESS_COUNT
+from cloud_photos.push_notification.db import delete_device_token, query_device_tokens
+from cloud_photos.push_notification.fcm import build_upload_complete_notification, get_firebase_app, send_notification
+from cloud_photos.push_notification.models import SuccessCount
+from cloud_photos.push_notification.response import error, success
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
+# This handler records each delivery at INFO, so it does not depend on the runtime's default level.
 logger.setLevel(logging.INFO)
 
-# Firebase App is reused across warm starts
-_firebase_app: Optional[firebase_admin.App] = None
 
+def handler(event: Mapping[str, Any], _context: object) -> dict[str, Any]:
+    identity_id = IdentityId.from_event(event)
+    if identity_id is None:
+        return error(HTTPStatus.UNAUTHORIZED, "Unauthorized")
 
-def _get_firebase_app() -> firebase_admin.App:
-    global _firebase_app
-    if _firebase_app is not None:
-        return _firebase_app
-
-    import boto3
-
-    secret_arn = os.environ["FIREBASE_CREDENTIALS_SECRET_ARN"]
-    client = boto3.client("secretsmanager")
-    secret_value = client.get_secret_value(SecretId=secret_arn)
-    service_account_info = json.loads(secret_value["SecretString"])
-
-    cred = credentials.Certificate(service_account_info)
-    _firebase_app = firebase_admin.initialize_app(cred)
-    return _firebase_app
-
-
-def _query_device_tokens(dynamodb, table_name: str, user_id: str) -> List[str]:
-    params: Dict[str, Any] = {
-        "TableName": table_name,
-        "KeyConditionExpression": "#uid = :uid",
-        "ExpressionAttributeNames": {"#uid": FIELD_USER_ID},
-        "ExpressionAttributeValues": {":uid": {"S": user_id}},
-        "ProjectionExpression": FIELD_DEVICE_TOKEN,
-    }
-    tokens: List[str] = []
-    while True:
-        result = dynamodb.query(**params)
-        tokens.extend(item[FIELD_DEVICE_TOKEN]["S"] for item in result.get("Items", []))
-        # A page can be empty and still have more pages after it.
-        last_evaluated_key = result.get("LastEvaluatedKey")
-        if not last_evaluated_key:
-            return tokens
-        params["ExclusiveStartKey"] = last_evaluated_key
-
-
-def _delete_device_token(dynamodb, table_name: str, user_id: str, token: str) -> None:
-    dynamodb.delete_item(
-        TableName=table_name,
-        Key={
-            FIELD_USER_ID: {"S": user_id},
-            FIELD_DEVICE_TOKEN: {"S": token},
-        },
-    )
-
-
-def _parse_body(event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    try:
-        body = json.loads(event.get("body") or "{}")
-    except (json.JSONDecodeError, TypeError):
-        return None
-    if not isinstance(body, dict):
-        return None
-    return body
-
-
-def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
-    import boto3
-
-    user_id = auth.get_identity_id(event)
-    if not user_id:
-        return response.error(401, "Unauthorized")
-
-    body = _parse_body(event)
+    body = parse_body(event)
     if body is None:
-        return response.error(400, "Invalid request body")
-
-    success_count = body.get("successCount")
-    # bool is a subclass of int, so reject it explicitly.
-    if isinstance(success_count, bool) or not isinstance(success_count, int) or success_count < 0:
-        return response.error(400, "successCount must be a non-negative integer")
-
-    masked = auth.mask_identity(user_id)
-    if success_count == 0:
-        logger.info("Nothing uploaded, skipping notification: user=%s", masked)
-        return response.success(204)
-
-    table_name = os.environ["TABLE_NAME"]
-    dynamodb = boto3.client("dynamodb")
-
-    logger.info("Notifying upload complete: user=%s successCount=%d", masked, success_count)
+        return error(HTTPStatus.BAD_REQUEST, "Invalid request body")
 
     try:
-        tokens = _query_device_tokens(dynamodb, table_name, user_id)
-    except Exception:
-        logger.exception("Failed to query device tokens: user=%s", masked)
-        return response.error(500, "Internal server error")
+        success_count = SuccessCount.parse(body.get(FIELD_SUCCESS_COUNT))
+    except ValidationError as e:
+        return error(HTTPStatus.BAD_REQUEST, str(e))
+
+    if success_count.is_zero:
+        logger.info("Nothing uploaded, skipping notification: user=%s", identity_id)
+        return success(HTTPStatus.NO_CONTENT)
+
+    logger.info("Notifying upload complete: user=%s successCount=%d", identity_id, success_count.value)
+
+    try:
+        tokens = query_device_tokens(identity_id)
+    except (BotoCoreError, ClientError):
+        logger.exception("Failed to query device tokens: user=%s", identity_id)
+        return error(HTTPStatus.INTERNAL_SERVER_ERROR, "Internal server error")
     if not tokens:
-        logger.info("No device tokens registered for user=%s", masked)
-        return response.success(204)
+        logger.info("No device tokens registered for user=%s", identity_id)
+        return success(HTTPStatus.NO_CONTENT)
 
     try:
-        _get_firebase_app()
+        get_firebase_app()
+    except (BotoCoreError, ClientError, ValueError):
+        # ValueError covers a secret that is not valid JSON or not a valid service account.
+        logger.exception("Failed to initialize Firebase: user=%s", identity_id)
+        return error(HTTPStatus.INTERNAL_SERVER_ERROR, "Internal server error")
+
+    notification = build_upload_complete_notification(success_count)
+    sent_count = sum(_notify_device(identity_id, token, notification) for token in tokens)
+
+    logger.info("Notification done: user=%s sent=%d total=%d", identity_id, sent_count, len(tokens))
+    return success(HTTPStatus.CREATED, {"sentCount": sent_count})
+
+
+def _notify_device(identity_id: IdentityId, device_token: DeviceToken, notification: messaging.Notification) -> bool:
+    """Send to one device and return whether it was delivered. A failure never stops the other devices."""
+    try:
+        send_notification(device_token, notification)
+    except messaging.UnregisteredError:
+        logger.info("Deleting unregistered token: user=%s token=%s", identity_id, device_token)
+        _delete_unregistered_token(identity_id, device_token)
+        return False
     except Exception:
-        logger.exception("Failed to initialize Firebase: user=%s", masked)
-        return response.error(500, "Internal server error")
+        # FCM reports network and server failures with several exception types. One device's failure,
+        # whatever its type, must not stop delivery to the others, so it is recorded and skipped.
+        logger.exception("FCM send failed: user=%s token=%s", identity_id, device_token)
+        return False
+    logger.info("FCM sent: user=%s token=%s", identity_id, device_token)
+    return True
 
-    notification_body = f"{success_count}件のメディアをアップロードしました"
-    notification = messaging.Notification(
-        title="アップロード完了",
-        body=notification_body,
-    )
 
-    sent_count = 0
-    for token in tokens:
-        message = messaging.Message(notification=notification, token=token)
-        try:
-            messaging.send(message)
-            sent_count += 1
-            logger.info("FCM sent: user=%s token=***%s", masked, token[-4:])
-        except messaging.UnregisteredError:
-            logger.info("Deleting unregistered token: user=%s token=***%s", masked, token[-4:])
-            try:
-                _delete_device_token(dynamodb, table_name, user_id, token)
-            except Exception:
-                # Keep sending to the other devices; the stale token is retried on the next notification.
-                logger.exception("Failed to delete unregistered token: user=%s token=***%s", masked, token[-4:])
-        except Exception as e:
-            logger.error("FCM send failed: user=%s token=***%s error=%s", masked, token[-4:], e, exc_info=True)
-
-    logger.info("Notification done: user=%s sent=%d total=%d", masked, sent_count, len(tokens))
-    return response.success(201, {"sentCount": sent_count})
+def _delete_unregistered_token(identity_id: IdentityId, device_token: DeviceToken) -> None:
+    try:
+        delete_device_token(identity_id, device_token)
+    except (BotoCoreError, ClientError):
+        # Keep sending to the other devices; the stale token is retried on the next notification.
+        logger.exception("Failed to delete unregistered token: user=%s token=%s", identity_id, device_token)

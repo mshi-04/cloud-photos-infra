@@ -4,8 +4,11 @@ from unittest.mock import patch
 import boto3
 import pytest
 from botocore.exceptions import ClientError
+from firebase_admin import messaging
 
-from cloud_photos.push_notification import notify_upload_complete
+from cloud_photos.common.device_token import DeviceToken
+from cloud_photos.push_notification import db, fcm, notify_upload_complete
+from cloud_photos.push_notification.auth import IdentityId
 from cloud_photos.push_notification.notify_upload_complete import handler
 
 IDENTITY_ID = "ap-northeast-1:test-user-id"
@@ -113,8 +116,6 @@ class TestNotifyUploadComplete:
         assert mock_send.call_count == 2
 
     def test_unregistered_token_is_deleted(self, dynamodb_table):
-        from firebase_admin import messaging
-
         _seed_token(dynamodb_table, IDENTITY_ID, TOKEN_A)
         with patch("firebase_admin.messaging.send", side_effect=messaging.UnregisteredError("stale")):
             resp = handler(_make_event({"successCount": 1}), None)
@@ -154,7 +155,7 @@ def _client_error(operation):
 class TestExternalServiceFailures:
     def test_query_failure_returns_500_without_internal_details(self, dynamodb_table, caplog):
         with (
-            patch.object(notify_upload_complete, "_query_device_tokens", side_effect=_client_error("Query")),
+            patch.object(notify_upload_complete, "query_device_tokens", side_effect=_client_error("Query")),
             patch("firebase_admin.messaging.send") as mock_send,
         ):
             resp = handler(_make_event({"successCount": 1}), None)
@@ -165,9 +166,9 @@ class TestExternalServiceFailures:
         assert "Failed to query device tokens" in caplog.text
         assert IDENTITY_ID not in caplog.text
 
+    @pytest.mark.usefixtures("real_firebase_init")
     def test_secret_fetch_failure_returns_500(self, dynamodb_table, monkeypatch):
         _seed_token(dynamodb_table, IDENTITY_ID, TOKEN_A)
-        monkeypatch.setattr(notify_upload_complete, "_firebase_app", None)
         monkeypatch.setenv(
             "FIREBASE_CREDENTIALS_SECRET_ARN",
             f"arn:aws:secretsmanager:{REGION}:000000000000:secret:missing-AbCdEf",
@@ -178,14 +179,15 @@ class TestExternalServiceFailures:
         assert resp["statusCode"] == 500
         assert json.loads(resp["body"]) == {"message": "Internal server error"}
         mock_send.assert_not_called()
-        assert notify_upload_complete._firebase_app is None
+        # A failed initialization is not cached, so the next request tries again.
+        assert fcm.get_firebase_app.cache_info().currsize == 0
 
+    @pytest.mark.usefixtures("real_firebase_init")
     def test_invalid_credentials_secret_returns_500(self, dynamodb_table, monkeypatch):
         _seed_token(dynamodb_table, IDENTITY_ID, TOKEN_A)
         secret = boto3.client("secretsmanager", region_name=REGION).create_secret(
             Name="firebase-credentials", SecretString="not-json"
         )
-        monkeypatch.setattr(notify_upload_complete, "_firebase_app", None)
         monkeypatch.setenv("FIREBASE_CREDENTIALS_SECRET_ARN", secret["ARN"])
         with patch("firebase_admin.messaging.send") as mock_send:
             resp = handler(_make_event({"successCount": 1}), None)
@@ -195,12 +197,10 @@ class TestExternalServiceFailures:
         mock_send.assert_not_called()
 
     def test_delete_failure_still_sends_to_remaining_devices(self, dynamodb_table, caplog):
-        from firebase_admin import messaging
-
         _seed_token(dynamodb_table, IDENTITY_ID, TOKEN_A)
         _seed_token(dynamodb_table, IDENTITY_ID, TOKEN_B)
         with (
-            patch.object(notify_upload_complete, "_delete_device_token", side_effect=_client_error("DeleteItem")),
+            patch.object(notify_upload_complete, "delete_device_token", side_effect=_client_error("DeleteItem")),
             patch("firebase_admin.messaging.send", side_effect=[messaging.UnregisteredError("stale"), "message-id"]) as mock_send,
         ):
             resp = handler(_make_event({"successCount": 1}), None)
@@ -211,6 +211,25 @@ class TestExternalServiceFailures:
         assert "Failed to delete unregistered token" in caplog.text
         assert IDENTITY_ID not in caplog.text
         assert TOKEN_A not in caplog.text
+
+
+class TestUnexpectedErrors:
+    # Only AWS and Firebase setup failures become 500. A configuration error propagates as a Lambda error,
+    # which API Gateway returns as 502.
+    def test_missing_table_name_propagates(self, dynamodb_table, monkeypatch):
+        monkeypatch.delenv("TABLE_NAME")
+        db.get_table_name.cache_clear()
+
+        with pytest.raises(KeyError, match="TABLE_NAME"):
+            handler(_make_event({"successCount": 1}), None)
+
+    @pytest.mark.usefixtures("real_firebase_init")
+    def test_missing_firebase_secret_arn_propagates(self, dynamodb_table, monkeypatch):
+        _seed_token(dynamodb_table, IDENTITY_ID, TOKEN_A)
+        monkeypatch.delenv("FIREBASE_CREDENTIALS_SECRET_ARN", raising=False)
+
+        with pytest.raises(KeyError, match="FIREBASE_CREDENTIALS_SECRET_ARN"):
+            handler(_make_event({"successCount": 1}), None)
 
 
 class _PagedDynamoDB:
@@ -226,7 +245,7 @@ class _PagedDynamoDB:
 
 
 class TestQueryDeviceTokens:
-    def test_follows_last_evaluated_key_across_pages(self):
+    def test_follows_last_evaluated_key_across_pages(self, monkeypatch):
         key_1 = {KEY_USER_ID: {"S": IDENTITY_ID}, KEY_DEVICE_TOKEN: {"S": TOKEN_A}}
         key_2 = {KEY_USER_ID: {"S": IDENTITY_ID}, KEY_DEVICE_TOKEN: {"S": "device-token-zzz"}}
         dynamodb = _PagedDynamoDB(
@@ -237,9 +256,12 @@ class TestQueryDeviceTokens:
             ]
         )
 
-        tokens = notify_upload_complete._query_device_tokens(dynamodb, TABLE_NAME, IDENTITY_ID)
+        monkeypatch.setattr(db, "get_dynamodb_client", lambda: dynamodb)
+        monkeypatch.setattr(db, "get_table_name", lambda: TABLE_NAME)
 
-        assert tokens == [TOKEN_A, TOKEN_B]
+        tokens = db.query_device_tokens(IdentityId(IDENTITY_ID))
+
+        assert tokens == [DeviceToken(TOKEN_A), DeviceToken(TOKEN_B)]
         assert [request.get("ExclusiveStartKey") for request in dynamodb.requests] == [None, key_1, key_2]
         for request in dynamodb.requests:
             assert request["ExpressionAttributeValues"] == {":uid": {"S": IDENTITY_ID}}
