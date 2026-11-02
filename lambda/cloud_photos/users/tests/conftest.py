@@ -1,6 +1,3 @@
-import os
-
-
 import boto3
 import pytest
 from moto import mock_aws
@@ -14,13 +11,12 @@ REGION = "ap-northeast-1"
 
 
 @pytest.fixture
-def aws_resources():
+def aws_resources(monkeypatch):
+    monkeypatch.setenv("AWS_DEFAULT_REGION", REGION)
+    monkeypatch.setenv("S3_BUCKET_NAME", S3_BUCKET_NAME)
+    monkeypatch.setenv("UPLOAD_RECORDS_TABLE_NAME", UPLOAD_RECORDS_TABLE_NAME)
+    monkeypatch.setenv("DEVICE_TOKENS_TABLE_NAME", DEVICE_TOKENS_TABLE_NAME)
     with mock_aws():
-        os.environ["AWS_DEFAULT_REGION"] = REGION
-        os.environ["S3_BUCKET_NAME"] = S3_BUCKET_NAME
-        os.environ["UPLOAD_RECORDS_TABLE_NAME"] = UPLOAD_RECORDS_TABLE_NAME
-        os.environ["DEVICE_TOKENS_TABLE_NAME"] = DEVICE_TOKENS_TABLE_NAME
-
         s3 = boto3.client("s3", region_name=REGION)
         s3.create_bucket(
             Bucket=S3_BUCKET_NAME,
@@ -57,12 +53,11 @@ def aws_resources():
             BillingMode="PAY_PER_REQUEST",
         )
 
-        delete_user._reset_for_testing()
+        # Recreate the cached clients inside the moto mock.
+        delete_user.get_s3_client.cache_clear()
+        delete_user.get_dynamodb_client.cache_clear()
 
         yield {"s3": s3, "dynamodb": dynamodb}
 
-        delete_user._reset_for_testing()
-        del os.environ["S3_BUCKET_NAME"]
-        del os.environ["UPLOAD_RECORDS_TABLE_NAME"]
-        del os.environ["DEVICE_TOKENS_TABLE_NAME"]
-        del os.environ["AWS_DEFAULT_REGION"]
+        delete_user.get_s3_client.cache_clear()
+        delete_user.get_dynamodb_client.cache_clear()

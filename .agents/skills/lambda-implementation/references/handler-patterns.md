@@ -57,8 +57,7 @@ def handler(event: Mapping[str, Any], _context: object) -> dict[str, Any]:
 
 ステータスの規則と、現在の API ごとの未認証応答・成功時の応答は、[docs/lambda.md](../../../../docs/lambda.md) の API 応答の契約が正本です。ここには書き写しません。
 
-`HTTPStatus` を使う実装（`media_uploads` / `device_tokens` / `push_notification`）と、数値リテラルを使う実装
-（`users`）が混在します。新規実装は `HTTPStatus` を使います。
+ステータスは、どの関数群も `HTTPStatus` で書きます。数値リテラルを使いません。
 
 ## 冪等性
 
@@ -89,8 +88,10 @@ if not deleted:
 
 内部例外の詳細をレスポンス本文へ載せません。
 
-`delete_user.py` は S3、upload records、device tokens をそれぞれ独立の `try` で処理し、
-失敗したサブシステム名だけを集約して 500 を返します。片方の失敗で残りをスキップしません。
+`delete_user.py` は S3、upload records、device tokens をそれぞれ独立に（`_try_delete`）削除し、
+失敗したサブシステム名だけを集約して 500 を返します。片方の失敗で残りをスキップしないため、保存先ごとの削除は
+`except Exception` で記録して続けます。規約の「最も外側で、記録と理由のコメントがある場合」に当たります。
+環境変数は削除の前にすべて読み、欠けていれば何も削除せずに送出します。
 
 ## ログ
 

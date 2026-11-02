@@ -51,7 +51,7 @@ from cloud_photos.users import auth
 | `media_uploads` | `from cloud_photos.common.auth import ...` の re-export |
 | `device_tokens` | `from cloud_photos.common.auth import ...` の re-export |
 | `push_notification` | `from cloud_photos.common.auth import ...` の re-export |
-| `users` | 同等実装のコピー（`requestContext` / `identity` の None を明示的に処理） |
+| `users` | `from cloud_photos.common.auth import ...` の re-export |
 
 新規関数は `cloud_photos/common/auth.py` を re-export する形を採ります。コピーを増やしません。
 

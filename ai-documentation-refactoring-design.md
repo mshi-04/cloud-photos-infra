@@ -2,7 +2,7 @@
 
 - 作成日: 2026-10-30
 - 更新日: 2026-10-31。レビュー指摘の反映、コーディング規約の章の追加、型検査とlintの厳しさの決定、段階ごとの作業とブランチの追加、PRのレビュー指摘の反映、段階0の省略と段階1の実施、段階2の省略、段階3から段階5の実施
-- 状態: 段階1（契約と規約の確定）、段階3（Skillの再編）、段階4（Terraformのファイル分割）、段階5（Lambda基盤）を実施。段階0と段階2は行わない。段階6以降は未実施。
+- 状態: 段階1（契約と規約の確定）、段階3（Skillの再編）、段階4（Terraformのファイル分割）、段階5（Lambda基盤）、段階6（Lambdaの規約への移行）を実施。段階0と段階2は行わない。段階7以降は未実施。
 - 設計の起点: `develop` の `e4dfb2d`
 - 本設計書のブランチ: `feature/ai-documentation-refactoring`。各段階のブランチは第10.1節に記す
 
@@ -563,7 +563,8 @@ ZIPの階層とhandlerを同時に変えるため、適用の途中で短時間�
 - 2026-11-02に、段階6の最初の単位として`common`と`device_tokens`の移行を確認した。移行の前に、DynamoDBの失敗時に500を返し、ログにIdentity IDとデバイストークンを生のまま出さないことを、handlerのテストで固定した。移行後は、既存のhandlerのテストを期待値を変えずに含めて、`lambda/`での一括実行で229件（`device_tokens`は56件）がすべて成功した。第8.4節のruffの中間のルールを、`common`と`device_tokens`の本番コードとテストに当てて指摘は0件だった。既定のruff、`ruff format --check`、Pyright（`standard`）も指摘なしだった。4つのZIPから7つのhandlerを読み込めた。`boto3-stubs`は、加えると`users`の4件が指摘されるため、`users`の移行時に加える。
 - 2026-11-02に、段階6の2つ目の単位として`push_notification`の移行を確認した。`DeviceToken`と本文の解析を`common`へ移し、`device_tokens`と共有した。既存のhandlerのテストは、patchの対象と準備だけを変え、期待値を変えずに成功した。`lambda/`での一括実行で250件（`push_notification`は59件）がすべて成功し、第8.4節のruffの中間のルールを`common`、`device_tokens`、`push_notification`に当てて指摘は0件だった。既定のruff、`ruff format --check`、Pyright（`standard`）も指摘なしで、4つのZIPから7つのhandlerを読み込めた。
 - 2026-11-02に、段階6の3つ目の単位として`media_uploads`の移行を確認した。メディアID、保存パス、メディア種別、ファイルサイズ、件数の上限、ページング位置を値オブジェクトにし、保存パスの所有者確認を`CloudStoragePath.belongs_to`へ、継続キーの所有者確認を`PageCursor.parse`へ移した。`AuthorizationError`は`common`へ移した。既存のhandlerのテストは期待値を変えずに成功した。応答メッセージと検証の順序は保った。AWS呼び出しの失敗だけを500にし、`TABLE_NAME`の欠落など想定外の例外は送出するテストを加えた。DynamoDBの数値の範囲を超える`fileSize`と、深くネストした`lastEvaluatedKey`は400にした。`lambda/`での一括実行で325件（`media_uploads`は170件）がすべて成功し、第8.4節のruffの中間のルールを`common`、`media_uploads`、`device_tokens`、`push_notification`に当てて指摘は0件だった。既定のruff、`ruff format --check`、Pyright（`standard`）も指摘なしで、4つのZIPから7つのhandlerを読み込めた。
-- 段階1、段階3、段階4、段階5の変更は実装済み。段階2は行わない。段階3の作業3のうち、Infra Skillのアドレス変更の手順を`moved`ブロック優先にする変更は、新しいコーディング規約との矛盾を避けるため段階1で実施した。段階6は`common`、`device_tokens`、`push_notification`、`media_uploads`まで実装し、残りの関数群と段階7以降のコード・Skill・CIの変更は未実装。設計書を作成したことと、提案した変更を検証したことを区別する。
+- 2026-11-02に、段階6の最後の単位として`users`の移行を確認した。`auth.py`を`IdentityId`のre-exportにし、`delete_user.py`のクライアントのキャッシュを`functools.cache`に、ステータスを`HTTPStatus`にした。保存先ごとの削除は、1つの失敗で残りを止めないため、`except Exception`で記録して続ける形を保った。環境変数は削除の前にすべて読むようにし、欠けている場合は何も削除せずに送出する。既存のhandlerのテストは、パッチの対象と引数の準備だけを変え、期待値を変えずに成功した。`boto3-stubs`（DynamoDB・S3・Secrets Manager用）を開発用の依存に加えると、Pyrightの指摘は第8.4節の見込みの4件ではなく13件だった。内訳は、`delete_user.py`で省略可能なキーを直接参照している4件、移行済みの関数群でクライアントの戻り値を`BaseClient`と注釈していたために操作が見つからない8件、`push_notification/db.py`で省略可能なキーを直接参照している1件である。クライアントの戻り値を型スタブの型にし、省略可能なキーは`get`で読むようにして、すべて直した。第8.4節のruffの中間のルールを`pyproject.toml`で有効にし、`lambda/`と`scripts/`で指摘は0件だった。`lambda/`での一括実行で331件（`users`は44件）がすべて成功し、`ruff format --check`とPyright（`standard`）も指摘なしで、4つのZIPから7つのhandlerを読み込めた。
+- 段階1、段階3、段階4、段階5、段階6の変更は実装済み。段階2は行わない。段階3の作業3のうち、Infra Skillのアドレス変更の手順を`moved`ブロック優先にする変更は、新しいコーディング規約との矛盾を避けるため段階1で実施した。段階7以降のコード・Skill・CIの変更は未実装。設計書を作成したことと、提案した変更を検証したことを区別する。
 
 ## 13. 外部仕様の確認先
 

@@ -5,8 +5,18 @@ src = ["lambda"]
 
 [tool.ruff.lint]
 # Pin the rule set explicitly so that ruff upgrades do not change it.
-# These are ruff's former default rules.
-select = ["E4", "E7", "E9", "F"]
+# E4, E7, E9 and F are ruff's former default rules; the rest are the conventions in docs/coding_standards.md.
+select = [
+    "E4", "E7", "E9", "F",
+    "I", "N", "UP", "B", "SIM", "RET", "C4", "C90", "ANN", "BLE", "G", "LOG",
+    "TRY400", "PLC0415", "PLW0603", "PLR2004", "PT", "RUF",
+]
+# Any is allowed at the boundary of Lambda events and responses.
+ignore = ["ANN401"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests do not need type annotations, and literal expected values are clearer than named constants.
+"**/tests/**" = ["ANN", "PLR2004"]
 
 [tool.pyright]
 include = ["lambda", "scripts"]

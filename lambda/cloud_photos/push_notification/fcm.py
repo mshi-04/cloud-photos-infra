@@ -1,21 +1,24 @@
 import functools
 import json
 import os
-from typing import Final
+from typing import TYPE_CHECKING, Final
 
 import boto3
 import firebase_admin
-from botocore.client import BaseClient
 from firebase_admin import credentials, messaging
 
 from cloud_photos.common.device_token import DeviceToken
 from cloud_photos.push_notification.models import SuccessCount
 
+if TYPE_CHECKING:
+    # The stubs are a development dependency; the Lambda runtime never imports them.
+    from mypy_boto3_secretsmanager import SecretsManagerClient
+
 NOTIFICATION_TITLE: Final = "アップロード完了"
 
 
 @functools.cache
-def get_secretsmanager_client() -> BaseClient:
+def get_secretsmanager_client() -> "SecretsManagerClient":
     return boto3.client("secretsmanager")
 
 

@@ -75,7 +75,7 @@ def dynamodb_table(monkeypatch):
 環境変数は `monkeypatch.setenv` で設定し、テストの終了時に元へ戻します。
 値オブジェクト（`models.py`）は、AWS のモックを使わずに `test_models.py` で直接テストします。
 
-`db.py` を持たない移行前の関数（`users/delete_user.py`）は、そのモジュールの `_reset_for_testing()` を呼びます。
+`db.py` を持たない `users/delete_user.py` は、そのモジュールの `get_s3_client.cache_clear()` と `get_dynamodb_client.cache_clear()` を呼びます。
 
 ## conftest（S3 + 複数テーブル）
 
@@ -147,7 +147,7 @@ class TestCreateUploadRecord:
 | 不正 JSON・型不正・列挙外 | 400 |
 | 対象なし（条件式失敗） | 404 |
 | AWS 呼び出し失敗 | 500 |
-| 想定外の例外（環境変数の欠落など） | 規約に移行した関数群では handler から送出される（`pytest.raises`） |
+| 想定外の例外（環境変数の欠落など） | handler から送出される（`pytest.raises`）。`delete_user` は、保存先ごとの削除の中の例外を 500 にする |
 | 冪等性（二重実行） | `create_upload_record` は 200 skipped |
 
 AWS 失敗は、moto のテーブルを削除するか、`unittest.mock` の `side_effect` でクライアントメソッドを差し替えて再現します。

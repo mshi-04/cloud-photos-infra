@@ -1,10 +1,11 @@
 import json
-from typing import Any, Dict
+from collections.abc import Callable
+from typing import Any, Final
 
-JSON_HEADERS = {"Content-Type": "application/json"}
+JSON_HEADERS: Final = {"Content-Type": "application/json"}
 
 
-def success(status_code: int, body: Any, default: Any = str) -> Dict[str, Any]:
+def success(status_code: int, body: Any, default: Callable[[Any], Any] = str) -> dict[str, Any]:
     return {
         "statusCode": status_code,
         "headers": JSON_HEADERS,
@@ -12,7 +13,7 @@ def success(status_code: int, body: Any, default: Any = str) -> Dict[str, Any]:
     }
 
 
-def error(status_code: int, message: str) -> Dict[str, Any]:
+def error(status_code: int, message: str) -> dict[str, Any]:
     return {
         "statusCode": status_code,
         "headers": JSON_HEADERS,

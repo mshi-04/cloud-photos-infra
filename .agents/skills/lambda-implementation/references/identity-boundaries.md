@@ -16,10 +16,9 @@
 `IdentityId`、`get_identity_id`、`mask_identity` の正本は [lambda/cloud_photos/common/auth.py](../../../../lambda/cloud_photos/common/auth.py) です。
 `IdentityId` は Identity ID の値オブジェクトで、`from_event` で event から生成し、`str()` と `repr()` では伏せ字になります。生の値は `.value` で、AWS を呼び出す直前にだけ取り出します。
 
-`media_uploads/auth.py`、`device_tokens/auth.py`、`push_notification/auth.py` は `IdentityId` を re-export します。
-`users/auth.py` は同等実装のコピーです。新規は re-export に揃えます。
+各関数群の `auth.py`（`media_uploads`、`device_tokens`、`push_notification`、`users`）は `IdentityId` を re-export します。新しい関数群も re-export にし、コピーを作りません。
 
-`requestContext`、`identity`、`cognitoIdentityId` の欠落・null・想定外の型は、例外にせず `None` を返します。handler は `None` を未認証として扱います。コピーを直す場合は、正本と同じ扱いにしてください。
+`requestContext`、`identity`、`cognitoIdentityId` の欠落・null・想定外の型は、例外にせず `None` を返します。handler は `None` を未認証として扱います。
 
 ## 境界チェックの実装
 
