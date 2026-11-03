@@ -14,6 +14,8 @@ on:
       - 'bootstrap/**'
       - '.github/workflows/**'
       - '.terraform-version'
+      - '.tflint.hcl'
+      - 'pyproject.toml'
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -147,6 +149,9 @@ jobs:
   tflint:
     name: "Terraform Lint"
     runs-on: ubuntu-latest
+    # The job runs a third-party action and needs only to read the repository.
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 

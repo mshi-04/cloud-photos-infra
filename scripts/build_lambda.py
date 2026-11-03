@@ -190,13 +190,14 @@ def build_layer(name: str, installed_dir: Path, output_dir: Path) -> Path:
 
 
 def parse_layer_dirs(values: list[str]) -> dict[str, Path]:
+    known = layer_names()
     layers = {}
     for value in values:
         name, separator, path = value.partition("=")
         if not separator or not name or not path:
             raise SystemExit(f"--layer-from must be LAYER=DIR, got {value!r}")
-        if name not in layer_names():
-            raise SystemExit(f"Unknown layer {name!r}; layers are {', '.join(layer_names())}")
+        if name not in known:
+            raise SystemExit(f"Unknown layer {name!r}; layers are {', '.join(known)}")
         layers[name] = Path(path).resolve()
     return layers
 
@@ -231,13 +232,22 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Built {display_path(build_group(group, output_dir))}")
 
     layer_dirs = parse_layer_dirs(args.layer_from)
+    # Directories installed here are removed once packed, so that only the ZIPs stay in the output
+    # directory. CD uploads the whole output directory with the plan.
+    install_root = output_dir / "layers"
+    installed_here: set[str] = set()
     if args.with_layers:
         for name in layer_names():
             if name not in layer_dirs:
-                layer_dirs[name] = output_dir / "layers" / name
+                layer_dirs[name] = install_root / name
                 install_layer(name, layer_dirs[name])
+                installed_here.add(name)
     for name, installed_dir in sorted(layer_dirs.items()):
         print(f"Built {display_path(build_layer(name, installed_dir, output_dir))}")
+        if name in installed_here:
+            shutil.rmtree(installed_dir)
+    if install_root.is_dir() and not any(install_root.iterdir()):
+        install_root.rmdir()
     return 0
 
 
