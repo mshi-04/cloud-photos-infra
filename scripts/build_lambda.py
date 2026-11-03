@@ -235,6 +235,7 @@ def main(argv: list[str] | None = None) -> int:
     # Directories installed here are removed once packed, so that only the ZIPs stay in the output
     # directory. CD uploads the whole output directory with the plan.
     install_root = output_dir / "layers"
+    install_root_existed = install_root.exists() or install_root.is_symlink()
     installed_here: set[str] = set()
     if args.with_layers:
         for name in layer_names():
@@ -246,8 +247,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Built {display_path(build_layer(name, installed_dir, output_dir))}")
         if name in installed_here:
             shutil.rmtree(installed_dir)
-    # Remove the parent only when this run installed into it. A symlink is left as it is.
-    if installed_here and not install_root.is_symlink() and not any(install_root.iterdir()):
+    # Remove the parent only when this run created it. An existing directory or symlink is left as it is.
+    if installed_here and not install_root_existed and not any(install_root.iterdir()):
         install_root.rmdir()
     return 0
 
