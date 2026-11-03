@@ -83,6 +83,7 @@ docs/               Implementation, verification, security, and operational guid
 - Python `3.12`
 - Docker for building the Firebase Admin Lambda Layer
 - Ruff, Pyright, and pytest, installed from [lambda/requirements-dev.txt](lambda/requirements-dev.txt). Ruff and Pyright are pinned to the same versions as CI; pytest uses the compatible-release specifier `~=8.0`
+- TFLint `v0.58.0` for checking the Terraform conventions, at the same version as CI
 - Optional: Trivy for IaC security scans
 - AWS permissions equivalent to the target environment's `gh-terraform-plan-<env>` role and the state bucket name, only when running `terraform plan`. In addition to resource read access, planning requires KMS decryption and S3 lockfile read/write permissions
 
@@ -101,6 +102,8 @@ python -m pip install -r lambda/requirements-dev.txt
 
 ```powershell
 terraform fmt -check -recursive
+tflint --recursive --config "$PWD/.tflint.hcl"
+python scripts/check_api_deployment_inputs.py
 ruff check lambda/ scripts/
 ruff format --check lambda/ scripts/
 pyright
@@ -112,23 +115,19 @@ trivy conf .
 
 Run pytest once from `lambda/` to test everything. To run one function group, use `pytest cloud_photos/<function_group>/tests/`. `pyright` checks types using the dependencies in the activated virtual environment.
 
-Terraform `validate` and `plan` require backend initialization, and the Lambda ZIPs and `firebase_admin_layer.zip` in `.build/`. Build the Lambda ZIPs from the repository root with the script below. CI and CD use the same script.
+Terraform `validate` and `plan` require backend initialization, and the Lambda ZIPs and `firebase_admin_layer.zip` in `.build/`. Both are built by `scripts/build_lambda.py`, and CI and CD use the same script. Run the following from the repository root to build only the ZIP of each function group.
 
 ```powershell
 python scripts/build_lambda.py
 ```
 
-Build the layer from the repository root with the same AWS SAM Python 3.12 image used by CI.
+To build every ZIP that Terraform needs, add `--with-layers` to build the layer ZIP as well. As in CI and CD, the dependencies are installed with the AWS SAM Python 3.12 build image pinned by tag and digest, so Docker is required. The same dependency definitions always give a ZIP with the same hash.
 
 ```powershell
-New-Item -ItemType Directory -Force .build | Out-Null
-$repositoryRoot = (Get-Location).Path
-docker run --rm `
-  --mount "type=bind,source=$repositoryRoot\.build,target=/out" `
-  --mount "type=bind,source=$repositoryRoot\lambda\layers\firebase_admin,target=/requirements,readonly" `
-  public.ecr.aws/sam/build-python3.12:latest-x86_64 `
-  bash -c "pip install -r /requirements/requirements.txt -t /tmp/python --quiet && cd /tmp && zip -r9 /out/firebase_admin_layer.zip python"
+python scripts/build_lambda.py --with-layers
 ```
+
+If Docker is not available, see [docs/commands.md](docs/commands.md).
 
 To check that every handler imports from the ZIPs, run the following. boto3 is loaded from outside the ZIPs, as in the Lambda runtime; install it outside `.build/`.
 
@@ -155,9 +154,9 @@ If a state lock is encountered, do not bypass it with `-lock=false` or `terrafor
 
 When relevant paths change in a pull request targeting `main` or `develop`, CI runs:
 
-- Terraform formatting checks
+- Terraform formatting checks, tflint, and the check of the API redeployment inputs
 - Ruff lint and formatting checks, and Pyright type checks
-- Lambda unit tests
+- Lambda unit tests, and a check that building the ZIPs (including the layer) twice gives the same hashes
 - Trivy IaC scanning with SARIF upload
 - `terraform validate` and `terraform plan` for dev and prod
 - Sanitized Terraform plan comments on the pull request

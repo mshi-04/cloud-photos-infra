@@ -43,7 +43,7 @@ API 応答のステータスと本文の形式は、[docs/lambda.md](../../../do
 
 ## 検証手順
 
-リポジトリルートで lint、整形、型検査を実行し、`lambda/` で関数群ごとにテストする。
+リポジトリルートで lint、整形、型検査を実行し、`lambda/` で関数群ごとにテストする。ツールは、[docs/commands.md](../../../docs/commands.md) の手順で `lambda/requirements-dev.txt` を入れた仮想環境から実行する。ruff と Pyright の版は CI と揃えてあり、Pyright と pytest はその環境の boto3 などの依存を使う。別の場所に入っている ruff、pyright、pytest は使わない。
 
 ```powershell
 ruff check lambda/

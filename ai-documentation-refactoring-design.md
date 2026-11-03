@@ -1,8 +1,8 @@
 # AI文書・開発基盤リファクタリング設計
 
 - 作成日: 2026-10-30
-- 更新日: 2026-10-31。レビュー指摘の反映、コーディング規約の章の追加、型検査とlintの厳しさの決定、段階ごとの作業とブランチの追加、PRのレビュー指摘の反映、段階0の省略と段階1の実施、段階2の省略、段階3から段階5の実施
-- 状態: 段階1（契約と規約の確定）、段階3（Skillの再編）、段階4（Terraformのファイル分割）、段階5（Lambda基盤）、段階6（Lambdaの規約への移行）、段階7（Terraformの改善）を実施。段階0と段階2は行わない。段階8は未実施。
+- 更新日: 2026-11-03。レビュー指摘の反映、コーディング規約の章の追加、型検査とlintの厳しさの決定、段階ごとの作業とブランチの追加、PRのレビュー指摘の反映、段階0の省略と段階1の実施、段階2の省略、段階3から段階8の実施
+- 状態: 段階1（契約と規約の確定）、段階3（Skillの再編）、段階4（Terraformのファイル分割）、段階5（Lambda基盤）、段階6（Lambdaの規約への移行）、段階7（Terraformの改善）、段階8（Skill選択の評価）を実施。段階0と段階2は行わない。
 - 設計の起点: `develop` の `e4dfb2d`
 - 本設計書のブランチ: `feature/ai-documentation-refactoring`。各段階のブランチは第10.1節に記す
 
@@ -567,10 +567,34 @@ ZIPの階層とhandlerを同時に変えるため、適用の途中で短時間�
 - 2026-11-02に段階7を確認した。AWSを動かしていないため、Terraformのplanとapplyは実行していない。
   - 更新判定: `media_api`のmethod、integration、method response、integration response、Gateway Responseを`locals`の一覧に集め、第7.2節の表の属性とidから`triggers.redeployment`を作るようにした。一覧に入っていないリソースを検出する`scripts/check_api_deployment_inputs.py`を加え、CIで実行する。method 12、integration 12、method response 5、integration response 5、Gateway Response 2がすべて含まれることを確かめ、1つを外すと失敗することも確かめた。適用時にはdeploymentが1回置き換えられる。
   - 実行可能ARN: 業務APIのメソッドとパスを`local.api_routes`にまとめ、methodの`http_method`、permissionの`source_arn`、出力の`api_execution_arns`をそこから導出した。値と出力の順序は変えていない。
-  - レイヤー: `scripts/build_lambda.py`に、固定したSAMイメージ（`1.170.0-x86_64`のタグとダイジェスト）で依存を入れる`--with-layers`と、入れ済みのディレクトリを使う`--layer-from`を加え、CIとCDの`docker run`の重複をなくした。依存はバイトコードにせず、ZIPの時刻と権限を固定する。`firebase-admin`の依存36個をすべてバージョン固定し、`requirements-dev.txt`はこのファイルを読み込むようにした。Dependabotのpipの対象を`/lambda`に直した。レビュー環境では別々に2回`pip install --target`してZIPにし、4つのLambdaのZIPとレイヤーのZIPのハッシュが一致した。SAMイメージでのビルドは、Dockerがないため実行していない。
+  - レイヤー: `scripts/build_lambda.py`に、固定したSAMイメージ（`1.170.0-x86_64`のタグとダイジェスト）で依存を入れる`--with-layers`と、入れ済みのディレクトリを使う`--layer-from`を加え、CIとCDの`docker run`の重複をなくした。依存はバイトコードにせず、ZIPの時刻と権限を固定する。`firebase-admin`とその依存34個（計35行）をすべてバージョン固定し、`requirements-dev.txt`はこのファイルを読み込むようにした。Dependabotのpipの対象を`/lambda`に直した。レビュー環境では別々に2回`pip install --target`してZIPにし、4つのLambdaのZIPとレイヤーのZIPのハッシュが一致した。SAMイメージでのビルドは、Dockerがないため実行していない。
   - モジュール: 7つのモジュールに`versions.tf`を置き、`media_api`の使われていないdata source 2つと、`cognito`のコメントアウトしたコードを削除した。tflintの指摘に合わせ、`bootstrap`の`terraform`・`provider`・dataを`main.tf`へ、出力を説明付きで`outputs.tf`へ移し、`envs/*`と`bootstrap`に空の`variables.tf`を置いた。いずれもリソースのアドレスは変えていない。
   - tflint: v0.58.0の同梱ルールセットで設定を置き、CIに加えた。初回の指摘22件はすべて直し、0件になった。`terraform fmt -check`と、3つのルートモジュールの`terraform validate`（`init -backend=false`）も成功した。
-- 段階1、段階3、段階4、段階5、段階6、段階7の変更は実装済み。段階2は行わない。段階3の作業3のうち、Infra Skillのアドレス変更の手順を`moved`ブロック優先にする変更は、新しいコーディング規約との矛盾を避けるため段階1で実施した。段階8は未実施。設計書を作成したことと、提案した変更を検証したことを区別する。
+- 2026-11-03に段階8を行った。静的検証と実行評価を分けて記す。
+  - 静的検証: `.claude/skills`と`.agents/skills`が同じ内容であることを`diff -r`で、Skill・入口・`docs/`の33文書にある相対リンク226件の参照先がすべてあることを確かめた。3つのSkillの`name`がディレクトリ名と一致し、`AGENTS.md`と`CLAUDE.md`の両方から参照されていること、削除した`auth-implementation`・`db-implementation`・`test-implementation`を参照する文書が本設計書のほかにないことも確かめた。
+  - 実行評価の方法: 第5章の依頼例6件を具体的な依頼文にし、文脈を引き継がない別々のサブエージェント（Claude Code）に1件ずつ依頼した。各エージェントは`develop`の`27e72f0`から作った別々の作業コピーで作業し、コミットとプッシュはしない。選んだSkill、読んだ資料、実行した検証は、エージェントの報告をツール呼び出しの記録と照らして確かめた。各依頼は1回ずつ行った。
+  - 最初の実行は無効にした。自動で作られた作業コピーが`develop`ではなく古い既定ブランチ（`da35d89`、段階3より前の6つのSkillが残る）から作られていたためである。
+  - 作業コピーの外のファイルを読まないよう依頼文で指示したため、Skillツールが本体の作業ディレクトリから読み込むことを避けて、A〜Dの4件は作業コピーの`SKILL.md`を直接読んだ。Skillツールで読み込んだのはEの1件である。どの依頼でも、最初に読んだSkillは期待と一致した。
+
+| 依頼例（第5章） | 依頼文 | 期待 | 選ばれたSkillと読んだ資料 | 実行された検証 | 判定 |
+|---|---|---|---|---|---|
+| A. アップロードAPIを追加する | アップロード記録を1件取得するAPI（`GET /media/uploads/{mediaId}`）を追加する | Lambda。Terraform配線ではInfraも使う | LambdaとInfra。Lambdaの参考資料5つ、`media-api-wiring.md`、`guardrails.md`。Lambda側を実装し、新しいロールに`GetItem`を付ける配線は、IAMの拡張として方針を示して止まった | ruff、Pyright、pytest（347件）、ZIPのビルドとhandlerの読み込みが成功。Terraformは変更していないため未実行 | 期待どおり |
+| B. 他人のページングキーを拒否する | `GET /media/uploads`で、他のユーザーの`lastEvaluatedKey`を拒否する | Lambda。所有者境界の資料 | Lambda。`identity-boundaries.md`、`handler-patterns.md`。`PageCursor.parse`で403を返すことを確かめ、変更しなかった | ruff、Pyright、pytest（331件）が成功 | 期待どおり |
+| C. 通知処理の不足テストを追加する | `notify_upload_complete`で足りないテストを追加する | Lambdaのテストだけの作業。fixture資料 | Lambda。`pytest-fixtures.md`、`docs/testing.md`。テストを14件追加し、handlerを一時的に壊して失敗することを確かめた | ruff、Pyright、pytest（345件）が成功 | 期待どおり |
+| D. DynamoDB削除保護を変更する | devのDynamoDBテーブルの削除保護を有効にする | Infra。環境差 | Infra。`env-matrix.md`、`guardrails.md`。置換や権限の拡張がないことを確かめて変更し、変数の説明、`env-matrix.md`、README、DynamoDBの資料も更新した | `terraform fmt -check`、tflint、devとprodの`validate`が成功。planは認証情報がなく、trivyは未導入のため未実行 | 期待どおり |
+| E. ブランチをレビューする | PR #70の変更をレビューする（マージ前の`develop`は`fb2199a`） | Review | Review。`review-checklist.md`、`docs/`の契約と規約。比較対象をマージコミットの親から確かめ、Criticalなし、Suggestion 6件、Nitpick 4件を根拠付きで報告した | fmt、tflint、validate、更新判定の確認、ruff、Pyright、pytest、ZIPの再現性が成功。`--with-layers`はDockerがなく、planは認証情報がなく、trivyは未導入のため未実行 | 期待どおり |
+| F. 設計書の文言だけを修正する | 第1章の最後の段落を現状に合わせる | 実装Skillは使わない。文書の検証 | Skillなし。第5章の表を理由に挙げた。`docs/verification_policy.md`、`docs/coding_standards.md` | 参照先の章があること、変更が1行だけであることを確かめた | 期待どおり |
+
+  - Skillの修正: Skillの選択は6件とも期待どおりだったため、選択のための修正はしていない。Lambdaの作業をしたA〜Cでは、3件とも最初に作業コピーの外にあるruff・Pyright・pytestを実行し、依存がないためにPyrightとpytestが失敗した。その後、`docs/commands.md`の手順で仮想環境を作って実行し直した。評価の環境のメモでこれらのツールがPATHにあると伝えたことも一因だが、版がCIと異なるruffを使うおそれもあるため、Lambda Skillの検証手順に、`lambda/requirements-dev.txt`を入れた仮想環境から実行することを書き加えた。
+  - 未実施: Codex（`AGENTS.md`と`.agents/skills`）での実行評価は行っていない。依頼例ごとの複数回の実行と、Skillツールでの読み込みをA〜Dで確かめることも行っていない。
+  - Eのレビューで見つかった段階7の残件のうち、次を本段階で直した。
+    - `README.en.md`のレイヤーの手順が、固定していないイメージで`docker run`する古いままだったため、`README.md`と同じく`--with-layers`の手順にし、tflint、更新判定の確認、CIの説明も揃えた。
+    - `--with-layers`で依存を入れたディレクトリが`.build/layers/`に残り、CDがplanと一緒に成果物として上げていたため、レイヤーのZIPを作った後に削除するようにした。`--layer-from`で渡したディレクトリは消さない。依存の代わりにファイルを書くだけの`docker`で、ZIPだけが残ることと、`--layer-from`のディレクトリが残ることを確かめた。
+    - CIの対象パスに`.tflint.hcl`と`pyproject.toml`がなく、tflintやruff・Pyrightの設定だけを変えるPRでCIが動かなかったため、加えた。
+    - 新しく加えた`tflint`ジョブが、ワークフロー全体の`id-token: write`などの権限のままサードパーティのアクションを動かしていたため、ジョブの権限を`contents: read`に絞った。
+    - 本章の記録の`firebase-admin`の依存の数の誤りを直した。
+  - 次は直していない。レイヤーに`.pyc`がないことによるコールドスタートへの影響は、AWSを動かしておらず測れないため、測ってから判断する。レイヤーの依存にハッシュを付けることは、`requirements-dev.txt`が`-r`で読み込むため、ハッシュの検査が開発用の依存すべてに及ぶので見送った。Dependabotのpipの対象の重複は、どちらも`open-pull-requests-limit: 0`でPRを作らないため、そのままにした。
+- 段階1、段階3、段階4、段階5、段階6、段階7、段階8の変更は実装済み。段階2は行わない。段階3の作業3のうち、Infra Skillのアドレス変更の手順を`moved`ブロック優先にする変更は、新しいコーディング規約との矛盾を避けるため段階1で実施した。設計書を作成したことと、提案した変更を検証したことを区別する。
 
 ## 13. 外部仕様の確認先
 
