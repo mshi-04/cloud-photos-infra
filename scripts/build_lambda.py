@@ -246,7 +246,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Built {display_path(build_layer(name, installed_dir, output_dir))}")
         if name in installed_here:
             shutil.rmtree(installed_dir)
-    if install_root.is_dir() and not any(install_root.iterdir()):
+    # Remove the parent only when this run installed into it. A symlink is left as it is.
+    if installed_here and not install_root.is_symlink() and not any(install_root.iterdir()):
         install_root.rmdir()
     return 0
 
