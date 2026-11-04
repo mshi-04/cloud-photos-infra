@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from cloud_photos.media_uploads.db import _convert_decimals, deserialize_item, serialize_item
+from cloud_photos.common.dynamodb import _convert_decimals, deserialize_item, serialize_item
 
 
 class TestSerializeItem:

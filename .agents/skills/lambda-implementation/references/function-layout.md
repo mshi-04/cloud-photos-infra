@@ -17,6 +17,9 @@ lambda/
       masking.py                 MASK / FULLY_MASKED_MAX_LENGTH
       errors.py                  ValidationError / AuthorizationError
       device_token.py            DeviceToken（device_tokens と push_notification で共有）
+      dynamodb.py                serialize_item / deserialize_item（Decimal の変換を含む）
+      tables.py                  FIELD_USER_ID / FIELD_MEDIA_ID / FIELD_DEVICE_TOKEN
+      storage.py                 PRIVATE_PATH_PREFIX
       request.py                 parse_body（本文の JSON オブジェクトを取り出す）
       tests/                     共通処理の単体テスト
     media_uploads/
@@ -47,12 +50,15 @@ from cloud_photos.common.auth import IdentityId
 from cloud_photos.common.response import error, success
 ```
 
-## 共通の認証・応答
+## 共通の認証・応答・契約
 
 すべての関数群で `IdentityId` を `cloud_photos.common.auth` から直接 import します。関数群ごとの `auth.py` や再エクスポートは作りません。
 
 応答は `cloud_photos.common.response` の `success(status, body=None)` と `error(status, message)` を使います。
 `success` は `body` が `None` なら空文字列を返し、204 の本文なし応答に使えます。本文があれば JSON 化し、JSON にできない値は `str` で文字列にします。
+
+テーブルのキー属性名は `common.tables`、保存パスのプレフィックスは `common.storage`、DynamoDB の値の変換は `common.dynamodb` に置きます。
+関数群の `constants.py` には、その関数群だけが使う項目名や上限を残します。`common` から関数群のモジュールは import しません。
 
 ## ZIP のビルドと Terraform の配線
 

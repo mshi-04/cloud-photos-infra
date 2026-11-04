@@ -4,24 +4,21 @@ import time
 from typing import TYPE_CHECKING, Any
 
 import boto3
-from boto3.dynamodb.types import TypeSerializer
 
 from cloud_photos.common.auth import IdentityId
 from cloud_photos.common.device_token import DeviceToken
+from cloud_photos.common.dynamodb import serialize_item
+from cloud_photos.common.tables import FIELD_DEVICE_TOKEN, FIELD_USER_ID
 from cloud_photos.device_tokens.constants import (
-    FIELD_DEVICE_TOKEN,
     FIELD_PLATFORM,
     FIELD_REGISTERED_AT,
     FIELD_UPDATED_AT,
-    FIELD_USER_ID,
 )
 from cloud_photos.device_tokens.models import Platform
 
 if TYPE_CHECKING:
     # The stubs are a development dependency; the Lambda runtime never imports them.
     from mypy_boto3_dynamodb import DynamoDBClient
-
-_serializer = TypeSerializer()
 
 
 @functools.cache
@@ -32,10 +29,6 @@ def get_dynamodb_client() -> "DynamoDBClient":
 @functools.cache
 def get_table_name() -> str:
     return os.environ["TABLE_NAME"]
-
-
-def serialize_item(item: dict[str, Any]) -> dict[str, Any]:
-    return {k: _serializer.serialize(v) for k, v in item.items()}
 
 
 def _key(identity_id: IdentityId, device_token: DeviceToken) -> dict[str, Any]:

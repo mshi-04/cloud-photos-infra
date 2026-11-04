@@ -36,6 +36,7 @@ handler、`db.py`、`models.py`、テストのすべてで `IdentityId` を `clo
 
 所有者の判定は、保存パスの値オブジェクト `CloudStoragePath` が持ちます。handler は判定を呼び、結果を 403 に変換します。
 保存パスには Identity ID が含まれるため、`CloudStoragePath` は `str()` と `repr()` で伏せ字になります。
+`PRIVATE_PATH_PREFIX` は `cloud_photos.common.storage` から import し、所有者確認や S3 操作の直前にパスを組み立てます。`IdentityId` に S3 のパス規則を持たせません。
 
 ```python
 def belongs_to(self, identity_id: IdentityId) -> bool:

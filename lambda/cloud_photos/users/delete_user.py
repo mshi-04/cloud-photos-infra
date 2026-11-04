@@ -12,15 +12,14 @@ from typing import TYPE_CHECKING, Any
 import boto3
 
 from cloud_photos.common.auth import IdentityId
+from cloud_photos.common.dynamodb import serialize_item
 from cloud_photos.common.response import error, success
+from cloud_photos.common.storage import PRIVATE_PATH_PREFIX
+from cloud_photos.common.tables import FIELD_DEVICE_TOKEN, FIELD_MEDIA_ID, FIELD_USER_ID
 from cloud_photos.users.constants import (
     BATCH_WRITE_BASE_WAIT_SECONDS,
     DYNAMODB_BATCH_WRITE_SIZE,
-    FIELD_DEVICE_TOKEN,
-    FIELD_MEDIA_ID,
-    FIELD_USER_ID,
     MAX_BATCH_WRITE_RETRIES,
-    PRIVATE_PATH_PREFIX,
     S3_DELETE_BATCH_SIZE,
     SUBSYSTEM_DEVICE_TOKENS,
     SUBSYSTEM_S3,
@@ -132,7 +131,7 @@ def _delete_dynamodb_records(table_name: str, identity_id: IdentityId, sort_key_
     params: dict[str, Any] = {
         "TableName": table_name,
         "KeyConditionExpression": f"{FIELD_USER_ID} = :uid",
-        "ExpressionAttributeValues": {":uid": {"S": identity_id.value}},
+        "ExpressionAttributeValues": serialize_item({":uid": identity_id.value}),
         "ProjectionExpression": f"{FIELD_USER_ID}, {sort_key_name}",
     }
     while True:
