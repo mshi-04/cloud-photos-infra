@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 from typing import Final, Self
 
-from cloud_photos.common.auth import FULLY_MASKED_MAX_LENGTH, MASK
 from cloud_photos.common.errors import ValidationError
+from cloud_photos.common.masking import FULLY_MASKED_MAX_LENGTH, MASK
 
 DEVICE_TOKEN_REQUIRED: Final = "deviceToken is required"
 

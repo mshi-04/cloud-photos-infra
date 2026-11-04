@@ -5,9 +5,9 @@ from typing import Any
 
 from botocore.exceptions import BotoCoreError, ClientError
 
+from cloud_photos.common.auth import IdentityId
 from cloud_photos.common.errors import ValidationError
 from cloud_photos.common.request import parse_body
-from cloud_photos.device_tokens.auth import IdentityId
 from cloud_photos.device_tokens.db import delete_device_token
 from cloud_photos.device_tokens.models import UnregisterDeviceTokenRequest
 from cloud_photos.device_tokens.response import error, success

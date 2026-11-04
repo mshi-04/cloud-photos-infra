@@ -6,10 +6,10 @@ from typing import Any
 from botocore.exceptions import BotoCoreError, ClientError
 from firebase_admin import messaging
 
+from cloud_photos.common.auth import IdentityId
 from cloud_photos.common.device_token import DeviceToken
 from cloud_photos.common.errors import ValidationError
 from cloud_photos.common.request import parse_body
-from cloud_photos.push_notification.auth import IdentityId
 from cloud_photos.push_notification.constants import FIELD_SUCCESS_COUNT
 from cloud_photos.push_notification.db import delete_device_token, query_device_tokens
 from cloud_photos.push_notification.fcm import build_upload_complete_notification, get_firebase_app, send_notification

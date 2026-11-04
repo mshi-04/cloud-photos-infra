@@ -4,8 +4,9 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Self
 
-from cloud_photos.common.auth import MASK, IdentityId
+from cloud_photos.common.auth import IdentityId
 from cloud_photos.common.errors import AuthorizationError, ValidationError
+from cloud_photos.common.masking import MASK
 from cloud_photos.media_uploads.constants import (
     DEFAULT_LIMIT,
     FIELD_CLOUD_STORAGE_PATH,

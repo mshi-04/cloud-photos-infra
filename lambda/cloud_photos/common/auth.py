@@ -1,15 +1,12 @@
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Final, Self
+from typing import Any, Self
 
+from cloud_photos.common import masking
 from cloud_photos.common.errors import ValidationError
 
-# Values up to this length are masked entirely, so that no part of a short value is logged.
-FULLY_MASKED_MAX_LENGTH: Final = 8
-MASK: Final = "***"
 
-
-def get_identity_id(event: Mapping[str, Any]) -> str | None:
+def _get_identity_id(event: Mapping[str, Any]) -> str | None:
     """Return the Cognito Identity ID, or None when the request carries no usable one.
 
     API Gateway can send requestContext or identity as null, so missing, null and
@@ -27,11 +24,11 @@ def get_identity_id(event: Mapping[str, Any]) -> str | None:
     return identity_id
 
 
-def mask_identity(identity_id: str | None) -> str:
+def _mask_identity(identity_id: str | None) -> str:
     """Masks an identity ID, showing only the first 4 and last 4 characters for logging."""
-    if not identity_id or len(identity_id) <= FULLY_MASKED_MAX_LENGTH:
-        return MASK
-    return f"{identity_id[:4]}{MASK}{identity_id[-4:]}"
+    if not identity_id or len(identity_id) <= masking.FULLY_MASKED_MAX_LENGTH:
+        return masking.MASK
+    return f"{identity_id[:4]}{masking.MASK}{identity_id[-4:]}"
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,13 +44,13 @@ class IdentityId:
     @classmethod
     def from_event(cls, event: Mapping[str, Any]) -> Self | None:
         """Return the caller's Identity ID, or None when the request is unauthenticated."""
-        identity_id = get_identity_id(event)
+        identity_id = _get_identity_id(event)
         if identity_id is None:
             return None
         return cls(identity_id)
 
     def __str__(self) -> str:
-        return mask_identity(self.value)
+        return _mask_identity(self.value)
 
     def __repr__(self) -> str:
-        return f"IdentityId({mask_identity(self.value)})"
+        return f"IdentityId({_mask_identity(self.value)})"

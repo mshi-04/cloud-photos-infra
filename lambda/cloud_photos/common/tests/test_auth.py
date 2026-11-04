@@ -1,7 +1,7 @@
 import pytest
 
+from cloud_photos.common.auth import IdentityId
 from cloud_photos.common.errors import ValidationError
-from cloud_photos.users.auth import IdentityId
 
 IDENTITY_ID = "ap-northeast-1:abcdefghij"
 

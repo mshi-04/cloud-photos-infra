@@ -12,24 +12,26 @@ lambda/
     __init__.py
     common/
       __init__.py
-      auth.py                    IdentityId / get_identity_id / mask_identity の正本
+      auth.py                    IdentityId の正本
+      masking.py                 MASK / FULLY_MASKED_MAX_LENGTH
       errors.py                  ValidationError / AuthorizationError
       device_token.py            DeviceToken（device_tokens と push_notification で共有）
       request.py                 parse_body（本文の JSON オブジェクトを取り出す）
+      tests/                     共通処理の単体テスト
     media_uploads/
-      __init__.py  auth.py  constants.py  db.py  models.py  response.py
+      __init__.py  constants.py  db.py  models.py  response.py
       get_upload_records.py  create_upload_record.py  delete_upload_record.py
       tests/
     device_tokens/
-      __init__.py  auth.py  constants.py  db.py  models.py  response.py
+      __init__.py  constants.py  db.py  models.py  response.py
       register_device_token.py  unregister_device_token.py
       tests/
     push_notification/
-      __init__.py  auth.py  constants.py  db.py  fcm.py  models.py  response.py
+      __init__.py  constants.py  db.py  fcm.py  models.py  response.py
       notify_upload_complete.py
       tests/
     users/
-      __init__.py  auth.py  constants.py  response.py
+      __init__.py  constants.py  response.py
       delete_user.py
       tests/
   layers/firebase_admin/requirements.txt
@@ -40,20 +42,13 @@ lambda/
 import は、本番とテストのどちらでも修飾付きで書きます。トップレベル名（`from auth import ...`）は使いません。
 
 ```python
-from cloud_photos.media_uploads.auth import IdentityId
-from cloud_photos.users import auth
+from cloud_photos.common.auth import IdentityId
+from cloud_photos.common.device_token import DeviceToken
 ```
 
-## auth.py の扱い
+## 共通の認証と伏せ字
 
-| 関数グループ | `auth.py` の実体 |
-|---|---|
-| `media_uploads` | `from cloud_photos.common.auth import ...` の re-export |
-| `device_tokens` | `from cloud_photos.common.auth import ...` の re-export |
-| `push_notification` | `from cloud_photos.common.auth import ...` の re-export |
-| `users` | `from cloud_photos.common.auth import ...` の re-export |
-
-新規関数は `cloud_photos/common/auth.py` を re-export する形を採ります。コピーを増やしません。
+すべての関数群で `IdentityId` を `cloud_photos.common.auth` から直接 import します。関数群ごとの `auth.py` や再エクスポートは作りません。
 
 ## response.py の差
 
@@ -67,7 +62,7 @@ ZIP は [scripts/build_lambda.py](../../../../scripts/build_lambda.py) が作り
 関数群ごとに `.build/<function_group>.zip` を出力します。
 
 - ZIP には `cloud_photos/__init__.py`、関数群のパッケージ、そこから `cloud_photos.<package>` として import している共有パッケージが入ります。
-  `media_uploads`、`device_tokens`、`push_notification` の ZIP には `common/` が入ります。
+  `media_uploads`、`device_tokens`、`push_notification`、`users` のすべての ZIP に `common/` が入ります。
 - `tests/` とキャッシュは入りません。
 - エントリの順序、更新時刻、権限を固定しているため、同じソースからは同じハッシュの ZIP ができます。
 
@@ -92,8 +87,8 @@ Terraform は [modules/media_api/archives.tf](../../../../modules/media_api/arch
 
 ## 新規関数を追加するとき
 
-1. 既存グループに属するか、新規グループを作るかを決める。新規なら `auth.py` / `response.py` /
-   `constants.py` / `tests/` を揃える。
+1. 既存グループに属するか、新規グループを作るかを決める。新規なら `__init__.py` / handler / `response.py` / `constants.py` / `tests/` を揃え、
+   認証は `common` から直接 import する。
 2. handler は [handler-patterns.md](handler-patterns.md) の骨格に合わせる。
 3. `modules/media_api/` の次のファイルに追加する。新規グループなら `archives.tf` の `local.lambda_packages` に ZIP のパスを足し、
    `main.tf` の `local.lambda_functions` に関数名、`iam.tf` に `aws_iam_role` と用途別の `aws_iam_role_policy`、
