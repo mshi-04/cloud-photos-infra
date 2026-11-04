@@ -61,7 +61,7 @@
 
 ## コード品質
 
-- 認証は `common.auth`、応答と DB 操作は各関数群の `response.py` / `db.py` のパターンに従っているか。ヘルパーを迂回していないか
+- 認証と応答は `common.auth` / `common.response`、DB 操作は各関数群の `db.py` のパターンに従っているか。ヘルパーを迂回していないか
 - フィールド名・列挙値が `constants.py` に集約されているか。文字列直書きが無いか
 - 型ヒントが付いているか（Python 3.12）
 - 条件式失敗を操作別に扱っているか。`create_upload_record.py` の重複は 200、`delete_upload_record.py` の対象不存在は 404、その他の AWS 呼び出しの失敗は 500。想定外の例外を 500 に変えていないか

@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any
 import boto3
 
 from cloud_photos.common.auth import IdentityId
+from cloud_photos.common.response import error, success
 from cloud_photos.users.constants import (
     BATCH_WRITE_BASE_WAIT_SECONDS,
     DYNAMODB_BATCH_WRITE_SIZE,
@@ -25,7 +26,6 @@ from cloud_photos.users.constants import (
     SUBSYSTEM_S3,
     SUBSYSTEM_UPLOAD_RECORDS,
 )
-from cloud_photos.users.response import error, success
 
 if TYPE_CHECKING:
     # The stubs are a development dependency; the Lambda runtime never imports them.

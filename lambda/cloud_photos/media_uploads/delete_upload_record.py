@@ -6,10 +6,10 @@ from typing import Any
 from botocore.exceptions import BotoCoreError, ClientError
 
 from cloud_photos.common.auth import IdentityId
+from cloud_photos.common.response import error, success
 from cloud_photos.media_uploads.constants import FIELD_MEDIA_ID
 from cloud_photos.media_uploads.db import mark_upload_record_deleted
 from cloud_photos.media_uploads.models import MediaId
-from cloud_photos.media_uploads.response import error, success
 
 logger = logging.getLogger(__name__)
 

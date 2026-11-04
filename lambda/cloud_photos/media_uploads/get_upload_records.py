@@ -7,9 +7,9 @@ from botocore.exceptions import BotoCoreError, ClientError
 
 from cloud_photos.common.auth import IdentityId
 from cloud_photos.common.errors import AuthorizationError, ValidationError
+from cloud_photos.common.response import error, success
 from cloud_photos.media_uploads.db import query_upload_records
 from cloud_photos.media_uploads.models import GetUploadRecordsRequest
-from cloud_photos.media_uploads.response import error, success
 
 logger = logging.getLogger(__name__)
 

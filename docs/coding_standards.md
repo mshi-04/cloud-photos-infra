@@ -128,7 +128,7 @@ def get_dynamodb_client() -> "DynamoDBClient":
 ### API Behavior
 
 - 認証は API Gateway の IAM 認証で行い、Lambda は `cloud_photos.common.auth` の `IdentityId.from_event` で Identity ID を取り出して所有者を確認します。Lambda で JWT は検証しません。
-- レスポンスは各関数群の `response.py` の `success` と `error` で作ります。
+- レスポンスは `cloud_photos.common.response` の `success` と `error` で作ります。
 - ステータスと本文の形式は、[lambda.md](lambda.md) の API 応答の契約に従います。
 - 既存のAPI契約を変える場合は、テストとドキュメントを更新します。
 
