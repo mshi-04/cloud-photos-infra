@@ -52,20 +52,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Read Terraform version
-        id: tf_version
-        run: |
-          TF_VERSION_FILE="$GITHUB_WORKSPACE/.terraform-version"
-          if [ ! -f "$TF_VERSION_FILE" ]; then
-            echo "::error::.terraform-version file not found at repository root"
-            exit 1
-          fi
-          echo "version=$(cat "$TF_VERSION_FILE")" >> "$GITHUB_OUTPUT"
-
-      - uses: hashicorp/setup-terraform@v3
+      - name: Setup Terraform
+        uses: ./.github/actions/setup-terraform
         with:
-          terraform_wrapper: false
-          terraform_version: ${{ inputs.tf_version || steps.tf_version.outputs.version }}
+          terraform-wrapper: "false"
+          terraform-version: ${{ inputs.tf_version }}
 
       - name: Configure AWS (OIDC) - plan role
         uses: aws-actions/configure-aws-credentials@v4
@@ -128,20 +119,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Read Terraform version
-        id: tf_version
-        run: |
-          TF_VERSION_FILE="$GITHUB_WORKSPACE/.terraform-version"
-          if [ ! -f "$TF_VERSION_FILE" ]; then
-            echo "::error::.terraform-version file not found at repository root"
-            exit 1
-          fi
-          echo "version=$(cat "$TF_VERSION_FILE")" >> "$GITHUB_OUTPUT"
-
-      - uses: hashicorp/setup-terraform@v3
+      - name: Setup Terraform
+        uses: ./.github/actions/setup-terraform
         with:
-          terraform_wrapper: false
-          terraform_version: ${{ inputs.tf_version || steps.tf_version.outputs.version }}
+          terraform-wrapper: "false"
+          terraform-version: ${{ inputs.tf_version }}
 
       - name: Download plan artifact
         uses: actions/download-artifact@v4

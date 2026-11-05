@@ -52,6 +52,8 @@ IAM権限を広げる場合や `bootstrap/` の変更が必要な場合は、実
 
 ワークフローは `.github/workflows/` にあります。
 
+Terraform のセットアップは [setup-terraform](../.github/actions/setup-terraform/action.yml)、Lambda の lint と test の Python 環境構築は [setup-python-dev](../.github/actions/setup-python-dev/action.yml) に共通化しています。共通 Action だけの変更でも PR の CI を実行します。
+
 - `main` と `develop` への PR では、lint、Pyright、test、Trivy、Terraform の format を実行します。dev と prod の plan ジョブは、実行できる状態になるまで一時的にコメントアウトしています。
 - CD は plan の前に、`scripts/build_lambda.py` で Lambda の ZIP を `.build/` に作ります。ZIP から各 handler を読み込めることも確かめます。plan で使った ZIP は、plan と一緒に apply へ渡します。
 - `develop` への push で、dev へ plan と apply を行います。

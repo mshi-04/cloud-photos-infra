@@ -1,0 +1,33 @@
+name: Setup Terraform
+description: Install Terraform using the repository version and an optional override.
+
+inputs:
+  terraform-version:
+    description: Terraform version override; defaults to .terraform-version.
+    required: false
+    default: ""
+  terraform-wrapper:
+    description: Whether to install the Terraform output wrapper.
+    required: false
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - name: Read Terraform version
+      id: tf_version
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: |
+        TF_VERSION_FILE="$GITHUB_WORKSPACE/.terraform-version"
+        if [ ! -f "$TF_VERSION_FILE" ]; then
+          echo "::error::.terraform-version file not found at repository root"
+          exit 1
+        fi
+        echo "version=$(cat "$TF_VERSION_FILE")" >> "$GITHUB_OUTPUT"
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v4
+      with:
+        terraform_version: ${{ inputs.terraform-version || steps.tf_version.outputs.version }}
+        terraform_wrapper: ${{ inputs.terraform-wrapper }}
