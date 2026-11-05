@@ -4,7 +4,7 @@
 
 ## Layout
 
-Lambda のコードは、`lambda/` をソースのルートとして、`cloud_photos` パッケージの下に関数群ごとにまとめます。1 つの関数群に複数の handler を置き、認証と伏せ字は `common/` で共有し、関数群固有の定数は `constants.py` に置きます。
+Lambda のコードは、`lambda/` をソースのルートとして、`cloud_photos` パッケージの下に関数群ごとにまとめます。1 つの関数群に複数の handler を置き、認証・応答・伏せ字は `common/` で共有し、関数群固有の定数は `constants.py` に置きます。
 
 ```text
 lambda/
@@ -12,6 +12,7 @@ lambda/
   cloud_photos/
     common/                  # 複数の関数群で使う共有処理
       auth.py                # IdentityId
+      response.py            # success / error
       masking.py             # 伏せ字の定数
       device_token.py        # DeviceToken
       request.py             # parse_body
@@ -24,7 +25,6 @@ lambda/
     <function_group>/
       __init__.py
       <handler_module>.py    # def handler(event, context)
-      response.py
       constants.py
       tests/
         conftest.py
@@ -57,11 +57,11 @@ ZIP は [scripts/build_lambda.py](../scripts/build_lambda.py) が関数群ごと
 
 ### 形式
 
-応答は各関数群の `response.py` の `success` と `error` で作ります。
+応答は `cloud_photos.common.response` の `success(status, body=None)` と `error(status, message)` で作ります。
 
 - ヘッダーは `Content-Type: application/json` です。
-- 本文は JSON の文字列です。エラーの本文は `{"message": "<理由>"}` です。
-- 本文のない応答（204）は、本文を空文字列にします。
+- 本文は JSON の文字列です。JSON にできない値は `str` で文字列にします。エラーの本文は `{"message": "<理由>"}` です。
+- `success` の `body` が `None` の場合は、本文を空文字列にします。本文のない応答（204）で使います。
 - 外部サービスの例外内容やスタックトレースなど、内部の情報を本文に含めないでください。
 
 ### ステータス

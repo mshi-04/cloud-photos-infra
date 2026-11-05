@@ -10,11 +10,11 @@ from cloud_photos.common.auth import IdentityId
 from cloud_photos.common.device_token import DeviceToken
 from cloud_photos.common.errors import ValidationError
 from cloud_photos.common.request import parse_body
+from cloud_photos.common.response import error, success
 from cloud_photos.push_notification.constants import FIELD_SUCCESS_COUNT
 from cloud_photos.push_notification.db import delete_device_token, query_device_tokens
 from cloud_photos.push_notification.fcm import build_upload_complete_notification, get_firebase_app, send_notification
 from cloud_photos.push_notification.models import SuccessCount
-from cloud_photos.push_notification.response import error, success
 
 logger = logging.getLogger(__name__)
 # This handler records each delivery at INFO, so it does not depend on the runtime's default level.

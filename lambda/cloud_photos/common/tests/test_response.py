@@ -1,6 +1,9 @@
 import json
+from decimal import Decimal
 
-from cloud_photos.media_uploads.response import error, success
+import pytest
+
+from cloud_photos.common.response import error, success
 
 
 class TestSuccess:
@@ -16,6 +19,20 @@ class TestSuccess:
     def test_content_type_header(self):
         resp = success(200, {})
         assert resp["headers"]["Content-Type"] == "application/json"
+
+    def test_no_content_has_empty_body(self):
+        resp = success(204)
+        assert resp == {"statusCode": 204, "headers": {"Content-Type": "application/json"}, "body": ""}
+
+    def test_explicit_none_has_empty_body(self):
+        assert success(204, None)["body"] == ""
+
+    @pytest.mark.parametrize("body", [{}, [], 0, False, ""])
+    def test_falsy_body_is_json(self, body):
+        assert json.loads(success(200, body)["body"]) == body
+
+    def test_non_json_value_is_serialized_as_string(self):
+        assert json.loads(success(200, {"amount": Decimal("1.5")})["body"]) == {"amount": "1.5"}
 
 
 class TestError:

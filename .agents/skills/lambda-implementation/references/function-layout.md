@@ -13,25 +13,26 @@ lambda/
     common/
       __init__.py
       auth.py                    IdentityId の正本
+      response.py                success / error
       masking.py                 MASK / FULLY_MASKED_MAX_LENGTH
       errors.py                  ValidationError / AuthorizationError
       device_token.py            DeviceToken（device_tokens と push_notification で共有）
       request.py                 parse_body（本文の JSON オブジェクトを取り出す）
       tests/                     共通処理の単体テスト
     media_uploads/
-      __init__.py  constants.py  db.py  models.py  response.py
+      __init__.py  constants.py  db.py  models.py
       get_upload_records.py  create_upload_record.py  delete_upload_record.py
       tests/
     device_tokens/
-      __init__.py  constants.py  db.py  models.py  response.py
+      __init__.py  constants.py  db.py  models.py
       register_device_token.py  unregister_device_token.py
       tests/
     push_notification/
-      __init__.py  constants.py  db.py  fcm.py  models.py  response.py
+      __init__.py  constants.py  db.py  fcm.py  models.py
       notify_upload_complete.py
       tests/
     users/
-      __init__.py  constants.py  response.py
+      __init__.py  constants.py
       delete_user.py
       tests/
   layers/firebase_admin/requirements.txt
@@ -43,18 +44,15 @@ import は、本番とテストのどちらでも修飾付きで書きます。�
 
 ```python
 from cloud_photos.common.auth import IdentityId
-from cloud_photos.common.device_token import DeviceToken
+from cloud_photos.common.response import error, success
 ```
 
-## 共通の認証と伏せ字
+## 共通の認証・応答
 
 すべての関数群で `IdentityId` を `cloud_photos.common.auth` から直接 import します。関数群ごとの `auth.py` や再エクスポートは作りません。
 
-## response.py の差
-
-`media_uploads` / `device_tokens` / `users` の `success` は本文必須です。
-`push_notification` の `success` のみ `body: Any = None` を許し、本文が無い場合は空文字列を返します
-（204 を返すため）。本文なしの応答が要るときはこの形を踏襲します。
+応答は `cloud_photos.common.response` の `success(status, body=None)` と `error(status, message)` を使います。
+`success` は `body` が `None` なら空文字列を返し、204 の本文なし応答に使えます。本文があれば JSON 化し、JSON にできない値は `str` で文字列にします。
 
 ## ZIP のビルドと Terraform の配線
 
@@ -87,8 +85,8 @@ Terraform は [modules/media_api/archives.tf](../../../../modules/media_api/arch
 
 ## 新規関数を追加するとき
 
-1. 既存グループに属するか、新規グループを作るかを決める。新規なら `__init__.py` / handler / `response.py` / `constants.py` / `tests/` を揃え、
-   認証は `common` から直接 import する。
+1. 既存グループに属するか、新規グループを作るかを決める。新規なら `__init__.py` / handler / `constants.py` / `tests/` を揃え、
+   認証と応答は `common` から直接 import する。
 2. handler は [handler-patterns.md](handler-patterns.md) の骨格に合わせる。
 3. `modules/media_api/` の次のファイルに追加する。新規グループなら `archives.tf` の `local.lambda_packages` に ZIP のパスを足し、
    `main.tf` の `local.lambda_functions` に関数名、`iam.tf` に `aws_iam_role` と用途別の `aws_iam_role_policy`、

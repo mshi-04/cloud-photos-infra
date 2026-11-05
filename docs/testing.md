@@ -37,7 +37,9 @@ lambda/
     common/
       tests/
         test_auth.py
+        test_response.py
         test_device_token.py
+        test_request.py
     <function_group>/
       tests/
         conftest.py
@@ -46,7 +48,7 @@ lambda/
 
 `conftest.py` には、API Gateway event、`requestContext.identity.cognitoIdentityId` を持つ認証済みの event、環境変数、AWS mock などの共有フィクスチャを置きます。API Gateway は IAM 認証のため、event に Cognito のクレームや JWT は含まれません。
 
-`common/tests/` では、Identity ID、デバイストークンを直接テストします。共通処理のテストを関数群ごとに複製しません。テーブルやバケットを作る moto の fixture とクライアントキャッシュのクリアは、ライフサイクルが異なるため各関数群の `tests/conftest.py` に残します。
+`common/tests/` では、Identity ID、応答、デバイストークン、本文の解析を直接テストします。共通処理のテストを関数群ごとに複製しません。テーブルやバケットを作る moto の fixture とクライアントキャッシュのクリアは、ライフサイクルが異なるため各関数群の `tests/conftest.py` に残します。
 
 ## What To Cover
 
