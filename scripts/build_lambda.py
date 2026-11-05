@@ -64,15 +64,17 @@ def package_files(name: str) -> list[Path]:
     return sorted(files)
 
 
-def defines_handler(path: Path) -> bool:
-    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+def defines_handler(source: str | bytes, filename: str) -> bool:
+    tree = ast.parse(source, filename=filename)
     return any(isinstance(node, ast.FunctionDef) and node.name == "handler" for node in tree.body)
 
 
 def function_groups() -> list[str]:
     groups = []
     for directory in sorted((SOURCE_ROOT / PACKAGE).iterdir()):
-        if directory.is_dir() and any(defines_handler(path) for path in directory.glob("*.py")):
+        if directory.is_dir() and any(
+            defines_handler(path.read_text(encoding="utf-8"), str(path)) for path in directory.glob("*.py")
+        ):
             groups.append(directory.name)
     return groups
 

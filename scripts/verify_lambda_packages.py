@@ -18,7 +18,6 @@ Then run, after `python scripts/build_lambda.py`:
 """
 
 import argparse
-import ast
 import json
 import subprocess
 import sys
@@ -27,7 +26,7 @@ import zipfile
 from pathlib import Path
 from typing import Final
 
-from build_lambda import OUTPUT_DIR, PACKAGE, REPO_ROOT, function_groups
+from build_lambda import OUTPUT_DIR, PACKAGE, REPO_ROOT, defines_handler, function_groups
 
 # Lambda adds both python/ and this directory under it to the module search path for each layer.
 LAYER_SITE_PACKAGES: Final = Path("lib") / "python3.12" / "site-packages"
@@ -58,8 +57,7 @@ def handler_modules(archive: zipfile.ZipFile, group: str) -> list[str]:
     for name in sorted(archive.namelist()):
         if not name.startswith(prefix) or not name.endswith(".py") or "/" in name[len(prefix) :]:
             continue
-        tree = ast.parse(archive.read(name), filename=name)
-        if any(isinstance(node, ast.FunctionDef) and node.name == "handler" for node in tree.body):
+        if defines_handler(archive.read(name), name):
             modules.append(name.removesuffix(".py").replace("/", "."))
     return modules
 
