@@ -88,6 +88,7 @@ jobs:
       # Build the ZIPs twice with the pinned SAM image, the same path as CD.
       # The same inputs must give the same hashes, so that plan shows no change for unchanged code.
       - name: Build Lambda packages and layers twice
+        id: build_packages
         if: ${{ !cancelled() }}
         run: |
           for build in 1 2; do
@@ -97,7 +98,7 @@ jobs:
 
       # Import every handler from the ZIPs alone, with the layer for the group that uses it.
       - name: Verify Lambda packages
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.build_packages.outcome == 'success' }}
         run: |
           pip install --quiet --target "$RUNNER_TEMP/runtime-deps" boto3
           python scripts/verify_lambda_packages.py \
