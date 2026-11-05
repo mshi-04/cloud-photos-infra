@@ -27,9 +27,9 @@ API 応答のステータスと本文の形式は、[docs/lambda.md](../../../do
 1. 変更する関数群と handler を特定し、近い既存の実装を読む。
 2. 新しく受け取る入力や概念は、値オブジェクト（`@dataclass(frozen=True, slots=True)`）で表し、検証を `__post_init__` に置く。
 3. handler は、認証、本文の解析、入力の検証、所有者確認、永続化、応答の順に組む。前提条件はガード節で先に返し、`return` の後に `else` を書かない。
-4. Identity ID は `auth.py` の `IdentityId.from_event` で取り出す。所有者確認は永続化より前に行い、クライアントから来たパスやページングキーをそのまま key に使わない。
+4. Identity ID は `cloud_photos.common.auth` の `IdentityId.from_event` で取り出す。所有者確認は永続化より前に行い、クライアントから来たパスやページングキーをそのまま key に使わない。
 5. DynamoDB の値は `serialize_item`（読み出しは `deserialize_item`）を通し、フィールド名は `constants.py` から取る。条件式の失敗は、操作ごとに応答の意味を決める。
-6. ログの識別子は、伏せ字にする値オブジェクト（`IdentityId`、`DeviceToken`）か `mask_identity` を通す。生のトークン、リクエストの本文、認証情報を出さない。
+6. ログの識別子は、伏せ字にする値オブジェクト（`IdentityId`、`DeviceToken`）で渡す。伏せ字の定数は `common.masking` に置く。生のトークン、リクエストの本文、認証情報を出さない。
 7. 動作を変えたら、テストを追加・更新する。未認証、IDOR、入力の不正、AWS 呼び出しの失敗を含める。既存の失敗を隠すためにテストを弱めない。
 
 書き方の詳細は [docs/coding_standards.md](../../../docs/coding_standards.md) の Python の原則と例に従う。

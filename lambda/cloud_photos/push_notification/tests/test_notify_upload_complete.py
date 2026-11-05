@@ -6,9 +6,9 @@ import pytest
 from botocore.exceptions import ClientError
 from firebase_admin import messaging
 
+from cloud_photos.common.auth import IdentityId
 from cloud_photos.common.device_token import DeviceToken
 from cloud_photos.push_notification import db, fcm, notify_upload_complete
-from cloud_photos.push_notification.auth import IdentityId
 from cloud_photos.push_notification.notify_upload_complete import handler
 
 IDENTITY_ID = "ap-northeast-1:test-user-id"

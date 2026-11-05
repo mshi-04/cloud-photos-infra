@@ -37,7 +37,7 @@ Lambda（Python）の関数群は、すべてこの規約に移行済みです�
 |---|---|---|
 | 値オブジェクト | 不変条件や機密性を持つ概念を、`@dataclass(frozen=True, slots=True)` の値オブジェクトや `enum.StrEnum` で表す。対象は Identity ID、メディアID、保存パス、デバイストークン、件数、ページング位置、列挙値などとする。検証は `__post_init__` に置き、どの経路で生成しても同じ規則を適用して、生成できた値は常に正しい状態にする。`parse` などの生成メソッドは、入力の型を絞り込んでから生成に委ねる。すべてのプリミティブを包むことはしない | Pyright、レビュー |
 | 規則の置き場所 | 所有者確認などの規則は、値オブジェクトのメソッドに置く。例えば、保存パスが本人のものかは保存パスの値オブジェクトが判定する | レビュー |
-| 機密値 | デバイストークンなどの機密値は `__repr__` で伏せ字にし、ログへ生の値が出ることを構造的に防ぐ。既存の `mask_identity` と同じく、8文字以下の値は全体を伏せ字にする。生の値は、AWSやFCMを呼び出す直前にだけ取り出す | レビュー、テスト |
+| 機密値 | デバイストークンなどの機密値は `__repr__` で伏せ字にし、ログへ生の値が出ることを構造的に防ぐ。`IdentityId` と `DeviceToken` は、8文字以下の値を全体の伏せ字にする。伏せ字の定数は `common/masking.py` に置く。生の値は、所有者境界の比較と AWS/FCM 呼び出しの引数作成に限って取り出す。ログやエラー応答に識別子を含める場合は、伏せ字にする値オブジェクトを渡す | レビュー、テスト |
 | 早期リターン | 前提条件はガード節で先に返すか送出する。`return` や `raise` の後に `else` を書かず、ネストを浅く保つ | ruffの `RET`、`SIM`、`C901` |
 | handlerの責務 | `handler` は、イベントの解釈、処理の呼び出し、HTTP応答への変換だけを行う。検証と業務規則は値オブジェクトと純粋な関数に置き、AWSの呼び出しは薄い関数に分ける | レビュー |
 | 例外 | 入力不正や所有者違反は専用の例外で表し、HTTP応答への変換は `handler` の1か所で行う。`except Exception` は最も外側で、記録と理由のコメントがある場合に限る | ruffの `BLE`、`TRY400` |
@@ -127,7 +127,7 @@ def get_dynamodb_client() -> "DynamoDBClient":
 
 ### API Behavior
 
-- 認証は API Gateway の IAM 認証で行い、Lambda は `auth.py` の `IdentityId.from_event`で Identity ID を取り出して所有者を確認します。Lambda で JWT は検証しません。
+- 認証は API Gateway の IAM 認証で行い、Lambda は `cloud_photos.common.auth` の `IdentityId.from_event` で Identity ID を取り出して所有者を確認します。Lambda で JWT は検証しません。
 - レスポンスは各関数群の `response.py` の `success` と `error` で作ります。
 - ステータスと本文の形式は、[lambda.md](lambda.md) の API 応答の契約に従います。
 - 既存のAPI契約を変える場合は、テストとドキュメントを更新します。

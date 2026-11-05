@@ -96,7 +96,7 @@ if not deleted:
 ## ログ
 
 - `logger = logging.getLogger(__name__)` をモジュールスコープに置きます。
-- identity は、伏せ字にする `IdentityId` を渡すか、`mask_identity` を通します。生の `cognitoIdentityId`、`deviceToken`、
+- identity は、`cloud_photos.common.auth` の伏せ字にする `IdentityId` で渡します。生の `cognitoIdentityId`、`deviceToken`、
   リクエストボディをログに出しません。FCM トークンは `DeviceToken` で渡し、末尾 4 文字より多くは出しません。
 - AWS 呼び出し失敗は `logger.exception` で操作名と対象キーを記録します。
 

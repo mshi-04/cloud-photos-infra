@@ -4,13 +4,19 @@
 
 ## Layout
 
-Lambda のコードは、`lambda/` をソースのルートとして、`cloud_photos` パッケージの下に関数群ごとにまとめます。1 つの関数群に複数の handler を置き、関数群の中で `auth.py`、`response.py`、`constants.py` などを共有します。
+Lambda のコードは、`lambda/` をソースのルートとして、`cloud_photos` パッケージの下に関数群ごとにまとめます。1 つの関数群に複数の handler を置き、認証と伏せ字は `common/` で共有し、関数群固有の定数は `constants.py` に置きます。
 
 ```text
 lambda/
   pytest.ini
   cloud_photos/
     common/                  # 複数の関数群で使う共有処理
+      auth.py                # IdentityId
+      masking.py             # 伏せ字の定数
+      device_token.py        # DeviceToken
+      request.py             # parse_body
+      errors.py              # ValidationError / AuthorizationError
+      tests/                 # 共通処理の単体テスト
     media_uploads/           # get_upload_records / create_upload_record / delete_upload_record
     device_tokens/           # register_device_token / unregister_device_token
     push_notification/       # notify_upload_complete
@@ -18,7 +24,6 @@ lambda/
     <function_group>/
       __init__.py
       <handler_module>.py    # def handler(event, context)
-      auth.py
       response.py
       constants.py
       tests/
@@ -42,7 +47,7 @@ ZIP は [scripts/build_lambda.py](../scripts/build_lambda.py) が関数群ごと
 認証は API Gateway の IAM 認証で行い、Lambda は所有者確認を行います。Lambda で JWT を検証する処理はありません。
 
 - 業務用のメソッドは `authorization = "AWS_IAM"` です。クライアントは Cognito Identity Pool が発行した一時認証情報で SigV4 署名し、API Gateway が署名を検証します。`authorization = "NONE"` は CORS の `OPTIONS` だけです。
-- Lambda は `event.requestContext.identity.cognitoIdentityId` を、呼び出したユーザーの Identity ID として使います。取得には、各関数群の `auth.py` が re-export する値オブジェクトの `IdentityId.from_event` を使います。`requestContext`、`identity`、`cognitoIdentityId` のどれかが欠けている、null である、または型が想定と違う場合は `None` を返し、handler は未認証として扱います（401 または 403）。
+- Lambda は `event.requestContext.identity.cognitoIdentityId` を、呼び出したユーザーの Identity ID として使います。取得には、`cloud_photos.common.auth` から直接 import した値オブジェクトの `IdentityId.from_event` を使います。`requestContext`、`identity`、`cognitoIdentityId` のどれかが欠けている、null である、または型が想定と違う場合は `None` を返し、handler は未認証として扱います（401 または 403）。
 - 認証済みでも、操作するリソースが本人のものかを Lambda で確認します。S3 は `private/<identity_id>/` のプレフィックス、DynamoDB はパーティションキーの `userId`、ページングは `lastEvaluatedKey.userId` で確かめます。
 - 業務メソッドの `authorization` を変えると、Lambda のコードを変えずに認証が外れます。Terraform の変更では、この設定を必ず確認してください。
 

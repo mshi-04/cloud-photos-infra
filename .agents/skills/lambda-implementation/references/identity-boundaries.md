@@ -13,10 +13,10 @@
 
 ## identity の取得
 
-`IdentityId`、`get_identity_id`、`mask_identity` の正本は [lambda/cloud_photos/common/auth.py](../../../../lambda/cloud_photos/common/auth.py) です。
-`IdentityId` は Identity ID の値オブジェクトで、`from_event` で event から生成し、`str()` と `repr()` では伏せ字になります。生の値は `.value` で、AWS を呼び出す直前にだけ取り出します。
+`IdentityId` の正本は [lambda/cloud_photos/common/auth.py](../../../../lambda/cloud_photos/common/auth.py) です。Identity ID の取り出しと伏せ字は、このモジュールの非公開の処理です。
+`IdentityId` は Identity ID の値オブジェクトで、`from_event` で event から生成し、`str()` と `repr()` では伏せ字になります。生の値は `.value` で取り出し、所有者境界の比較と AWS/FCM 呼び出しの引数作成に限って使います。ログやエラー応答に識別子を含める場合は、伏せ字にする値オブジェクトを渡します。
 
-各関数群の `auth.py`（`media_uploads`、`device_tokens`、`push_notification`、`users`）は `IdentityId` を re-export します。新しい関数群も re-export にし、コピーを作りません。
+handler、`db.py`、`models.py`、テストのすべてで `IdentityId` を `cloud_photos.common.auth` から直接 import します。関数群ごとの再エクスポートは作りません。伏せ字の定数は `common.masking` にあり、Identity ID は先頭4文字と末尾4文字、デバイストークンは末尾4文字だけを残します。8文字以下はどちらも全体を伏せます。
 
 `requestContext`、`identity`、`cognitoIdentityId` の欠落・null・想定外の型は、例外にせず `None` を返します。handler は `None` を未認証として扱います。
 

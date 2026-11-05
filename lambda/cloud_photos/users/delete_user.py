@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any
 
 import boto3
 
-from cloud_photos.users.auth import IdentityId
+from cloud_photos.common.auth import IdentityId
 from cloud_photos.users.constants import (
     BATCH_WRITE_BASE_WAIT_SECONDS,
     DYNAMODB_BATCH_WRITE_SIZE,

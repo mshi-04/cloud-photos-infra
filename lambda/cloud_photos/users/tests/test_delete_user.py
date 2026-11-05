@@ -5,8 +5,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from cloud_photos.common.auth import IdentityId
 from cloud_photos.users import delete_user
-from cloud_photos.users.auth import IdentityId
 from cloud_photos.users.delete_user import handler
 
 IDENTITY_ID = "ap-northeast-1:test-user-id"
