@@ -1,13 +1,5 @@
 from typing import Final
 
-# DynamoDB field names
-FIELD_USER_ID: Final = "userId"
-FIELD_MEDIA_ID: Final = "mediaId"
-FIELD_DEVICE_TOKEN: Final = "deviceToken"
-
-# Storage path
-PRIVATE_PATH_PREFIX: Final = "private/"
-
 # AWS batch limits
 S3_DELETE_BATCH_SIZE: Final = 1000
 DYNAMODB_BATCH_WRITE_SIZE: Final = 25

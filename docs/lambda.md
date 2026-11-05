@@ -4,7 +4,7 @@
 
 ## Layout
 
-Lambda のコードは、`lambda/` をソースのルートとして、`cloud_photos` パッケージの下に関数群ごとにまとめます。1 つの関数群に複数の handler を置き、認証・応答・伏せ字は `common/` で共有し、関数群固有の定数は `constants.py` に置きます。
+Lambda のコードは、`lambda/` をソースのルートとして、`cloud_photos` パッケージの下に関数群ごとにまとめます。1 つの関数群に複数の handler を置きます。認証、応答、DynamoDB の値の変換、テーブルのキー属性名、保存パスのプレフィックスなど、関数群をまたぐ契約は `common/` に置きます。関数群の `constants.py` には、その関数群だけが使う項目名や上限を残します。
 
 ```text
 lambda/
@@ -15,6 +15,9 @@ lambda/
       response.py            # success / error
       masking.py             # 伏せ字の定数
       device_token.py        # DeviceToken
+      dynamodb.py            # serialize_item / deserialize_item
+      tables.py              # テーブルのキー属性名
+      storage.py             # PRIVATE_PATH_PREFIX
       request.py             # parse_body
       errors.py              # ValidationError / AuthorizationError
       tests/                 # 共通処理の単体テスト

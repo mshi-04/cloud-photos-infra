@@ -6,7 +6,8 @@ import boto3
 
 from cloud_photos.common.auth import IdentityId
 from cloud_photos.common.device_token import DeviceToken
-from cloud_photos.push_notification.constants import FIELD_DEVICE_TOKEN, FIELD_USER_ID
+from cloud_photos.common.dynamodb import deserialize_item, serialize_item
+from cloud_photos.common.tables import FIELD_DEVICE_TOKEN, FIELD_USER_ID
 
 if TYPE_CHECKING:
     # The stubs are a development dependency; the Lambda runtime never imports them.
@@ -29,13 +30,13 @@ def query_device_tokens(identity_id: IdentityId) -> list[DeviceToken]:
         "TableName": get_table_name(),
         "KeyConditionExpression": "#uid = :uid",
         "ExpressionAttributeNames": {"#uid": FIELD_USER_ID},
-        "ExpressionAttributeValues": {":uid": {"S": identity_id.value}},
+        "ExpressionAttributeValues": serialize_item({":uid": identity_id.value}),
         "ProjectionExpression": FIELD_DEVICE_TOKEN,
     }
     tokens: list[DeviceToken] = []
     while True:
         result = get_dynamodb_client().query(**params)
-        tokens.extend(DeviceToken.parse(item[FIELD_DEVICE_TOKEN].get("S")) for item in result.get("Items", []))
+        tokens.extend(DeviceToken.parse(deserialize_item(item)[FIELD_DEVICE_TOKEN]) for item in result.get("Items", []))
         # A page can be empty and still have more pages after it.
         last_evaluated_key = result.get("LastEvaluatedKey")
         if not last_evaluated_key:
@@ -46,8 +47,5 @@ def query_device_tokens(identity_id: IdentityId) -> list[DeviceToken]:
 def delete_device_token(identity_id: IdentityId, device_token: DeviceToken) -> None:
     get_dynamodb_client().delete_item(
         TableName=get_table_name(),
-        Key={
-            FIELD_USER_ID: {"S": identity_id.value},
-            FIELD_DEVICE_TOKEN: {"S": device_token.value},
-        },
+        Key=serialize_item({FIELD_USER_ID: identity_id.value, FIELD_DEVICE_TOKEN: device_token.value}),
     )

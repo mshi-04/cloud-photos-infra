@@ -1,26 +1,23 @@
 import functools
 import os
 import time
-from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Final
 
 import boto3
-from boto3.dynamodb.types import TypeDeserializer, TypeSerializer
 from botocore.exceptions import ClientError
 
 from cloud_photos.common.auth import IdentityId
+from cloud_photos.common.dynamodb import deserialize_item, serialize_item
+from cloud_photos.common.tables import FIELD_MEDIA_ID, FIELD_USER_ID
 from cloud_photos.media_uploads.constants import (
     FIELD_CLOUD_STORAGE_PATH,
     FIELD_CONTENT_TYPE,
     FIELD_FILE_SIZE,
     FIELD_IS_DELETED,
-    FIELD_MEDIA_ID,
     FIELD_MEDIA_TYPE,
     FIELD_UPDATED_AT,
     FIELD_UPLOADED_AT,
-    FIELD_USER_ID,
 )
 from cloud_photos.media_uploads.models import CreateUploadRecordRequest, MediaId, PageCursor, PageLimit
 
@@ -29,9 +26,6 @@ if TYPE_CHECKING:
     from mypy_boto3_dynamodb import DynamoDBClient
 
 CONDITIONAL_CHECK_FAILED: Final = "ConditionalCheckFailedException"
-
-_serializer = TypeSerializer()
-_deserializer = TypeDeserializer()
 
 
 @functools.cache
@@ -42,24 +36,6 @@ def get_dynamodb_client() -> "DynamoDBClient":
 @functools.cache
 def get_table_name() -> str:
     return os.environ["TABLE_NAME"]
-
-
-def serialize_item(item: Mapping[str, Any]) -> dict[str, Any]:
-    return {k: _serializer.serialize(v) for k, v in item.items()}
-
-
-def _convert_decimals(value: Any) -> Any:
-    if isinstance(value, Decimal):
-        return int(value) if value == int(value) else float(value)
-    if isinstance(value, Mapping):
-        return {k: _convert_decimals(v) for k, v in value.items()}
-    if isinstance(value, Sequence) and not isinstance(value, str):
-        return [_convert_decimals(v) for v in value]
-    return value
-
-
-def deserialize_item(item: Mapping[str, Any]) -> dict[str, Any]:
-    return {k: _convert_decimals(_deserializer.deserialize(v)) for k, v in item.items()}
 
 
 def _key(identity_id: IdentityId, media_id: MediaId) -> dict[str, Any]:
