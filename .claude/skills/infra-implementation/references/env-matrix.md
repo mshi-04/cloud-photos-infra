@@ -3,6 +3,8 @@
 [envs/dev/main.tf](../../../../envs/dev/main.tf) と [envs/prod/main.tf](../../../../envs/prod/main.tf) は
 同じモジュールを同じ順序で呼び、変数だけが異なります。新しい変数を足すときは両方を更新します。
 
+`env` と `project_name` は各 `main.tf` の `locals` に置き、`default_tags` と各モジュールの呼び出しから参照します。環境ごとに異なる値は、差が見えるように呼び出しへ直接書きます。
+
 ## モジュール引数
 
 | モジュール | 変数 | dev | prod |
@@ -27,7 +29,6 @@
 
 | 変数 | 既定 |
 |---|---|
-| `project_name` | `"cloud-photos"` |
 | `lambda_memory_size` | `256` |
 | `lambda_timeout` | `10` |
 | `password_minimum_length` | `8` |
