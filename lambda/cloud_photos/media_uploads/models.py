@@ -196,6 +196,19 @@ class CreateUploadRecordRequest:
 
 
 @dataclass(frozen=True, slots=True)
+class DeleteUploadRecordRequest:
+    media_id: MediaId
+
+    @classmethod
+    def parse(cls, path_parameters: object) -> Self:
+        raw = path_parameters.get(FIELD_MEDIA_ID) if isinstance(path_parameters, Mapping) else None
+        if not isinstance(raw, str) or not raw:
+            raise ValidationError(f"Missing {FIELD_MEDIA_ID}")
+        # MediaId.parse would strip the value, and " abc " would then delete the record "abc".
+        return cls(media_id=MediaId(raw))
+
+
+@dataclass(frozen=True, slots=True)
 class GetUploadRecordsRequest:
     limit: PageLimit
     cursor: PageCursor | None = None

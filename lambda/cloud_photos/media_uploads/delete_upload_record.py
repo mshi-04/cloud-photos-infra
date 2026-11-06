@@ -6,22 +6,12 @@ from typing import Any
 from botocore.exceptions import BotoCoreError, ClientError
 
 from cloud_photos.common.auth import IdentityId
+from cloud_photos.common.errors import ValidationError
 from cloud_photos.common.response import error, success
-from cloud_photos.media_uploads.constants import FIELD_MEDIA_ID
 from cloud_photos.media_uploads.db import mark_upload_record_deleted
-from cloud_photos.media_uploads.models import MediaId
+from cloud_photos.media_uploads.models import DeleteUploadRecordRequest
 
 logger = logging.getLogger(__name__)
-
-
-def _media_id_from_path(event: Mapping[str, Any]) -> MediaId | None:
-    path_parameters = event.get("pathParameters")
-    if not isinstance(path_parameters, Mapping):
-        return None
-    media_id = path_parameters.get(FIELD_MEDIA_ID)
-    if not isinstance(media_id, str) or not media_id:
-        return None
-    return MediaId(media_id)
 
 
 def handler(event: Mapping[str, Any], _context: object) -> dict[str, Any]:
@@ -29,14 +19,15 @@ def handler(event: Mapping[str, Any], _context: object) -> dict[str, Any]:
     if identity_id is None:
         return error(HTTPStatus.FORBIDDEN, "Unauthorized")
 
-    media_id = _media_id_from_path(event)
-    if media_id is None:
-        return error(HTTPStatus.BAD_REQUEST, "Missing mediaId")
+    try:
+        request = DeleteUploadRecordRequest.parse(event.get("pathParameters"))
+    except ValidationError as e:
+        return error(HTTPStatus.BAD_REQUEST, str(e))
 
     try:
-        deleted = mark_upload_record_deleted(identity_id, media_id)
+        deleted = mark_upload_record_deleted(identity_id, request.media_id)
     except (BotoCoreError, ClientError):
-        logger.exception("Failed to logically delete item: userId=%s, mediaId=%s", identity_id, media_id.value)
+        logger.exception("Failed to logically delete item: userId=%s, mediaId=%s", identity_id, request.media_id.value)
         return error(HTTPStatus.INTERNAL_SERVER_ERROR, "Internal server error")
 
     if not deleted:

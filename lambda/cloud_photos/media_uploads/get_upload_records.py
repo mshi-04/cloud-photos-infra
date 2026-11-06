@@ -19,9 +19,8 @@ def handler(event: Mapping[str, Any], _context: object) -> dict[str, Any]:
     if identity_id is None:
         return error(HTTPStatus.FORBIDDEN, "Unauthorized")
 
-    params = event.get("queryStringParameters") or {}
     try:
-        request = GetUploadRecordsRequest.parse(params, identity_id)
+        request = GetUploadRecordsRequest.parse(event.get("queryStringParameters"), identity_id)
     except ValidationError as e:
         return error(HTTPStatus.BAD_REQUEST, str(e))
     except AuthorizationError as e:
