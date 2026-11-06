@@ -28,10 +28,16 @@ TRACKED_TYPES: Final = {
 DISJOINT_TABLES: Final = ("api_routes", "cors_preflights")
 OPENING: Final = "{[("
 CLOSING: Final = "}])"
+# Strings are matched first, because they can contain comment markers such as the `/*` in "private/*".
+STRING_OR_COMMENT: Final = re.compile(r'"(?:\\.|[^"\\\n])*"|(?:#|//)[^\n]*|/\*.*?\*/', flags=re.DOTALL)
+
+
+def without_comments(source: str) -> str:
+    return STRING_OR_COMMENT.sub(lambda match: match.group() if match.group().startswith('"') else "", source)
 
 
 def module_source() -> str:
-    return "\n".join(path.read_text(encoding="utf-8") for path in sorted(MODULE_DIR.glob("*.tf")))
+    return without_comments("\n".join(path.read_text(encoding="utf-8") for path in sorted(MODULE_DIR.glob("*.tf"))))
 
 
 def declared_resources(source: str, resource_type: str) -> dict[str, bool]:
@@ -64,8 +70,7 @@ def whole_map_references(expression: str, resource_type: str) -> set[str]:
 
 def listed_entries(expression: str, resource_type: str) -> list[tuple[str, str]]:
     """Return the (key, resource name) pairs written as `key = aws_api_gateway_<type>.<name>`."""
-    # An entry may end with a comment (`#` or `//`).
-    pattern = rf"^\s*(\w+)\s*=\s*aws_api_gateway_{resource_type}\.(\w+)\s*(?:(?:#|//).*)?$"
+    pattern = rf"^\s*(\w+)\s*=\s*aws_api_gateway_{resource_type}\.(\w+)\s*$"
     return re.findall(pattern, expression, flags=re.MULTILINE)
 
 

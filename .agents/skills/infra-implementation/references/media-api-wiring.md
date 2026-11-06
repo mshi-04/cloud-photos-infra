@@ -41,7 +41,7 @@
    ```
 
 5. `outputs.tf` の `api_execution_arns` の末尾に `local.api_execution_arns.<key>` を足す。これが Identity Pool の `execute-api:Invoke` の範囲になるため、漏らすとクライアントから 403 になります。順序はロールのポリシーの JSON に入るため、既存の順序を変えません。
-6. ブラウザからの利用を想定するパスなら、`local.cors_preflights` に 1 行足す。`OPTIONS` の method、integration、`method_response`、`integration_response` が作られます。`local.api_routes` と同じ key は使えません。
+6. ブラウザからの利用を想定する新しいパスなら、`local.cors_preflights` に 1 行足す。`OPTIONS` の method、integration、`method_response`、`integration_response` が作られます。`local.api_routes` と同じ key は使えません。既存のパスにメソッドを足す場合は、行を足さず、そのパスの `allow_methods` を更新します。同じパスに `OPTIONS` を 2 つ定義すると、適用時に競合します。
 7. API の動作に影響する属性を新しく設定する場合は、`local.api_deployment_inputs` にもその属性を加える。Gateway Response を足す場合は、`local.api_gateway_responses` にも足す。`aws_api_gateway_deployment.media` は、これらの id と設定（`authorization`、integration の `type`、`integration_http_method`、`uri`、`request_templates`）が変わると置き換えられ、ステージへ反映されます。`local.api_routes` と `local.cors_preflights` に足したものは自動で含まれます。`python scripts/check_api_deployment_inputs.py` で確かめます。
 
 ## 変数と環境差
