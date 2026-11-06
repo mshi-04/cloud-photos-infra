@@ -36,7 +36,7 @@ lambda/
 
 import は、本番とテストのどちらでも `from cloud_photos.<function_group>.<module> import ...` のように修飾付きで書きます。Lambda の `handler` 設定は `cloud_photos.<function_group>.<handler_module>.handler` です。
 
-ZIP は [scripts/build_lambda.py](../scripts/build_lambda.py) が関数群ごとに `.build/<function_group>.zip` へ作ります。ZIP には、関数群のパッケージと、そこから import している `cloud_photos` の共有パッケージが入り、`tests/` とキャッシュは入りません。Terraform は [modules/media_api/archives.tf](../modules/media_api/archives.tf) でこの ZIP を参照します。新しいファイルや共有処理を追加した場合は、[scripts/verify_lambda_packages.py](../scripts/verify_lambda_packages.py) で、ZIP から各 handler を読み込めることを確かめてください。手順は [commands.md](commands.md) にあります。
+ZIP は [scripts/build_lambda.py](../scripts/build_lambda.py) が関数群ごとに `.build/<function_group>.zip` へ作ります。ZIP には、関数群のパッケージと、そこから import している `cloud_photos` の共有パッケージが入り、`tests/` とキャッシュは入りません。Terraform は [modules/media_api/archives.tf](../modules/media_api/archives.tf) でこの ZIP を参照し、どの関数がどの ZIP を使うかは [modules/media_api/main.tf](../modules/media_api/main.tf) の `local.lambda_functions` の `package` で決まります。新しいファイルや共有処理を追加した場合は、[scripts/verify_lambda_packages.py](../scripts/verify_lambda_packages.py) で、ZIP から各 handler を読み込めることを確かめてください。手順は [commands.md](commands.md) にあります。
 
 ## Handler Design
 
