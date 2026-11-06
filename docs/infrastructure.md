@@ -59,6 +59,8 @@ Terraform のセットアップは [setup-terraform](../.github/actions/setup-te
 - `develop` への push で、dev へ plan と apply を行います。
 - `main` への push で、dev へ適用した後に prod へ plan と apply を行います。
 - prod の apply は GitHub の Environment `production` で実行します。承認の要否は Environment の保護設定によります。
-- CI と CD は、ワークフローの `paths` に当たる変更でだけ起動します。文書だけの変更や、`pyproject.toml` だけの変更では起動しません。
+- CI は、PR の変更がワークフローの `paths` に一致すると起動します。`pyproject.toml`、`.github/actions/**`、`.github/workflows/**` だけの変更でも起動します。
+- CD は、`main` または `develop` への push に `envs/**`、`modules/**`、`lambda/**`、`scripts/**` の変更が含まれる場合に起動します。`pyproject.toml` だけの変更では起動しません。
+- `docs/**` やルートの `README.md` だけの変更では、CI と CD のどちらも起動しません。
 
 ワークフローを変更する場合は、認証方式、対象環境、permissions、secrets参照を確認してください。
