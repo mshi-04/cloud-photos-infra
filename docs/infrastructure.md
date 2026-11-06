@@ -30,6 +30,7 @@ IAM権限を広げる場合や `bootstrap/` の変更が必要な場合は、実
 - module input/output の互換性を確認します。
 - リソース名、for_each key、count、module path の変更は replacement や state move の可能性があります。
 - `terraform plan` で destroy/replace が出た場合は、意図した変更かを明記してください。
+- `modules/media_api` の Lambda、ロール、ログ用のポリシー、API のルート、CORS は、`local.lambda_functions`、`local.api_routes`、`local.cors_preflights` の定義表から `for_each` で作ります。表の key は state のアドレスになるため、変えるときは `moved` ブロックで移します。API の追加手順は infra-implementation Skill の `media-api-wiring.md` にあります。
 - prodに影響する場合は devだけで判断しないでください。
 
 ## State And Backend

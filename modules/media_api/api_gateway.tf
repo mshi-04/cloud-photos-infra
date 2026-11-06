@@ -59,19 +59,35 @@ resource "aws_api_gateway_resource" "users" {
 }
 
 # ==========================================
-# Business Routes
+# Routes
 # ==========================================
 locals {
-  # Method and path of each business endpoint. The methods, the Lambda permissions and the
-  # execution ARNs granted to the Cognito role are all derived from this one definition.
+  cors_allow_headers = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
+
   api_routes = {
-    get_uploads           = { method = "GET", path = "media/uploads" }
-    post_uploads          = { method = "POST", path = "media/uploads" }
-    delete_upload         = { method = "DELETE", path = "media/uploads/*" }
-    post_uploads_complete = { method = "POST", path = "media/uploads/complete" }
-    put_devices_token     = { method = "PUT", path = "devices/token" }
-    delete_devices_token  = { method = "DELETE", path = "devices/token" }
-    delete_user           = { method = "DELETE", path = "users" }
+    get_uploads           = { method = "GET", path = "media/uploads", resource = "uploads", function = "get_upload_records" }
+    post_uploads          = { method = "POST", path = "media/uploads", resource = "uploads", function = "create_upload_record" }
+    delete_upload         = { method = "DELETE", path = "media/uploads/*", resource = "upload_item", function = "delete_upload_record" }
+    post_uploads_complete = { method = "POST", path = "media/uploads/complete", resource = "uploads_complete", function = "notify_upload_complete" }
+    put_devices_token     = { method = "PUT", path = "devices/token", resource = "devices_token", function = "register_device_token" }
+    delete_devices_token  = { method = "DELETE", path = "devices/token", resource = "devices_token", function = "unregister_device_token" }
+    delete_user           = { method = "DELETE", path = "users", resource = "users", function = "delete_user" }
+  }
+
+  cors_preflights = {
+    options_uploads          = { resource = "uploads", allow_methods = "GET,POST,OPTIONS" }
+    options_upload_item      = { resource = "upload_item", allow_methods = "DELETE,OPTIONS" }
+    options_uploads_complete = { resource = "uploads_complete", allow_methods = "POST,OPTIONS" }
+    options_devices_token    = { resource = "devices_token", allow_methods = "PUT,DELETE,OPTIONS" }
+    options_users            = { resource = "users", allow_methods = "DELETE,OPTIONS" }
+  }
+
+  api_resource_ids = {
+    uploads          = aws_api_gateway_resource.uploads.id
+    upload_item      = aws_api_gateway_resource.upload_item.id
+    uploads_complete = aws_api_gateway_resource.uploads_complete.id
+    devices_token    = aws_api_gateway_resource.devices_token.id
+    users            = aws_api_gateway_resource.users.id
   }
 
   api_execution_arns = {
@@ -80,101 +96,54 @@ locals {
   }
 }
 
-# ==========================================
-# GET /media/uploads
-# ==========================================
-resource "aws_api_gateway_method" "get_uploads" {
+resource "aws_api_gateway_method" "route" {
+  for_each = local.api_routes
+
   rest_api_id   = aws_api_gateway_rest_api.media.id
-  resource_id   = aws_api_gateway_resource.uploads.id
-  http_method   = local.api_routes.get_uploads.method
+  resource_id   = local.api_resource_ids[each.value.resource]
+  http_method   = each.value.method
   authorization = "AWS_IAM"
 }
 
-resource "aws_api_gateway_integration" "get_uploads" {
+resource "aws_api_gateway_integration" "route" {
+  for_each = local.api_routes
+
   rest_api_id             = aws_api_gateway_rest_api.media.id
-  resource_id             = aws_api_gateway_resource.uploads.id
-  http_method             = aws_api_gateway_method.get_uploads.http_method
+  resource_id             = local.api_resource_ids[each.value.resource]
+  http_method             = aws_api_gateway_method.route[each.key].http_method
   integration_http_method = "POST"
   type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.get_upload_records.invoke_arn
+  uri                     = aws_lambda_function.api[each.value.function].invoke_arn
 }
 
-resource "aws_lambda_permission" "get_uploads" {
+resource "aws_lambda_permission" "route" {
+  for_each = local.api_routes
+
   statement_id  = "AllowAPIGatewayInvoke"
   action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.get_upload_records.function_name
+  function_name = aws_lambda_function.api[each.value.function].function_name
   principal     = "apigateway.amazonaws.com"
-  source_arn    = local.api_execution_arns.get_uploads
+  source_arn    = local.api_execution_arns[each.key]
 }
 
 # ==========================================
-# POST /media/uploads
+# CORS Preflight
 # ==========================================
-resource "aws_api_gateway_method" "post_uploads" {
+resource "aws_api_gateway_method" "cors_preflight" {
+  for_each = local.cors_preflights
+
   rest_api_id   = aws_api_gateway_rest_api.media.id
-  resource_id   = aws_api_gateway_resource.uploads.id
-  http_method   = local.api_routes.post_uploads.method
-  authorization = "AWS_IAM"
-}
-
-resource "aws_api_gateway_integration" "post_uploads" {
-  rest_api_id             = aws_api_gateway_rest_api.media.id
-  resource_id             = aws_api_gateway_resource.uploads.id
-  http_method             = aws_api_gateway_method.post_uploads.http_method
-  integration_http_method = "POST"
-  type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.create_upload_record.invoke_arn
-}
-
-resource "aws_lambda_permission" "post_uploads" {
-  statement_id  = "AllowAPIGatewayInvoke"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.create_upload_record.function_name
-  principal     = "apigateway.amazonaws.com"
-  source_arn    = local.api_execution_arns.post_uploads
-}
-
-# ==========================================
-# DELETE /media/uploads/{mediaId}
-# ==========================================
-resource "aws_api_gateway_method" "delete_upload" {
-  rest_api_id   = aws_api_gateway_rest_api.media.id
-  resource_id   = aws_api_gateway_resource.upload_item.id
-  http_method   = local.api_routes.delete_upload.method
-  authorization = "AWS_IAM"
-}
-
-resource "aws_api_gateway_integration" "delete_upload" {
-  rest_api_id             = aws_api_gateway_rest_api.media.id
-  resource_id             = aws_api_gateway_resource.upload_item.id
-  http_method             = aws_api_gateway_method.delete_upload.http_method
-  integration_http_method = "POST"
-  type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.delete_upload_record.invoke_arn
-}
-
-resource "aws_lambda_permission" "delete_upload" {
-  statement_id  = "AllowAPIGatewayInvoke"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.delete_upload_record.function_name
-  principal     = "apigateway.amazonaws.com"
-  source_arn    = local.api_execution_arns.delete_upload
-}
-
-# ==========================================
-# CORS Preflight for /media/uploads
-# ==========================================
-resource "aws_api_gateway_method" "options_uploads" {
-  rest_api_id   = aws_api_gateway_rest_api.media.id
-  resource_id   = aws_api_gateway_resource.uploads.id
+  resource_id   = local.api_resource_ids[each.value.resource]
   http_method   = "OPTIONS"
   authorization = "NONE"
 }
 
-resource "aws_api_gateway_integration" "options_uploads" {
+resource "aws_api_gateway_integration" "cors_preflight" {
+  for_each = local.cors_preflights
+
   rest_api_id = aws_api_gateway_rest_api.media.id
-  resource_id = aws_api_gateway_resource.uploads.id
-  http_method = aws_api_gateway_method.options_uploads.http_method
+  resource_id = local.api_resource_ids[each.value.resource]
+  http_method = aws_api_gateway_method.cors_preflight[each.key].http_method
   type        = "MOCK"
 
   request_templates = {
@@ -182,10 +151,12 @@ resource "aws_api_gateway_integration" "options_uploads" {
   }
 }
 
-resource "aws_api_gateway_method_response" "options_uploads" {
+resource "aws_api_gateway_method_response" "cors_preflight" {
+  for_each = local.cors_preflights
+
   rest_api_id = aws_api_gateway_rest_api.media.id
-  resource_id = aws_api_gateway_resource.uploads.id
-  http_method = aws_api_gateway_method.options_uploads.http_method
+  resource_id = local.api_resource_ids[each.value.resource]
+  http_method = aws_api_gateway_method.cors_preflight[each.key].http_method
   status_code = "200"
 
   response_parameters = {
@@ -195,311 +166,17 @@ resource "aws_api_gateway_method_response" "options_uploads" {
   }
 }
 
-resource "aws_api_gateway_integration_response" "options_uploads" {
+resource "aws_api_gateway_integration_response" "cors_preflight" {
+  for_each = local.cors_preflights
+
   rest_api_id = aws_api_gateway_rest_api.media.id
-  resource_id = aws_api_gateway_resource.uploads.id
-  http_method = aws_api_gateway_method.options_uploads.http_method
-  status_code = aws_api_gateway_method_response.options_uploads.status_code
+  resource_id = local.api_resource_ids[each.value.resource]
+  http_method = aws_api_gateway_method.cors_preflight[each.key].http_method
+  status_code = aws_api_gateway_method_response.cors_preflight[each.key].status_code
 
   response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
-    "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,OPTIONS'"
-    "method.response.header.Access-Control-Allow-Origin"  = "'${var.cors_allow_origin}'"
-  }
-}
-
-# ==========================================
-# CORS Preflight for /media/uploads/{mediaId}
-# ==========================================
-resource "aws_api_gateway_method" "options_upload_item" {
-  rest_api_id   = aws_api_gateway_rest_api.media.id
-  resource_id   = aws_api_gateway_resource.upload_item.id
-  http_method   = "OPTIONS"
-  authorization = "NONE"
-}
-
-resource "aws_api_gateway_integration" "options_upload_item" {
-  rest_api_id = aws_api_gateway_rest_api.media.id
-  resource_id = aws_api_gateway_resource.upload_item.id
-  http_method = aws_api_gateway_method.options_upload_item.http_method
-  type        = "MOCK"
-
-  request_templates = {
-    "application/json" = "{\"statusCode\": 200}"
-  }
-}
-
-resource "aws_api_gateway_method_response" "options_upload_item" {
-  rest_api_id = aws_api_gateway_rest_api.media.id
-  resource_id = aws_api_gateway_resource.upload_item.id
-  http_method = aws_api_gateway_method.options_upload_item.http_method
-  status_code = "200"
-
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = true
-    "method.response.header.Access-Control-Allow-Methods" = true
-    "method.response.header.Access-Control-Allow-Origin"  = true
-  }
-}
-
-resource "aws_api_gateway_integration_response" "options_upload_item" {
-  rest_api_id = aws_api_gateway_rest_api.media.id
-  resource_id = aws_api_gateway_resource.upload_item.id
-  http_method = aws_api_gateway_method.options_upload_item.http_method
-  status_code = aws_api_gateway_method_response.options_upload_item.status_code
-
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
-    "method.response.header.Access-Control-Allow-Methods" = "'DELETE,OPTIONS'"
-    "method.response.header.Access-Control-Allow-Origin"  = "'${var.cors_allow_origin}'"
-  }
-}
-
-# ==========================================
-# POST /media/uploads/complete
-# ==========================================
-resource "aws_api_gateway_method" "post_uploads_complete" {
-  rest_api_id   = aws_api_gateway_rest_api.media.id
-  resource_id   = aws_api_gateway_resource.uploads_complete.id
-  http_method   = local.api_routes.post_uploads_complete.method
-  authorization = "AWS_IAM"
-}
-
-resource "aws_api_gateway_integration" "post_uploads_complete" {
-  rest_api_id             = aws_api_gateway_rest_api.media.id
-  resource_id             = aws_api_gateway_resource.uploads_complete.id
-  http_method             = aws_api_gateway_method.post_uploads_complete.http_method
-  integration_http_method = "POST"
-  type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.notify_upload_complete.invoke_arn
-}
-
-resource "aws_lambda_permission" "post_uploads_complete" {
-  statement_id  = "AllowAPIGatewayInvoke"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.notify_upload_complete.function_name
-  principal     = "apigateway.amazonaws.com"
-  source_arn    = local.api_execution_arns.post_uploads_complete
-}
-
-# ==========================================
-# CORS Preflight for /media/uploads/complete
-# ==========================================
-resource "aws_api_gateway_method" "options_uploads_complete" {
-  rest_api_id   = aws_api_gateway_rest_api.media.id
-  resource_id   = aws_api_gateway_resource.uploads_complete.id
-  http_method   = "OPTIONS"
-  authorization = "NONE"
-}
-
-resource "aws_api_gateway_integration" "options_uploads_complete" {
-  rest_api_id = aws_api_gateway_rest_api.media.id
-  resource_id = aws_api_gateway_resource.uploads_complete.id
-  http_method = aws_api_gateway_method.options_uploads_complete.http_method
-  type        = "MOCK"
-
-  request_templates = {
-    "application/json" = "{\"statusCode\": 200}"
-  }
-}
-
-resource "aws_api_gateway_method_response" "options_uploads_complete" {
-  rest_api_id = aws_api_gateway_rest_api.media.id
-  resource_id = aws_api_gateway_resource.uploads_complete.id
-  http_method = aws_api_gateway_method.options_uploads_complete.http_method
-  status_code = "200"
-
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = true
-    "method.response.header.Access-Control-Allow-Methods" = true
-    "method.response.header.Access-Control-Allow-Origin"  = true
-  }
-}
-
-resource "aws_api_gateway_integration_response" "options_uploads_complete" {
-  rest_api_id = aws_api_gateway_rest_api.media.id
-  resource_id = aws_api_gateway_resource.uploads_complete.id
-  http_method = aws_api_gateway_method.options_uploads_complete.http_method
-  status_code = aws_api_gateway_method_response.options_uploads_complete.status_code
-
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
-    "method.response.header.Access-Control-Allow-Methods" = "'POST,OPTIONS'"
-    "method.response.header.Access-Control-Allow-Origin"  = "'${var.cors_allow_origin}'"
-  }
-}
-
-# ==========================================
-# PUT /devices/token
-# ==========================================
-resource "aws_api_gateway_method" "put_devices_token" {
-  rest_api_id   = aws_api_gateway_rest_api.media.id
-  resource_id   = aws_api_gateway_resource.devices_token.id
-  http_method   = local.api_routes.put_devices_token.method
-  authorization = "AWS_IAM"
-}
-
-resource "aws_api_gateway_integration" "put_devices_token" {
-  rest_api_id             = aws_api_gateway_rest_api.media.id
-  resource_id             = aws_api_gateway_resource.devices_token.id
-  http_method             = aws_api_gateway_method.put_devices_token.http_method
-  integration_http_method = "POST"
-  type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.register_device_token.invoke_arn
-}
-
-resource "aws_lambda_permission" "put_devices_token" {
-  statement_id  = "AllowAPIGatewayInvoke"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.register_device_token.function_name
-  principal     = "apigateway.amazonaws.com"
-  source_arn    = local.api_execution_arns.put_devices_token
-}
-
-# ==========================================
-# DELETE /devices/token
-# ==========================================
-resource "aws_api_gateway_method" "delete_devices_token" {
-  rest_api_id   = aws_api_gateway_rest_api.media.id
-  resource_id   = aws_api_gateway_resource.devices_token.id
-  http_method   = local.api_routes.delete_devices_token.method
-  authorization = "AWS_IAM"
-}
-
-resource "aws_api_gateway_integration" "delete_devices_token" {
-  rest_api_id             = aws_api_gateway_rest_api.media.id
-  resource_id             = aws_api_gateway_resource.devices_token.id
-  http_method             = aws_api_gateway_method.delete_devices_token.http_method
-  integration_http_method = "POST"
-  type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.unregister_device_token.invoke_arn
-}
-
-resource "aws_lambda_permission" "delete_devices_token" {
-  statement_id  = "AllowAPIGatewayInvoke"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.unregister_device_token.function_name
-  principal     = "apigateway.amazonaws.com"
-  source_arn    = local.api_execution_arns.delete_devices_token
-}
-
-# ==========================================
-# CORS Preflight for /devices/token
-# ==========================================
-resource "aws_api_gateway_method" "options_devices_token" {
-  rest_api_id   = aws_api_gateway_rest_api.media.id
-  resource_id   = aws_api_gateway_resource.devices_token.id
-  http_method   = "OPTIONS"
-  authorization = "NONE"
-}
-
-resource "aws_api_gateway_integration" "options_devices_token" {
-  rest_api_id = aws_api_gateway_rest_api.media.id
-  resource_id = aws_api_gateway_resource.devices_token.id
-  http_method = aws_api_gateway_method.options_devices_token.http_method
-  type        = "MOCK"
-
-  request_templates = {
-    "application/json" = "{\"statusCode\": 200}"
-  }
-}
-
-resource "aws_api_gateway_method_response" "options_devices_token" {
-  rest_api_id = aws_api_gateway_rest_api.media.id
-  resource_id = aws_api_gateway_resource.devices_token.id
-  http_method = aws_api_gateway_method.options_devices_token.http_method
-  status_code = "200"
-
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = true
-    "method.response.header.Access-Control-Allow-Methods" = true
-    "method.response.header.Access-Control-Allow-Origin"  = true
-  }
-}
-
-resource "aws_api_gateway_integration_response" "options_devices_token" {
-  rest_api_id = aws_api_gateway_rest_api.media.id
-  resource_id = aws_api_gateway_resource.devices_token.id
-  http_method = aws_api_gateway_method.options_devices_token.http_method
-  status_code = aws_api_gateway_method_response.options_devices_token.status_code
-
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
-    "method.response.header.Access-Control-Allow-Methods" = "'PUT,DELETE,OPTIONS'"
-    "method.response.header.Access-Control-Allow-Origin"  = "'${var.cors_allow_origin}'"
-  }
-}
-
-# ==========================================
-# DELETE /users
-# ==========================================
-resource "aws_api_gateway_method" "delete_user" {
-  rest_api_id   = aws_api_gateway_rest_api.media.id
-  resource_id   = aws_api_gateway_resource.users.id
-  http_method   = local.api_routes.delete_user.method
-  authorization = "AWS_IAM"
-}
-
-resource "aws_api_gateway_integration" "delete_user" {
-  rest_api_id             = aws_api_gateway_rest_api.media.id
-  resource_id             = aws_api_gateway_resource.users.id
-  http_method             = aws_api_gateway_method.delete_user.http_method
-  integration_http_method = "POST"
-  type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.delete_user.invoke_arn
-}
-
-resource "aws_lambda_permission" "delete_user" {
-  statement_id  = "AllowAPIGatewayInvoke"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.delete_user.function_name
-  principal     = "apigateway.amazonaws.com"
-  source_arn    = local.api_execution_arns.delete_user
-}
-
-# ==========================================
-# CORS Preflight for /users
-# ==========================================
-resource "aws_api_gateway_method" "options_users" {
-  rest_api_id   = aws_api_gateway_rest_api.media.id
-  resource_id   = aws_api_gateway_resource.users.id
-  http_method   = "OPTIONS"
-  authorization = "NONE"
-}
-
-resource "aws_api_gateway_integration" "options_users" {
-  rest_api_id = aws_api_gateway_rest_api.media.id
-  resource_id = aws_api_gateway_resource.users.id
-  http_method = aws_api_gateway_method.options_users.http_method
-  type        = "MOCK"
-
-  request_templates = {
-    "application/json" = "{\"statusCode\": 200}"
-  }
-}
-
-resource "aws_api_gateway_method_response" "options_users" {
-  rest_api_id = aws_api_gateway_rest_api.media.id
-  resource_id = aws_api_gateway_resource.users.id
-  http_method = aws_api_gateway_method.options_users.http_method
-  status_code = "200"
-
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = true
-    "method.response.header.Access-Control-Allow-Methods" = true
-    "method.response.header.Access-Control-Allow-Origin"  = true
-  }
-}
-
-resource "aws_api_gateway_integration_response" "options_users" {
-  rest_api_id = aws_api_gateway_rest_api.media.id
-  resource_id = aws_api_gateway_resource.users.id
-  http_method = aws_api_gateway_method.options_users.http_method
-  status_code = aws_api_gateway_method_response.options_users.status_code
-
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
-    "method.response.header.Access-Control-Allow-Methods" = "'DELETE,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Headers" = local.cors_allow_headers
+    "method.response.header.Access-Control-Allow-Methods" = "'${each.value.allow_methods}'"
     "method.response.header.Access-Control-Allow-Origin"  = "'${var.cors_allow_origin}'"
   }
 }
@@ -513,7 +190,7 @@ resource "aws_api_gateway_gateway_response" "default_4xx" {
 
   response_parameters = {
     "gatewayresponse.header.Access-Control-Allow-Origin"  = "'${var.cors_allow_origin}'"
-    "gatewayresponse.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
+    "gatewayresponse.header.Access-Control-Allow-Headers" = local.cors_allow_headers
   }
 }
 
@@ -523,7 +200,7 @@ resource "aws_api_gateway_gateway_response" "default_5xx" {
 
   response_parameters = {
     "gatewayresponse.header.Access-Control-Allow-Origin"  = "'${var.cors_allow_origin}'"
-    "gatewayresponse.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
+    "gatewayresponse.header.Access-Control-Allow-Headers" = local.cors_allow_headers
   }
 }
 
@@ -531,50 +208,12 @@ resource "aws_api_gateway_gateway_response" "default_5xx" {
 # Deployment & Stage
 # ==========================================
 locals {
-  # The resources whose settings change how the published API behaves. Add a new method, integration,
-  # response or gateway response here, so that changing it redeploys the stage.
-  api_methods = {
-    get_uploads              = aws_api_gateway_method.get_uploads
-    post_uploads             = aws_api_gateway_method.post_uploads
-    delete_upload            = aws_api_gateway_method.delete_upload
-    options_uploads          = aws_api_gateway_method.options_uploads
-    options_upload_item      = aws_api_gateway_method.options_upload_item
-    post_uploads_complete    = aws_api_gateway_method.post_uploads_complete
-    options_uploads_complete = aws_api_gateway_method.options_uploads_complete
-    put_devices_token        = aws_api_gateway_method.put_devices_token
-    delete_devices_token     = aws_api_gateway_method.delete_devices_token
-    options_devices_token    = aws_api_gateway_method.options_devices_token
-    delete_user              = aws_api_gateway_method.delete_user
-    options_users            = aws_api_gateway_method.options_users
-  }
-  api_integrations = {
-    get_uploads              = aws_api_gateway_integration.get_uploads
-    post_uploads             = aws_api_gateway_integration.post_uploads
-    delete_upload            = aws_api_gateway_integration.delete_upload
-    options_uploads          = aws_api_gateway_integration.options_uploads
-    options_upload_item      = aws_api_gateway_integration.options_upload_item
-    post_uploads_complete    = aws_api_gateway_integration.post_uploads_complete
-    options_uploads_complete = aws_api_gateway_integration.options_uploads_complete
-    put_devices_token        = aws_api_gateway_integration.put_devices_token
-    delete_devices_token     = aws_api_gateway_integration.delete_devices_token
-    options_devices_token    = aws_api_gateway_integration.options_devices_token
-    delete_user              = aws_api_gateway_integration.delete_user
-    options_users            = aws_api_gateway_integration.options_users
-  }
-  api_method_responses = {
-    options_uploads          = aws_api_gateway_method_response.options_uploads
-    options_upload_item      = aws_api_gateway_method_response.options_upload_item
-    options_uploads_complete = aws_api_gateway_method_response.options_uploads_complete
-    options_devices_token    = aws_api_gateway_method_response.options_devices_token
-    options_users            = aws_api_gateway_method_response.options_users
-  }
-  api_integration_responses = {
-    options_uploads          = aws_api_gateway_integration_response.options_uploads
-    options_upload_item      = aws_api_gateway_integration_response.options_upload_item
-    options_uploads_complete = aws_api_gateway_integration_response.options_uploads_complete
-    options_devices_token    = aws_api_gateway_integration_response.options_devices_token
-    options_users            = aws_api_gateway_integration_response.options_users
-  }
+  # The resources whose settings change how the published API behaves. A route or CORS preflight added to
+  # its table is included automatically; add a new gateway response here, so that changing it redeploys the stage.
+  api_methods               = merge(aws_api_gateway_method.route, aws_api_gateway_method.cors_preflight)
+  api_integrations          = merge(aws_api_gateway_integration.route, aws_api_gateway_integration.cors_preflight)
+  api_method_responses      = aws_api_gateway_method_response.cors_preflight
+  api_integration_responses = aws_api_gateway_integration_response.cors_preflight
   api_gateway_responses = {
     default_4xx = aws_api_gateway_gateway_response.default_4xx
     default_5xx = aws_api_gateway_gateway_response.default_5xx
@@ -632,6 +271,11 @@ resource "aws_api_gateway_deployment" "media" {
 
   lifecycle {
     create_before_destroy = true
+
+    precondition {
+      condition     = length(setintersection(keys(local.api_routes), keys(local.cors_preflights))) == 0
+      error_message = "local.api_routes and local.cors_preflights must not share a key: merge() in local.api_methods would silently drop one of them."
+    }
   }
 }
 

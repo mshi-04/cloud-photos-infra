@@ -95,10 +95,10 @@ Terraform は [modules/media_api/archives.tf](../../../../modules/media_api/arch
    認証と応答は `common` から直接 import する。
 2. handler は [handler-patterns.md](handler-patterns.md) の骨格に合わせる。
 3. `modules/media_api/` の次のファイルに追加する。新規グループなら `archives.tf` の `local.lambda_packages` に ZIP のパスを足し、
-   `main.tf` の `local.lambda_functions` に関数名、`iam.tf` に `aws_iam_role` と用途別の `aws_iam_role_policy`、
-   `lambda.tf` に `aws_lambda_function`、`api_gateway.tf` に resource / method / integration / `aws_lambda_permission`。
-4. 新しい method / integration を `api_gateway.tf` の `local.api_methods` と `local.api_integrations` に足す。
-   忘れるとステージへ反映されません。手順は infra-implementation Skill の media-api-wiring にあります。
+   `main.tf` の `local.lambda_functions` に関数の定義、`iam.tf` にデータアクセスの `aws_iam_role_policy`、
+   `api_gateway.tf` の `local.api_routes` にルート、`outputs.tf` の `api_execution_arns` に実行 ARN を足す。
+4. 新しいパスなら `api_gateway.tf` に `aws_api_gateway_resource`、`local.api_resource_ids`、`local.cors_preflights` を足す。
+   手順は infra-implementation Skill の media-api-wiring にあります。
 5. `tests/` を追加し、`lambda/` で `pytest` を通す。CI も同じ `pytest` を実行するため、ジョブへの追加は要りません。
 6. `python scripts/build_lambda.py` で ZIP を作り、`scripts/verify_lambda_packages.py` で新しい handler を読み込めることを確かめる。
 

@@ -7,73 +7,60 @@
 
 | ファイル | 内容 |
 |---|---|
-| [main.tf](../../../../modules/media_api/main.tf) | `data`（`aws_region`、`aws_caller_identity`）、`locals` の `function_prefix` と `lambda_functions` |
+| [main.tf](../../../../modules/media_api/main.tf) | `locals` の `function_prefix`、`lambda_runtime`、関数の定義表 `lambda_functions` |
 | [archives.tf](../../../../modules/media_api/archives.tf) | `local.lambda_packages`（`scripts/build_lambda.py` が `.build/` に作る ZIP のパス） |
-| [iam.tf](../../../../modules/media_api/iam.tf) | `locals` の `assume_role_policy`、Lambda ごとの `aws_iam_role`、用途ごとの `aws_iam_role_policy`（dynamodb / s3 / secretsmanager / logs） |
-| [lambda.tf](../../../../modules/media_api/lambda.tf) | `aws_cloudwatch_log_group`（`local.lambda_functions` を `for_each`）、`aws_lambda_function`、`aws_lambda_code_signing_config` |
-| [api_gateway.tf](../../../../modules/media_api/api_gateway.tf) | REST API、パスごとの resource、エンドポイントごとの method / integration / `aws_lambda_permission`、CORS の `OPTIONS`、Gateway Response、deployment、stage |
+| [iam.tf](../../../../modules/media_api/iam.tf) | `locals` の `assume_role_policy`、`aws_iam_role.lambda` と `aws_iam_role_policy.logs`（`local.lambda_functions` を `for_each`）、関数ごとのデータアクセスの `aws_iam_role_policy`（dynamodb / s3 / secretsmanager） |
+| [lambda.tf](../../../../modules/media_api/lambda.tf) | `aws_cloudwatch_log_group.lambda` と `aws_lambda_function.api`（`local.lambda_functions` を `for_each`）、`aws_lambda_code_signing_config` |
+| [api_gateway.tf](../../../../modules/media_api/api_gateway.tf) | REST API、パスごとの resource、定義表 `api_routes` と `cors_preflights`、method / integration / `aws_lambda_permission`（`route[<key>]`）、CORS の 4 種類（`cors_preflight[<key>]`）、Gateway Response、deployment、stage |
 | [variables.tf](../../../../modules/media_api/variables.tf) / [outputs.tf](../../../../modules/media_api/outputs.tf) | 入出力 |
+| [moved.tf](../../../../modules/media_api/moved.tf) | `for_each` へ移したリソースの `moved` ブロック |
 
 ## エンドポイント追加の手順
 
-1. `main.tf` の `local.lambda_functions` に `<key> = "<ハイフン区切り関数名>"` を足す。
-   log group の `for_each` がこのマップを参照します。
-2. `iam.tf` に `aws_iam_role` を 1 つ作り、`assume_role_policy = local.assume_role_policy` を使う。
-3. 用途ごとに `aws_iam_role_policy` を分ける。`name` は `dynamodb-query` / `s3-delete` /
-   `cloudwatch-logs` のように権限内容を表す。logs は必ず自分の log group ARN に限定する。
+1. `main.tf` の `local.lambda_functions` に要素を足す。Lambda 本体、ロール、ログ用のポリシー、log group は、この表から `for_each` で作られます。
 
    ```hcl
-   Resource = "${aws_cloudwatch_log_group.lambda["<key>"].arn}:*"
+   <key> = {
+     name                    = "<ハイフン区切り関数名>"
+     handler                 = "cloud_photos.<function_group>.<module>.handler"
+     package                 = "<function_group>"
+     timeout                 = var.lambda_timeout
+     layers                  = null
+     code_signing_config_arn = null
+     environment             = tomap({ TABLE_NAME = var.dynamodb_table_name })
+   }
    ```
 
-4. `lambda.tf` に `aws_lambda_function` を追加する。`runtime = "python3.12"`、`handler = "cloud_photos.<function_group>.<module>.handler"`、
-   `filename = local.lambda_packages.<function_group>`、`source_code_hash = filebase64sha256(local.lambda_packages.<function_group>)` とし、
-   `depends_on = [aws_cloudwatch_log_group.lambda["<key>"]]` を付ける。
-5. 以降は `api_gateway.tf` を変える。パスが新しければ `aws_api_gateway_resource` を足す。既存パスなら再利用する。
-6. `aws_api_gateway_method`（`authorization = "AWS_IAM"`）、
-   `aws_api_gateway_integration`（`integration_http_method = "POST"`、`type = "AWS_PROXY"`）、
-   `aws_lambda_permission` の 3 点セットを作る。
-   `source_arn` はメソッドとパスまで絞る。
-
-   メソッドとパスは `api_gateway.tf` の `local.api_routes` に1行で定義し、method の `http_method` と
-   permission の `source_arn` はそこから導出します。
+   要素はすべて同じ属性を持たせます。レイヤーやコード署名を持たない関数は `null` にします。`layers = []` にすると、設定値が空配列に変わります。新しい関数群なら、`archives.tf` の `local.lambda_packages` にも ZIP のパスを足します。
+2. `iam.tf` にデータアクセスのポリシーを足す。権限の境界をレビューしやすいように、関数ごとの個別のリソースにします。`name` は `dynamodb-query` / `s3-delete` のように権限内容を表し、`role` は `aws_iam_role.lambda["<key>"].id` にします。
+3. 以降は `api_gateway.tf` を変える。パスが新しければ `aws_api_gateway_resource` を足し、`local.api_resource_ids` にも足す。既存パスなら再利用する。
+4. `local.api_routes` に 1 行足す。method、integration（`AWS_PROXY`）、`aws_lambda_permission` は、この表から `for_each` で作られます。`function` は `local.lambda_functions` の key、`resource` は `local.api_resource_ids` の key です。`source_arn` は `method` と `path` から導出され、メソッドとパスまで絞られます。
 
    ```hcl
-   get_uploads = { method = "GET", path = "media/uploads" }
+   get_uploads = { method = "GET", path = "media/uploads", resource = "uploads", function = "get_upload_records" }
    ```
 
-   ```hcl
-   http_method = local.api_routes.get_uploads.method
-   source_arn  = local.api_execution_arns.get_uploads
-   ```
-
-7. `outputs.tf` の `api_execution_arns` に `local.api_execution_arns.<key>` を足す。これが Identity Pool の
-   `execute-api:Invoke` の範囲になるため、漏らすとクライアントから 403 になります。
-8. 新しい method と integration を、`api_gateway.tf` の `local.api_methods` と `local.api_integrations` に足す。
-   `aws_api_gateway_deployment.media` は、これらの id と設定（`authorization`、integration の `type`、
-   `integration_http_method`、`uri`、`request_templates`）が変わると置き換えられ、ステージへ反映されます。
-   漏らすと、リソースは作られてもステージへ反映されません。`python scripts/check_api_deployment_inputs.py` で確かめます。
-9. ブラウザからの利用を想定するパスなら `OPTIONS`（`authorization = "NONE"`）と
-   `method_response` / `integration_response` を追加し、`local.api_method_responses` と
-   `local.api_integration_responses` にも足す。API の動作に影響する属性を新しく設定する場合は、
-   `local.api_deployment_inputs` にもその属性を加える。
+5. `outputs.tf` の `api_execution_arns` の末尾に `local.api_execution_arns.<key>` を足す。これが Identity Pool の `execute-api:Invoke` の範囲になるため、漏らすとクライアントから 403 になります。順序はロールのポリシーの JSON に入るため、既存の順序を変えません。
+6. ブラウザからの利用を想定する新しいパスなら、`local.cors_preflights` に 1 行足す。`OPTIONS` の method、integration、`method_response`、`integration_response` が作られます。`local.api_routes` と同じ key は使えません。既存のパスにメソッドを足す場合は、行を足さず、そのパスの `allow_methods` を更新します。同じパスに `OPTIONS` を 2 つ定義すると、適用時に競合します。
+7. API の動作に影響する属性を新しく設定する場合は、`local.api_deployment_inputs` にもその属性を加える。Gateway Response を足す場合は、`local.api_gateway_responses` にも足す。`aws_api_gateway_deployment.media` は、これらの id と設定（`authorization`、integration の `type`、`integration_http_method`、`uri`、`request_templates`）が変わると置き換えられ、ステージへ反映されます。`local.api_routes` と `local.cors_preflights` に足したものは自動で含まれます。`python scripts/check_api_deployment_inputs.py` で確かめます。
 
 ## 変数と環境差
 
 `modules/` 内に `var.env` の分岐を書きません。差分は `envs/*/main.tf` から変数で渡します。
 `media_api` の既定値は `lambda_memory_size = 256`、`lambda_timeout = 10` です。
-`notify_upload_complete` と `delete_user` はモジュール内で `timeout = 30` を直接指定しています。
+`notify_upload_complete` と `delete_user` は `local.lambda_functions` で `timeout = 30` を直接指定しています。
 
 `env` には `contains(["dev", "prod"], var.env)` の `validation` があります。
 新しい環境を足すときはここも更新が必要です。
 
 ## 変更時の注意
 
-- `local.lambda_functions` の key を変えると log group が置換されます。関数名の変更は
+- `local.lambda_functions`、`local.api_routes`、`local.cors_preflights` の key は state のアドレスになります。key を変えるときは `moved` ブロックで移します。関数の `name` の変更は
   Lambda 本体・log group・IAM ロール名を同時に動かすため、`terraform plan` の destroy / replace を必ず読みます。
 - `aws_api_gateway_resource` の `path_part` 変更は下流の method / integration をすべて置換します。
 - リソース名やモジュールパスを変えるだけの整理でも state の移行が必要になります。`moved` ブロックで移し、
   実装前にユーザーへ方針を示します。ファイルを分けるだけなら、リソースアドレスは変わりません。
+- `moved.tf` のブロックは、dev と prod の両方へ適用したことを確かめた後の、別の変更で削除します。
 - IAM 権限を広げる変更と `bootstrap/` の変更は、実装前に方針を提示します。
 
 ## 検証

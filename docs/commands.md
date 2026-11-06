@@ -37,7 +37,7 @@ terraform fmt -check -recursive
 tflint --recursive --config "$PWD/.tflint.hcl"
 ```
 
-`media_api` の method、integration、レスポンス、Gateway Response が、API の再デプロイの判定にすべて含まれているかを確かめます。CI も同じスクリプトを実行します。
+`media_api` の method、integration、レスポンス、Gateway Response が、API の再デプロイの判定にすべて含まれているかと、`local.api_routes` と `local.cors_preflights` の key が重ならないかを確かめます。CI も同じスクリプトを実行します。
 
 ```powershell
 python scripts/check_api_deployment_inputs.py

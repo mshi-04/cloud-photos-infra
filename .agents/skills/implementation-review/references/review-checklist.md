@@ -53,11 +53,12 @@
 
 `terraform plan` に destroy / replace が出た場合、意図した変更かを明記します。
 
-- `local.lambda_functions` の key 変更 → log group の置換
+- `local.lambda_functions`、`local.api_routes`、`local.cors_preflights` の key 変更 → `for_each` のアドレスの変更。`moved` ブロックがなければ置換になる
 - `aws_api_gateway_resource.path_part` 変更 → 下流 method / integration の置換
 - リソース名・モジュールパスの変更 → `moved` ブロックがあるか。手作業の `terraform state mv` を前提にしていないか
 - `deletion_protection_enabled` / `force_destroy` / `noncurrent_version_expiration_days` の変更 → データ保護の後退
-- 新しい method / integration / レスポンスが `api_gateway.tf` の `local.api_*` に入り、API の動作に影響する新しい属性が `local.api_deployment_inputs` に入っているか（`scripts/check_api_deployment_inputs.py`）
+- 新しい method / integration / レスポンスが `local.api_routes` か `local.cors_preflights` から作られ、新しい Gateway Response が `local.api_gateway_responses` に入り、API の動作に影響する新しい属性が `local.api_deployment_inputs` に入っているか（`scripts/check_api_deployment_inputs.py`）
+- 出力の `api_execution_arns` の順序を変えていないか。Identity Pool のロールのポリシーの JSON が変わる
 
 ## コード品質
 
