@@ -75,11 +75,11 @@ def dynamodb_table(monkeypatch):
 環境変数は `monkeypatch.setenv` で設定し、テストの終了時に元へ戻します。
 値オブジェクト（`models.py`）は、AWS のモックを使わずに `test_models.py` で直接テストします。
 
-`db.py` を持たない `users/delete_user.py` は、そのモジュールの `get_s3_client.cache_clear()` と `get_dynamodb_client.cache_clear()` を呼びます。
+`users` の `conftest.py` は、`storage.get_s3_client.cache_clear()` と `db.get_dynamodb_client.cache_clear()` を呼びます。
 
 ## conftest（S3 + 複数テーブル）
 
-`users` の形です。バージョニングまで再現します。`delete_user.py` が
+`users` の形です。バージョニングまで再現します。`users/storage.py` が
 `list_object_versions` と `DeleteMarkers` を扱うため、これが無いとテストになりません。
 
 ```python

@@ -35,7 +35,7 @@ lambda/
       notify_upload_complete.py
       tests/
     users/
-      __init__.py  constants.py
+      __init__.py  constants.py  db.py  storage.py
       delete_user.py
       tests/
   layers/firebase_admin/requirements.txt
@@ -86,8 +86,8 @@ Terraform は [modules/media_api/archives.tf](../../../../modules/media_api/arch
 | `notify_upload_complete` | `TABLE_NAME`（device tokens）、`FIREBASE_CREDENTIALS_SECRET_ARN` |
 | `delete_user` | `S3_BUCKET_NAME`、`UPLOAD_RECORDS_TABLE_NAME`、`DEVICE_TOKENS_TABLE_NAME` |
 
-`db.py` を持つグループは `get_table_name()` が `os.environ["TABLE_NAME"]` をキャッシュします。
-複数テーブルを扱う `delete_user.py` は `db.py` を持たず、handler で環境変数を直接読みます。
+`users` 以外の `db.py` は `get_table_name()` が `os.environ["TABLE_NAME"]` をキャッシュします。
+複数の保存先を扱う `delete_user.py` は handler で環境変数を直接読み、バケット名とテーブル名を `users/storage.py` と `users/db.py` の関数へ引数で渡します。
 
 ## 新規関数を追加するとき
 

@@ -24,7 +24,7 @@ lambda/
     media_uploads/           # get_upload_records / create_upload_record / delete_upload_record
     device_tokens/           # register_device_token / unregister_device_token
     push_notification/       # notify_upload_complete
-    users/                   # delete_user
+    users/                   # delete_user（S3 の削除は storage.py、DynamoDB の削除は db.py）
     <function_group>/
       __init__.py
       <handler_module>.py    # def handler(event, context)

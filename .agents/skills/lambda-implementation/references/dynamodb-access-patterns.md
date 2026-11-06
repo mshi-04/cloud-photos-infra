@@ -107,7 +107,7 @@ get_dynamodb_client().update_item(
 
 ## BatchWrite
 
-`users/delete_user.py` のみ物理削除を行います。
+`users/db.py` のみ物理削除を行います。
 
 - `ProjectionExpression` で key 属性だけを取得してから削除する
 - 25 件ずつ `batch_write_item` する
@@ -115,7 +115,7 @@ get_dynamodb_client().update_item(
   それでも残る場合は `RuntimeError` にする
 - `LastEvaluatedKey` がある限り Query を繰り返す
 
-`users/delete_user.py` の `_batch_delete_items` は、query が返す AttributeValue 形式のキーを `DeleteRequest` にそのまま渡します。ここで再度 `serialize_item` は使いません。
+`users/db.py` の `_batch_delete_items` は、query が返す AttributeValue 形式のキーを `DeleteRequest` にそのまま渡します。ここで再度 `serialize_item` は使いません。
 
 S3 側は `list_object_versions` のページネータで `Versions` と `DeleteMarkers` を集め、
 1000 件ごとに `delete_objects` します。`Delete.Objects` の上限が 1000 のためです。

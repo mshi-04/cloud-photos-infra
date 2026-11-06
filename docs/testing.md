@@ -51,6 +51,8 @@ lambda/
 
 `common/tests/` では、Identity ID、応答、DynamoDB の値の変換、デバイストークン、本文の解析を直接テストします。共通処理のテストを関数群ごとに複製しません。テーブルやバケットを作る moto の fixture とクライアントキャッシュのクリアは、ライフサイクルが異なるため各関数群の `tests/conftest.py` に残します。
 
+`users/tests/test_delete_user.py` は、`delete_user.py` の handler と、`users/storage.py`・`users/db.py` の関数をテストします。クライアントキャッシュのクリア先は `storage.get_s3_client` と `db.get_dynamodb_client` です。
+
 ## What To Cover
 
 - 正常系
