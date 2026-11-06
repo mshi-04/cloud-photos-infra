@@ -9,6 +9,7 @@ Run from anywhere: `python scripts/check_lambda_role_names.py`.
 
 import re
 import sys
+from collections import Counter
 from pathlib import Path
 from typing import Final
 
@@ -23,14 +24,18 @@ def source_of(path: Path) -> str:
     return without_comments(path.read_text(encoding="utf-8"))
 
 
-def bootstrap_names() -> set[str] | None:
-    expression = local_expression(source_of(BOOTSTRAP_FILE), "lambda_function_names")
-    return None if expression is None else set(re.findall(r'"([^"]+)"', expression))
+def bootstrap_names() -> list[str]:
+    expression = local_expression(source_of(BOOTSTRAP_FILE), "lambda_function_names") or ""
+    return re.findall(r'"([^"]+)"', expression)
 
 
-def media_api_names() -> set[str] | None:
-    expression = local_expression(source_of(MEDIA_API_FILE), "lambda_functions")
-    return None if expression is None else set(re.findall(r'^\s*name\s*=\s*"([^"]+)"', expression, flags=re.MULTILINE))
+def media_api_names() -> list[str]:
+    expression = local_expression(source_of(MEDIA_API_FILE), "lambda_functions") or ""
+    return re.findall(r'^\s*name\s*=\s*"([^"]+)"', expression, flags=re.MULTILINE)
+
+
+def duplicates(names: list[str]) -> list[str]:
+    return sorted(name for name, count in Counter(names).items() if count > 1)
 
 
 def main() -> int:
@@ -40,16 +45,20 @@ def main() -> int:
         problems.append(f"local.lambda_function_names has no names in {BOOTSTRAP_FILE.relative_to(REPO_ROOT)}")
     if not media_api:
         problems.append(f"local.lambda_functions has no names in {MEDIA_API_FILE.relative_to(REPO_ROOT)}")
+    if repeated := duplicates(bootstrap):
+        problems.append(f"local.lambda_function_names in bootstrap repeats: {', '.join(repeated)}")
+    if repeated := duplicates(media_api):
+        problems.append(f"local.lambda_functions in media_api repeats: {', '.join(repeated)}")
     if bootstrap and media_api:
-        if missing := sorted(media_api - bootstrap):
+        if missing := sorted(set(media_api) - set(bootstrap)):
             problems.append(f"local.lambda_function_names in bootstrap lacks: {', '.join(missing)}")
-        if unknown := sorted(bootstrap - media_api):
+        if unknown := sorted(set(bootstrap) - set(media_api)):
             problems.append(f"local.lambda_function_names in bootstrap has functions unknown to media_api: {', '.join(unknown)}")
     for problem in problems:
         print(problem, file=sys.stderr)
     if problems:
         return 1
-    print(f"bootstrap and media_api list the same {len(media_api or ())} Lambda functions.")
+    print(f"bootstrap and media_api list the same {len(media_api)} Lambda functions.")
     return 0
 
 
