@@ -9,13 +9,18 @@ terraform {
   }
 }
 
+locals {
+  env          = "prod"
+  project_name = "cloud-photos"
+}
+
 provider "aws" {
   region = "ap-northeast-1"
 
   default_tags {
     tags = {
-      Project     = "cloud-photos"
-      Environment = "prod"
+      Project     = local.project_name
+      Environment = local.env
       ManagedBy   = "Terraform"
     }
   }
@@ -24,8 +29,8 @@ provider "aws" {
 module "cognito" {
   source = "../../modules/cognito"
 
-  env                 = "prod"
-  project_name        = "cloud-photos"
+  env                 = local.env
+  project_name        = local.project_name
   deletion_protection = "ACTIVE"
   mfa_configuration   = "ON"
 }
@@ -33,8 +38,8 @@ module "cognito" {
 module "media_storage" {
   source = "../../modules/media_storage"
 
-  env                                = "prod"
-  project_name                       = "cloud-photos"
+  env                                = local.env
+  project_name                       = local.project_name
   force_destroy                      = false
   noncurrent_version_expiration_days = 90
 }
@@ -42,8 +47,8 @@ module "media_storage" {
 module "identity_pool" {
   source = "../../modules/identity_pool"
 
-  env                 = "prod"
-  project_name        = "cloud-photos"
+  env                 = local.env
+  project_name        = local.project_name
   user_pool_id        = module.cognito.user_pool_id
   user_pool_client_id = module.cognito.user_pool_client_id
   media_bucket_arn    = module.media_storage.bucket_arn
@@ -53,16 +58,16 @@ module "identity_pool" {
 module "media_db" {
   source = "../../modules/media_db"
 
-  env                         = "prod"
-  project_name                = "cloud-photos"
+  env                         = local.env
+  project_name                = local.project_name
   deletion_protection_enabled = true
 }
 
 module "media_api" {
   source = "../../modules/media_api"
 
-  env                             = "prod"
-  project_name                    = "cloud-photos"
+  env                             = local.env
+  project_name                    = local.project_name
   dynamodb_table_name             = module.media_db.table_name
   dynamodb_table_arn              = module.media_db.table_arn
   device_tokens_table_name        = module.device_token_db.table_name
@@ -80,14 +85,14 @@ module "media_api" {
 module "device_token_db" {
   source = "../../modules/device_token_db"
 
-  env                         = "prod"
-  project_name                = "cloud-photos"
+  env                         = local.env
+  project_name                = local.project_name
   deletion_protection_enabled = true
 }
 
 module "push_notification" {
   source = "../../modules/push_notification"
 
-  env          = "prod"
-  project_name = "cloud-photos"
+  env          = local.env
+  project_name = local.project_name
 }
