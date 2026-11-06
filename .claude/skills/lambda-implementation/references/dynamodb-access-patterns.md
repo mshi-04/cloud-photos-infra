@@ -1,6 +1,6 @@
 # DynamoDB アクセスパターン
 
-テーブル定義、`db.py` のヘルパー、操作別の実装、対応する IAM です。
+テーブル定義、共有の値の変換、関数群ごとの操作、対応する IAM です。
 
 ## テーブル
 
@@ -13,25 +13,26 @@
 `Query` は partition key の等価条件が必須なので、現行テーブルでは `userId` を条件に含めます。
 `Scan` は `userId` 条件なしでも実行できますが、テーブル全体を読むため現行設計では使いません。追加する前にアクセスパターンとテーブル設計を見直します。
 
-## db.py
+## 共通の変換と db.py
 
-`media_uploads/db.py` の関数です。`device_tokens/db.py` と `push_notification/db.py` も同じ形で、読み出した値をそのまま返さないため `deserialize_item` は持ちません。
+`serialize_item` と `deserialize_item` は `cloud_photos.common.dynamodb` から import します。テーブルのキー属性名（`FIELD_USER_ID`、`FIELD_MEDIA_ID`、`FIELD_DEVICE_TOKEN`）は `cloud_photos.common.tables` に置きます。リクエストの項目名など、その関数群だけが使う定数は各 `constants.py` に残し、入力を解析する `models.py` はテーブル定義に依存させません。
 
 | 関数 | 役割 |
 |---|---|
-| `get_dynamodb_client()` | クライアントを `functools.cache` でキャッシュ |
-| `get_table_name()` | `os.environ["TABLE_NAME"]` を `functools.cache` でキャッシュ |
-| `serialize_item(item)` | `TypeSerializer` で `{"S": ...}` 形式へ |
-| `deserialize_item(item)` | `TypeDeserializer` + `Decimal` を int / float へ変換 |
-| `put_upload_record` / `mark_upload_record_deleted` / `query_upload_records` | 操作ごとの DynamoDB の呼び出し |
+| `common.dynamodb.serialize_item(item)` | `TypeSerializer` で AttributeValue 形式へ |
+| `common.dynamodb.deserialize_item(item)` | `TypeDeserializer` + `Decimal` を int / float へ変換 |
+| 各 `db.py` の `get_dynamodb_client()` | クライアントを `functools.cache` でキャッシュ |
+| `users` 以外の `db.py` の `get_table_name()` | `os.environ["TABLE_NAME"]` を `functools.cache` でキャッシュ |
+| `media_uploads/db.py` の `put_upload_record` / `mark_upload_record_deleted` / `query_upload_records` | 操作ごとの DynamoDB の呼び出し |
 
-テストでは `get_dynamodb_client.cache_clear()` と `get_table_name.cache_clear()` を呼びます。DynamoDB の呼び出しは操作ごとの関数に分け、値オブジェクトを受け取って、呼び出しの直前に生の値を取り出します。条件式の失敗は関数の中で `bool` に変え、それ以外の `ClientError` はそのまま送出します。応答への変換は handler が行います。
+テストでは `get_dynamodb_client.cache_clear()` と、`users` 以外では `get_table_name.cache_clear()` を呼びます。DynamoDB の呼び出しは操作ごとの関数に分け、値オブジェクトを受け取って、呼び出しの直前に生の値を取り出します。条件式の失敗は関数の中で `bool` に変え、それ以外の `ClientError` はそのまま送出します。応答への変換は handler が行います。
 
 low-level client（`boto3.client("dynamodb")`）を使うため、値は必ず AttributeValue 形式です。
 `serialize_item` は `ExpressionAttributeValues` にも使えます。
+キーの組み立て（`_key`）とクエリの `ExpressionAttributeValues` は、キャッシュや IAM の境界と同じく関数群に残します。`push_notification/db.py` の読み出しも `deserialize_item` を通します。
 
 ```python
-"ExpressionAttributeValues": serialize_item({":user_id": identity_id})
+"ExpressionAttributeValues": serialize_item({":user_id": identity_id.value})
 ```
 
 レスポンスの `Decimal` をそのまま `json.dumps` に渡さないため、読み出しは `deserialize_item` を通します。
@@ -83,7 +84,7 @@ ExpressionAttributeNames={"#platform": FIELD_PLATFORM, ...},
 ExpressionAttributeValues=serialize_item({":platform": platform, ":now": now}),
 ```
 
-予約語や `constants.py` 由来の名前は `ExpressionAttributeNames` で受けます。
+予約語や定数由来の名前は `ExpressionAttributeNames` で受けます。
 
 ## 論理削除
 
@@ -106,13 +107,15 @@ get_dynamodb_client().update_item(
 
 ## BatchWrite
 
-`users/delete_user.py` のみ物理削除を行います。
+`batch_write_item` で一括して物理削除するのは、ユーザー削除の `users/db.py` だけです。`device_tokens/db.py` と `push_notification/db.py` の `delete_device_token` は、`DeleteItem` で 1 件ずつ物理削除します。
 
 - `ProjectionExpression` で key 属性だけを取得してから削除する
 - 25 件ずつ `batch_write_item` する
 - `UnprocessedItems` は `0.1 * (2 ** attempt)` の指数バックオフで最大 5 回リトライし、
   それでも残る場合は `RuntimeError` にする
 - `LastEvaluatedKey` がある限り Query を繰り返す
+
+`users/db.py` の `_batch_delete_items` は、query が返す AttributeValue 形式のキーを `DeleteRequest` にそのまま渡します。ここで再度 `serialize_item` は使いません。
 
 S3 側は `list_object_versions` のページネータで `Versions` と `DeleteMarkers` を集め、
 1000 件ごとに `delete_objects` します。`Delete.Objects` の上限が 1000 のためです。

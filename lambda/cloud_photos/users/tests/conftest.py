@@ -2,7 +2,7 @@ import boto3
 import pytest
 from moto import mock_aws
 
-from cloud_photos.users import delete_user
+from cloud_photos.users import db, storage
 
 S3_BUCKET_NAME = "test-media-bucket"
 UPLOAD_RECORDS_TABLE_NAME = "test-upload-records"
@@ -54,10 +54,10 @@ def aws_resources(monkeypatch):
         )
 
         # Recreate the cached clients inside the moto mock.
-        delete_user.get_s3_client.cache_clear()
-        delete_user.get_dynamodb_client.cache_clear()
+        storage.get_s3_client.cache_clear()
+        db.get_dynamodb_client.cache_clear()
 
         yield {"s3": s3, "dynamodb": dynamodb}
 
-        delete_user.get_s3_client.cache_clear()
-        delete_user.get_dynamodb_client.cache_clear()
+        storage.get_s3_client.cache_clear()
+        db.get_dynamodb_client.cache_clear()

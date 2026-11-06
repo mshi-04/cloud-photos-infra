@@ -13,10 +13,10 @@
 
 ## identity の取得
 
-`IdentityId`、`get_identity_id`、`mask_identity` の正本は [lambda/cloud_photos/common/auth.py](../../../../lambda/cloud_photos/common/auth.py) です。
-`IdentityId` は Identity ID の値オブジェクトで、`from_event` で event から生成し、`str()` と `repr()` では伏せ字になります。生の値は `.value` で、AWS を呼び出す直前にだけ取り出します。
+`IdentityId` の正本は [lambda/cloud_photos/common/auth.py](../../../../lambda/cloud_photos/common/auth.py) です。Identity ID の取り出しと伏せ字は、このモジュールの非公開の処理です。
+`IdentityId` は Identity ID の値オブジェクトで、`from_event` で event から生成し、`str()` と `repr()` では伏せ字になります。生の値は `.value` で取り出し、所有者境界の比較と AWS/FCM 呼び出しの引数作成に限って使います。ログやエラー応答に識別子を含める場合は、伏せ字にする値オブジェクトを渡します。
 
-各関数群の `auth.py`（`media_uploads`、`device_tokens`、`push_notification`、`users`）は `IdentityId` を re-export します。新しい関数群も re-export にし、コピーを作りません。
+handler、`db.py`、`models.py`、テストのすべてで `IdentityId` を `cloud_photos.common.auth` から直接 import します。関数群ごとの再エクスポートは作りません。伏せ字の定数は `common.masking` にあり、Identity ID は先頭4文字と末尾4文字、デバイストークンは末尾4文字だけを残します。8文字以下はどちらも全体を伏せます。
 
 `requestContext`、`identity`、`cognitoIdentityId` の欠落・null・想定外の型は、例外にせず `None` を返します。handler は `None` を未認証として扱います。
 
@@ -24,7 +24,7 @@
 
 | リソース | 境界 | 実装箇所 |
 |---|---|---|
-| S3 オブジェクト | `private/<identity_id>/` プレフィックス一致 | `models.CloudStoragePath.belongs_to`（`create_upload_record.py` が書き込み前に呼ぶ）、`delete_user.py`（削除対象の列挙） |
+| S3 オブジェクト | `private/<identity_id>/` プレフィックス一致 | `models.CloudStoragePath.belongs_to`（`create_upload_record.py` が書き込み前に呼ぶ）、`users/storage.py`（削除対象の列挙） |
 | DynamoDB（upload records） | HASH key `userId` に identity_id | `get_upload_records.py`、`create_upload_record.py`、`delete_upload_record.py` |
 | DynamoDB（device tokens） | HASH key `userId` に identity_id | `register_device_token.py`、`unregister_device_token.py` |
 | ページネーション継続キー | `lastEvaluatedKey.userId == identity_id` | `models.PageCursor.parse` |
@@ -36,6 +36,7 @@
 
 所有者の判定は、保存パスの値オブジェクト `CloudStoragePath` が持ちます。handler は判定を呼び、結果を 403 に変換します。
 保存パスには Identity ID が含まれるため、`CloudStoragePath` は `str()` と `repr()` で伏せ字になります。
+`PRIVATE_PATH_PREFIX` は `cloud_photos.common.storage` から import し、所有者確認や S3 操作の直前にパスを組み立てます。`IdentityId` に S3 のパス規則を持たせません。
 
 ```python
 def belongs_to(self, identity_id: IdentityId) -> bool:

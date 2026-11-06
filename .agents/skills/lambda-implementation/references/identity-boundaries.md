@@ -24,7 +24,7 @@ handler、`db.py`、`models.py`、テストのすべてで `IdentityId` を `clo
 
 | リソース | 境界 | 実装箇所 |
 |---|---|---|
-| S3 オブジェクト | `private/<identity_id>/` プレフィックス一致 | `models.CloudStoragePath.belongs_to`（`create_upload_record.py` が書き込み前に呼ぶ）、`delete_user.py`（削除対象の列挙） |
+| S3 オブジェクト | `private/<identity_id>/` プレフィックス一致 | `models.CloudStoragePath.belongs_to`（`create_upload_record.py` が書き込み前に呼ぶ）、`users/storage.py`（削除対象の列挙） |
 | DynamoDB（upload records） | HASH key `userId` に identity_id | `get_upload_records.py`、`create_upload_record.py`、`delete_upload_record.py` |
 | DynamoDB（device tokens） | HASH key `userId` に identity_id | `register_device_token.py`、`unregister_device_token.py` |
 | ページネーション継続キー | `lastEvaluatedKey.userId == identity_id` | `models.PageCursor.parse` |

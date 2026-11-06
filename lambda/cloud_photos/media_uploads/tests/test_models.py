@@ -7,6 +7,7 @@ from cloud_photos.common.errors import AuthorizationError, ValidationError
 from cloud_photos.media_uploads.models import (
     CloudStoragePath,
     CreateUploadRecordRequest,
+    DeleteUploadRecordRequest,
     FileSize,
     GetUploadRecordsRequest,
     MediaId,
@@ -233,6 +234,24 @@ class TestCreateUploadRecordRequest:
     def test_data_not_object_rejected(self, data):
         with pytest.raises(ValidationError, match=r"^Request body must be an object$"):
             CreateUploadRecordRequest.parse(data)
+
+
+class TestDeleteUploadRecordRequest:
+    def test_valid(self):
+        assert DeleteUploadRecordRequest.parse({"mediaId": "media-001"}).media_id == MediaId("media-001")
+
+    @pytest.mark.parametrize("raw", ["   ", " media-001 "], ids=["whitespace_only", "surrounding_whitespace"])
+    def test_media_id_is_not_stripped(self, raw):
+        assert DeleteUploadRecordRequest.parse({"mediaId": raw}).media_id.value == raw
+
+    @pytest.mark.parametrize(
+        "path_parameters",
+        [None, "media-001", {}, {"mediaId": None}, {"mediaId": ""}, {"mediaId": 123}],
+        ids=["null", "not_object", "no_media_id", "media_id_null", "media_id_empty", "media_id_not_string"],
+    )
+    def test_invalid_path_parameters_rejected(self, path_parameters):
+        with pytest.raises(ValidationError, match=r"^Missing mediaId$"):
+            DeleteUploadRecordRequest.parse(path_parameters)
 
 
 class TestGetUploadRecordsRequest:

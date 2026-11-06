@@ -28,7 +28,7 @@
 
 ## ログ衛生
 
-- identity は `mask_identity` を通すか、伏せ字にする値オブジェクト（`IdentityId`、`DeviceToken`）で渡しているか
+- identity は伏せ字にする値オブジェクト（`IdentityId`、`DeviceToken`）で渡しているか。伏せ字の定数は `common.masking` を使っているか
 - 生の `cognitoIdentityId`、`deviceToken`、リクエストボディ、認証情報が出ていないか
   （FCM トークンは `DeviceToken` で渡し、末尾 4 文字より多くは出さない）
 - 例外の詳細をレスポンス本文へ載せていないか。500 の本文は `"Internal server error"` 固定か
@@ -61,8 +61,8 @@
 
 ## コード品質
 
-- `auth.py` / `response.py` / `db.py` のパターンに従っているか。ヘルパーを迂回していないか
-- フィールド名・列挙値が `constants.py` に集約されているか。文字列直書きが無いか
+- 認証と応答を `common.auth` / `common.response` から直接 import し、関数群の `db.py` では `common.dynamodb` の変換を使っているか。共有の契約を複製していないか
+- テーブルのキー属性名は `common.tables`、保存パスのプレフィックスは `common.storage`、関数群だけが使う項目名・上限・列挙値は各 `constants.py` に集約されているか。文字列直書きが無いか
 - 型ヒントが付いているか（Python 3.12）
 - 条件式失敗を操作別に扱っているか。`create_upload_record.py` の重複は 200、`delete_upload_record.py` の対象不存在は 404、その他の AWS 呼び出しの失敗は 500。想定外の例外を 500 に変えていないか
 - 動作変更に対応するテストが追加・更新されているか

@@ -82,6 +82,35 @@ class TestDeleteUploadRecord:
         resp = handler(event, None)
         assert resp["statusCode"] == 400
 
+    @pytest.mark.parametrize(
+        "path_parameters",
+        [None, "media-001", {}, {"mediaId": None}, {"mediaId": ""}, {"mediaId": 123}],
+        ids=["null", "not_object", "no_media_id", "media_id_null", "media_id_empty", "media_id_not_string"],
+    )
+    def test_invalid_path_parameters_return_missing_media_id(self, dynamodb_table, path_parameters):
+        event = {
+            "requestContext": {"identity": {"cognitoIdentityId": IDENTITY_ID}},
+            "pathParameters": path_parameters,
+        }
+
+        resp = handler(event, None)
+
+        assert resp["statusCode"] == 400
+        assert json.loads(resp["body"]) == {"message": "Missing mediaId"}
+
+    @pytest.mark.parametrize("media_id", ["   ", f" {MEDIA_ID} "], ids=["whitespace_only", "surrounding_whitespace"])
+    def test_media_id_with_whitespace_does_not_match_the_stripped_record(self, dynamodb_table, media_id):
+        _seed_record(dynamodb_table)
+
+        resp = handler(_make_event(media_id=media_id), None)
+
+        assert resp["statusCode"] == 404
+        item = dynamodb_table.get_item(
+            TableName=os.environ["TABLE_NAME"],
+            Key={"userId": {"S": IDENTITY_ID}, "mediaId": {"S": MEDIA_ID}},
+        )["Item"]
+        assert "isDeleted" not in item
+
     def test_other_users_record_is_not_deleted(self, dynamodb_table):
         _seed_record(dynamodb_table, identity_id="ap-northeast-1:other-user-id")
 
