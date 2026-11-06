@@ -51,21 +51,14 @@ jobs:
         working-directory: ${{ inputs.tf_working_dir }}
     steps:
       - uses: actions/checkout@v4
-
-      - name: Read Terraform version
-        id: tf_version
-        run: |
-          TF_VERSION_FILE="$GITHUB_WORKSPACE/.terraform-version"
-          if [ ! -f "$TF_VERSION_FILE" ]; then
-            echo "::error::.terraform-version file not found at repository root"
-            exit 1
-          fi
-          echo "version=$(cat "$TF_VERSION_FILE")" >> "$GITHUB_OUTPUT"
-
-      - uses: hashicorp/setup-terraform@v3
         with:
-          terraform_wrapper: false
-          terraform_version: ${{ inputs.tf_version || steps.tf_version.outputs.version }}
+          persist-credentials: false
+
+      - name: Setup Terraform
+        uses: ./.github/actions/setup-terraform
+        with:
+          terraform-wrapper: "false"
+          terraform-version: ${{ inputs.tf_version }}
 
       - name: Configure AWS (OIDC) - plan role
         uses: aws-actions/configure-aws-credentials@v4
@@ -73,28 +66,40 @@ jobs:
           role-to-assume: ${{ inputs.role_plan }}
           aws-region: ${{ inputs.aws_region }}
 
-      - name: Build Firebase Admin Lambda Layer
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # The ZIPs built here are uploaded with the plan, so apply deploys exactly what plan saw.
+      # The layer is installed with the pinned AWS SAM build image, so the same requirements give the same ZIP.
+      - name: Build Lambda packages and layers
+        working-directory: ${{ github.workspace }}
+        run: python scripts/build_lambda.py --with-layers
+
+      - name: Verify Lambda packages
         working-directory: ${{ github.workspace }}
         run: |
-          mkdir -p .build
-          docker run --rm \
-            -v "${{ github.workspace }}/.build:/out" \
-            -v "${{ github.workspace }}/lambda/layers/firebase_admin:/requirements" \
-            public.ecr.aws/sam/build-python3.12:latest-x86_64 \
-            bash -c "pip install -r /requirements/requirements.txt -t /tmp/python --quiet && cd /tmp && zip -r9 /out/firebase_admin_layer.zip python"
+          pip install --quiet --target "$RUNNER_TEMP/runtime-deps" boto3
+          python scripts/verify_lambda_packages.py \
+            --runtime-deps "$RUNNER_TEMP/runtime-deps" \
+            --layer "push_notification=.build/firebase_admin_layer.zip"
 
       - name: Terraform init
-        run: terraform init -backend-config="bucket=${{ inputs.tf_state_bucket }}"
+        env:
+          TF_STATE_BUCKET: ${{ inputs.tf_state_bucket }}
+        run: terraform init -backend-config="bucket=$TF_STATE_BUCKET"
 
       - name: Terraform plan (save)
         run: terraform plan -no-color -lock-timeout=5m -out=tfplan
 
       - name: Terraform show (summary)
+        env:
+          TF_ENV_NAME: ${{ inputs.env_name }}
         run: |
           SUMMARY_LINE=$(terraform show -no-color tfplan | grep -E '^(Plan:|No changes\.)' | tail -n 1 || true)
           echo "${SUMMARY_LINE:-Plan summary unavailable.}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "詳細差分は artifact (tfplan-${{ inputs.env_name }}) を参照してください。" >> $GITHUB_STEP_SUMMARY
+          echo "詳細差分は artifact (tfplan-$TF_ENV_NAME) を参照してください。" >> $GITHUB_STEP_SUMMARY
 
       - name: Upload plan artifact
         uses: actions/upload-artifact@v4
@@ -119,21 +124,14 @@ jobs:
         working-directory: ${{ inputs.tf_working_dir }}
     steps:
       - uses: actions/checkout@v4
-
-      - name: Read Terraform version
-        id: tf_version
-        run: |
-          TF_VERSION_FILE="$GITHUB_WORKSPACE/.terraform-version"
-          if [ ! -f "$TF_VERSION_FILE" ]; then
-            echo "::error::.terraform-version file not found at repository root"
-            exit 1
-          fi
-          echo "version=$(cat "$TF_VERSION_FILE")" >> "$GITHUB_OUTPUT"
-
-      - uses: hashicorp/setup-terraform@v3
         with:
-          terraform_wrapper: false
-          terraform_version: ${{ inputs.tf_version || steps.tf_version.outputs.version }}
+          persist-credentials: false
+
+      - name: Setup Terraform
+        uses: ./.github/actions/setup-terraform
+        with:
+          terraform-wrapper: "false"
+          terraform-version: ${{ inputs.tf_version }}
 
       - name: Download plan artifact
         uses: actions/download-artifact@v4
@@ -148,7 +146,11 @@ jobs:
           aws-region: ${{ inputs.aws_region }}
 
       - name: Terraform init
-        run: terraform init -backend-config="bucket=${{ inputs.tf_state_bucket }}"
+        env:
+          TF_STATE_BUCKET: ${{ inputs.tf_state_bucket }}
+        run: terraform init -backend-config="bucket=$TF_STATE_BUCKET"
 
       - name: Terraform apply (from saved plan)
-        run: terraform apply -lock-timeout=5m ${{ github.workspace }}/${{ inputs.tf_working_dir }}/tfplan
+        env:
+          TF_WORKING_DIR: ${{ inputs.tf_working_dir }}
+        run: terraform apply -lock-timeout=5m "$GITHUB_WORKSPACE/$TF_WORKING_DIR/tfplan"

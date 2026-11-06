@@ -1,36 +1,55 @@
 ---
 name: implementation-review
-description: 実装差分のレビューに使う。最小権限IAM / IDOR防止 / PII・トークンのログ漏洩 / シークレット混入 / 既存パターン準拠を観点に変更を点検する。セキュリティ観点を中核に据える。
+description: 実装差分のレビューに使う。比較対象を依頼や PR から確かめ、最小権限 IAM、IDOR 防止、PII とトークンのログ漏洩、シークレットの混入、API 応答の契約、コーディング規約を観点に変更を点検し、根拠とともに分類して報告する。セキュリティの観点を中核に据える。
 ---
 
 # Implementation Review
 
-## 実装手順
+ブランチや PR の差分をレビューする作業に使う。このリポジトリにない他の Skill を前提にしない。
 
-1. ベースブランチ（`develop` / `main`）との差分を対象にする。一般的な品質網羅は `review-branch` skill、脆弱性スキャンは `security-review` / `trivy` と併用する。
-2. IAM: `"Action":"*"` / `"Resource":"*"` を避け、アクションとARNを限定して `jsonencode` で書かれているか確認する。CloudWatch Logs の event write は、限定した log group ARN に必要な `:*` suffixを許容する（`modules/media_api/main.tf`）。
-3. IDOR: 全データアクセス前に identity 境界（S3 `private/<identity>/`、DynamoDB key、`lastEvaluatedKey.userId`）を確認しているか。認証だけで満足していないか。
-4. ログ衛生: `mask_identity` を通し、生 `cognitoIdentityId` / `deviceToken` / 認証情報・リクエストボディをログに出していないか。
-5. シークレット混入: トークン・秘密鍵・AWSアカウントID（12桁）・PII が差分に無いか。
-6. Cognito / 認可設定: `prevent_user_existence_errors`、password policy、`generate_secret = false`、API method の `authorization = "AWS_IAM"` が弱められていないか。
-7. コード品質: `auth.py` / `response.py` / `db.py` パターン準拠、`constants.py` 集約、型ヒント、`ClientError` の操作別レスポンス、テスト更新を確認する。新規実装の未認証レスポンスは403。既存の `users` / `push_notification` は401を維持し、変更する場合はAPI互換性とテストを確認する。
+## 比較対象の確かめ方
+
+1. 依頼に比較対象のブランチやコミットがあれば、それを使う。
+2. PR のレビューなら、PR の base branch を使う。`develop` が常に比較対象だと仮定しない。
+3. どちらも分からない場合は、ユーザーに確認する。
+
+比較対象を取得してから、共通の祖先からの差分を見る。比較対象がブランチなら `origin/<base>` を、コミットなら SHA をそのまま使う。
+
+```powershell
+# ブランチの場合
+git fetch origin <base>
+git diff origin/<base>...HEAD
+
+# コミットの場合。ローカルにないときだけ git fetch origin <sha> を先に実行する
+git diff <sha>...HEAD
+```
+
+## レビュー手順
+
+1. 変更されたファイルから、関係する契約と規約を選んで読む。Lambda なら [docs/lambda.md](../../../docs/lambda.md)、Terraform なら [docs/infrastructure.md](../../../docs/infrastructure.md)、どちらにも [docs/security.md](../../../docs/security.md) と [docs/coding_standards.md](../../../docs/coding_standards.md) を使う。
+2. セキュリティを確かめる。IAM の最小権限、データアクセス前の所有者確認（IDOR）、ログの衛生、シークレットや AWS アカウント ID の混入、Cognito と API の認証設定。
+3. 契約を確かめる。API の応答（ステータス、本文、未認証の 401 と 403）、条件付き書き込み、冪等性が、[docs/lambda.md](../../../docs/lambda.md) と一致するか。
+4. コーディング規約を確かめる。新しく書いたコードと変更した範囲が、[docs/coding_standards.md](../../../docs/coding_standards.md) の原則に従っているか。指摘には、根拠の原則の名前（例:「早期リターン」「値オブジェクト」）を示す。
+5. Terraform では、plan で destroy や replace が出る変更、`moved` ブロックのない改名、データ保護の後退を確かめる。
+6. 動作の変更に対応するテストがあるかを確かめる。
+
+観点ごとの確認項目は [review-checklist.md](references/review-checklist.md) を参照する。
 
 ## トリアージ
 
-各指摘は次のいずれかに分類して報告する。
+各指摘は次のいずれかに分類する。
 
-- **Critical**: マージブロック。リリース前に必ず直す。例: Lambda のクラッシュ・未処理例外、データ損失（破壊的な物理削除・`terraform` のリソース置換/destroy）、認証・権限不備（IDOR、IAM の過剰権限・ワイルドカード）、secret 漏洩（トークン・鍵・AWSアカウントID・PII の混入やログ出力）、state/migration 破壊（不適切な `state mv`・互換性のない変更）、CI で確実に失敗する問題。
-- **Suggestion**: マージブロックではないが、保守性、責務分離、テスト網羅、エラー処理、性能、将来の変更容易性を明確に改善する指摘。
-- **Nitpick**: 動作や設計への影響が小さい表記、命名、整形、軽微な読みやすさの指摘。対応任意として扱う。
+- **Critical**: マージを止める。例: Lambda のクラッシュや未処理例外、データ損失（物理削除、意図しないリソースの置換や destroy）、認証・権限の不備（IDOR、IAM の過剰な権限やワイルドカード）、シークレットの漏洩（トークン、鍵、AWS アカウント ID、PII の混入やログ出力）、state の破壊、CI で確実に失敗する問題。
+- **Suggestion**: マージは止めないが、保守性、責務の分離、テストの網羅、エラー処理、性能、規約への準拠を明確に改善する。
+- **Nitpick**: 動作や設計への影響が小さい表記、命名、整形。対応は任意。
 
-## 検証手順
+## 報告
 
-1. 差分取得 `git diff develop...HEAD`（リモート PR は `review-branch` skill）。
-2. IaC を含むなら `trivy conf .`。
-3. 指摘は「ファイル:行」と根拠（規約・出典）を添えて報告する。
+指摘ごとに「ファイル:行」、分類、根拠（契約、規約の原則、既存の実装の該当箇所）を示す。IaC を含む差分では、可能なら `trivy conf .` を実行し、実行できなければ `Not executed` として理由を書く。検証の報告は [docs/verification_policy.md](../../../docs/verification_policy.md) の形式に従う。
 
 ## 参考資料
 
-- [references/review-checklist.md](references/review-checklist.md): 観点ごとの確認項目と根拠となる実装位置
+- [references/review-checklist.md](references/review-checklist.md): 観点ごとの確認項目と根拠となる実装の位置
 - [docs/security.md](../../../docs/security.md)
+- [docs/coding_standards.md](../../../docs/coding_standards.md)
 - [docs/guardrails.md](../../../docs/guardrails.md)

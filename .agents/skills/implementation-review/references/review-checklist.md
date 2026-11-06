@@ -28,9 +28,9 @@
 
 ## ログ衛生
 
-- identity は `mask_identity` を通しているか
+- identity は伏せ字にする値オブジェクト（`IdentityId`、`DeviceToken`）で渡しているか。伏せ字の定数は `common.masking` を使っているか
 - 生の `cognitoIdentityId`、`deviceToken`、リクエストボディ、認証情報が出ていないか
-  （FCM トークンは `token[-4:]` のみが既存の扱い）
+  （FCM トークンは `DeviceToken` で渡し、末尾 4 文字より多くは出さない）
 - 例外の詳細をレスポンス本文へ載せていないか。500 の本文は `"Internal server error"` 固定か
 
 ## シークレット混入
@@ -53,32 +53,42 @@
 
 `terraform plan` に destroy / replace が出た場合、意図した変更かを明記します。
 
-- `local.lambda_functions` の key 変更 → log group の置換
+- `local.lambda_functions`、`local.api_routes`、`local.cors_preflights` の key 変更 → `for_each` のアドレスの変更。`moved` ブロックがなければ置換になる
 - `aws_api_gateway_resource.path_part` 変更 → 下流 method / integration の置換
-- リソース名・モジュールパスの変更 → `terraform state mv` の要否
+- リソース名・モジュールパスの変更 → `moved` ブロックがあるか。手作業の `terraform state mv` を前提にしていないか
 - `deletion_protection_enabled` / `force_destroy` / `noncurrent_version_expiration_days` の変更 → データ保護の後退
-- `aws_api_gateway_deployment.media` の `triggers.redeployment` に新しい id が入っているか
+- 新しい method / integration / レスポンスが `local.api_routes` か `local.cors_preflights` から作られ、新しい Gateway Response が `local.api_gateway_responses` に入り、API の動作に影響する新しい属性が `local.api_deployment_inputs` に入っているか（`scripts/check_api_deployment_inputs.py`）
+- 出力の `api_execution_arns` の順序を変えていないか。Identity Pool のロールのポリシーの JSON が変わる
+- `local.lambda_functions` に足した関数が `bootstrap` の `local.lambda_function_names` にも入っているか（`scripts/check_lambda_role_names.py`）。一覧の順序を変えていないか。ポリシーの JSON が変わる
 
 ## コード品質
 
-- `auth.py` / `response.py` / `db.py` のパターンに従っているか。ヘルパーを迂回していないか
-- フィールド名・列挙値が `constants.py` に集約されているか。文字列直書きが無いか
+- 認証と応答を `common.auth` / `common.response` から直接 import し、関数群の `db.py` では `common.dynamodb` の変換を使っているか。共有の契約を複製していないか
+- テーブルのキー属性名は `common.tables`、保存パスのプレフィックスは `common.storage`、関数群だけが使う項目名・上限・列挙値は各 `constants.py` に集約されているか。文字列直書きが無いか
 - 型ヒントが付いているか（Python 3.12）
-- 条件式失敗を操作別に扱っているか。`create_upload_record.py` の重複は 200、`delete_upload_record.py` の対象不存在は 404、その他の例外は 500
+- 条件式失敗を操作別に扱っているか。`create_upload_record.py` の重複は 200、`delete_upload_record.py` の対象不存在は 404、その他の AWS 呼び出しの失敗は 500。想定外の例外を 500 に変えていないか
 - 動作変更に対応するテストが追加・更新されているか
-- 新規ファイルが明示リスト方式の ZIP に属する場合、`modules/media_api/main.tf` の `locals` へ
-  追加されているか
+- import が `cloud_photos.<function_group>.<module>` の修飾付きか。トップレベル名の import や `sys.path` の操作を足していないか
+- ファイルや共有処理を追加・移動した場合、ビルドした ZIP から各 handler を読み込めることを確かめたか
 
-## トリアージ
+## コーディング規約
 
-- **Critical**: クラッシュ・未処理例外、データ損失、認証/権限不備、secret 漏洩、state 破壊、CI 確実失敗
-- **Suggestion**: 保守性・責務分離・テスト網羅・エラー処理・性能の明確な改善
-- **Nitpick**: 表記・命名・整形。対応任意
+新しく書いたコードと、変更した範囲を [docs/coding_standards.md](../../../../docs/coding_standards.md) の原則と照らします。
+変更していない既存コードの書き方は、指摘の対象にしません。指摘には原則の名前を添えます。
 
-指摘には「ファイル:行」と根拠（規約または既存実装の該当箇所）を添えます。
+- 値オブジェクト: 不変条件や機密性を持つ入力を、検証付きの値オブジェクトで表しているか
+- 早期リターン: 前提条件をガード節で返しているか。`return` や `raise` の後に `else` を重ねていないか
+- handler の責務: 検証や業務規則を handler に直接書いていないか
+- 例外: `except Exception` を最も外側以外で使っていないか
+- 型: 引数と戻り値に型があるか。`Any` を境界以外で使っていないか
+- Terraform: 新しいモジュールに `versions.tf` があるか。変数に `type` と `description` があるか。
+  `count` を有効と無効の切り替え以外に使っていないか。モジュールの中で環境名による分岐をしていないか
+
+指摘の分類（Critical / Suggestion / Nitpick）は SKILL.md のトリアージに従い、「ファイル:行」と根拠を添えます。
 
 ## 参考資料
 
 - [docs/security.md](../../../../docs/security.md)
+- [docs/coding_standards.md](../../../../docs/coding_standards.md)
 - [docs/guardrails.md](../../../../docs/guardrails.md)
 - [docs/verification_policy.md](../../../../docs/verification_policy.md)

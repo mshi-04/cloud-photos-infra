@@ -30,6 +30,7 @@ IAM権限を広げる場合や `bootstrap/` の変更が必要な場合は、実
 - module input/output の互換性を確認します。
 - リソース名、for_each key、count、module path の変更は replacement や state move の可能性があります。
 - `terraform plan` で destroy/replace が出た場合は、意図した変更かを明記してください。
+- `modules/media_api` の Lambda、ロール、ログ用のポリシー、API のルート、CORS は、`local.lambda_functions`、`local.api_routes`、`local.cors_preflights` の定義表から `for_each` で作ります。表の key は state のアドレスになるため、変えるときは `moved` ブロックで移します。API の追加手順は infra-implementation Skill の `media-api-wiring.md` にあります。
 - prodに影響する場合は devだけで判断しないでください。
 
 ## State And Backend
@@ -48,12 +49,21 @@ IAM権限を広げる場合や `bootstrap/` の変更が必要な場合は、実
 - 手動適用が必要な順序
 - 適用しない場合の制約
 
+dev と prod の plan・apply のロールとポリシーは、`bootstrap/oidc_roles.tf` の `local.environments` から `for_each` で作ります。`bootstrap/moved.tf` のブロックは、適用したことを確かめた後の別の変更で削除します。
+
 ## CI/CD
 
 ワークフローは `.github/workflows/` にあります。
 
-- PRでは plan、lint、test を実行します。
-- `main` マージ後、devへ自動適用されます。
-- prodは手動承認を前提にします。
+Terraform のセットアップは [setup-terraform](../.github/actions/setup-terraform/action.yml)、Lambda の lint と test の Python 環境構築は [setup-python-dev](../.github/actions/setup-python-dev/action.yml) に共通化しています。共通 Action だけの変更でも PR の CI を実行します。
+
+- `main` と `develop` への PR では、lint、Pyright、test、Trivy、Terraform の format を実行します。dev と prod の plan ジョブは、実行できる状態になるまで一時的にコメントアウトしています。
+- CD は plan の前に、`scripts/build_lambda.py` で Lambda の ZIP を `.build/` に作ります。ZIP から各 handler を読み込めることも確かめます。plan で使った ZIP は、plan と一緒に apply へ渡します。
+- `develop` への push で、dev へ plan と apply を行います。
+- `main` への push で、dev へ適用した後に prod へ plan と apply を行います。
+- prod の apply は GitHub の Environment `production` で実行します。承認の要否は Environment の保護設定によります。
+- CI は、PR の変更がワークフローの `paths` に一致すると起動します。`pyproject.toml`、`.github/actions/**`、`.github/workflows/**` だけの変更でも起動します。
+- CD は、`main` または `develop` への push に `envs/**`、`modules/**`、`lambda/**`、`scripts/**` の変更が含まれる場合に起動します。`pyproject.toml` だけの変更では起動しません。
+- `docs/**` やルートの `README.md` だけの変更では、CI と CD のどちらも起動しません。
 
 ワークフローを変更する場合は、認証方式、対象環境、permissions、secrets参照を確認してください。

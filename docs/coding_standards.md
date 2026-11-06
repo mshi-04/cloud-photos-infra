@@ -1,6 +1,6 @@
 # コーディング規約
 
-この文書は、Terraform、Python、ドキュメントの共通規約を定義します。
+この文書は、Terraform、Python、ドキュメントの規約の正本です。PythonとTerraformとして望ましい設計と書き方を、確かめ方とともに定めます。
 
 ## Common
 
@@ -10,13 +10,162 @@
 - シークレット、AWSアカウントID、個人情報をコードや例に含めないでください。
 - 無関係な整形やリファクタリングを混ぜないでください。
 
+### 既存コードとの関係
+
+Lambda（Python）の関数群は、すべてこの規約に移行済みです。値オブジェクト、例外、型、キャッシュの書き方は、`common` とどの関数群も同じ形で、手本になります。Terraform も、各モジュールの `versions.tf` と tflint で規約に揃えています。
+
+- 新しく書くコードは、この規約に従います。
+- 既存のコードを変更する場合は、変更する関数とリソースの範囲だけを規約に合わせます。触れない部分を書き換えないでください。
+- 同じモジュールの既存の仕組みと組み合わせる必要がある場合は、既存の仕組みを優先します。
+
+### 機械的な確認
+
+判定できる規則は、ツールで確かめます。Python のツール（ruff、Pyright）のバージョンは [lambda/requirements-dev.txt](../lambda/requirements-dev.txt) で固定し、設定は [pyproject.toml](../pyproject.toml) に置きます。Terraform のバージョンは [.terraform-version](../.terraform-version)、tflint のバージョンは CI（[ci-terraform.yml](../.github/workflows/ci-terraform.yml)）の `v0.58.0` で固定し、tflint の設定は [.tflint.hcl](../.tflint.hcl) に置きます。コマンドは [commands.md](commands.md) を参照してください。
+
+| ツール | 現在の設定 | CI |
+|---|---|---|
+| ruff | ruffの従来の既定ルール（`E4`、`E7`、`E9`、`F`）に、下の表の「確かめ方」のルールを加えたもの。`ANN401` を除き、テストでは `ANN` と `PLR2004` を除く。整形は `ruff format` | 実行する |
+| Pyright | `standard`（`off`、`basic`、`standard`、`strict` のうち中間）。boto3 のクライアントは、型スタブ（`boto3-stubs`）で型を付けて確かめる | 実行する |
+| terraform fmt | `terraform fmt -check -recursive` | 実行する |
+| tflint | 同梱の terraform ルールセットの `recommended` に、`terraform_documented_variables`、`terraform_documented_outputs`、`terraform_naming_convention`、`terraform_standard_module_structure` を加えたもの（[.tflint.hcl](../.tflint.hcl)） | 実行する |
+
+## Python Lambda
+
+### 原則
+
+| 原則 | 内容 | 確かめ方 |
+|---|---|---|
+| 値オブジェクト | 不変条件や機密性を持つ概念を、`@dataclass(frozen=True, slots=True)` の値オブジェクトや `enum.StrEnum` で表す。対象は Identity ID、メディアID、保存パス、デバイストークン、件数、ページング位置、列挙値などとする。検証は `__post_init__` に置き、どの経路で生成しても同じ規則を適用して、生成できた値は常に正しい状態にする。`parse` などの生成メソッドは、入力の型を絞り込んでから生成に委ねる。すべてのプリミティブを包むことはしない | Pyright、レビュー |
+| 規則の置き場所 | 所有者確認などの規則は、値オブジェクトのメソッドに置く。例えば、保存パスが本人のものかは保存パスの値オブジェクトが判定する | レビュー |
+| 機密値 | デバイストークンなどの機密値は `__repr__` で伏せ字にし、ログへ生の値が出ることを構造的に防ぐ。`IdentityId` と `DeviceToken` は、8文字以下の値を全体の伏せ字にする。伏せ字の定数は `common/masking.py` に置く。生の値は、所有者境界の比較と AWS/FCM 呼び出しの引数作成に限って取り出す。ログやエラー応答に識別子を含める場合は、伏せ字にする値オブジェクトを渡す | レビュー、テスト |
+| 早期リターン | 前提条件はガード節で先に返すか送出する。`return` や `raise` の後に `else` を書かず、ネストを浅く保つ | ruffの `RET`、`SIM`、`C901` |
+| handlerの責務 | `handler` は、イベントの解釈、処理の呼び出し、HTTP応答への変換だけを行う。検証と業務規則は値オブジェクトと純粋な関数に置き、AWSの呼び出しは薄い関数に分ける | レビュー |
+| 例外 | 入力不正や所有者違反は専用の例外で表し、HTTP応答への変換は `handler` の1か所で行う。`except Exception` は最も外側で、記録と理由のコメントがある場合に限る | ruffの `BLE`、`TRY400` |
+| 型 | Python 3.12 の書き方である `dict[str, Any]` や `X \| None` を使う。引数と戻り値に型を付け、`Any` は Lambda のイベントと応答の境界に限る | ruffの `UP`、`ANN`、Pyright |
+| 状態の保持 | クライアントなどの遅延生成は、`global` 文ではなく `functools.cache` で行い、テストでは `cache_clear()` で元に戻す | ruffの `PLW0603` |
+| 定数と列挙 | 意味のある数値や文字列は、`Final` を付けた名前付き定数か列挙にする | ruffの `PLR2004` |
+| ログ | ロガーは `logging.getLogger(__name__)` で取得し、引数は遅延評価の形（`logger.info("... %s", value)`）で渡す。例外時は `logger.exception` を使う | ruffの `G`、`TRY400` |
+| import | import はファイルの先頭に書き、関数の中で import しない | ruffの `I`、`PLC0415` |
+| 命名とテスト | 名前は PEP 8 に従う。テストは pytest の書き方に揃え、値オブジェクトは AWS のモックを使わずに直接テストする | ruffの `N`、`PT` |
+
+### 例: 値オブジェクト
+
+```python
+FULLY_MASKED_MAX_LENGTH: Final = 8
+
+
+@dataclass(frozen=True, slots=True)
+class DeviceToken:
+    value: str
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.value, str) or not self.value:
+            raise ValidationError("deviceToken is required")
+
+    @classmethod
+    def parse(cls, raw: object) -> Self:
+        if not isinstance(raw, str):
+            raise ValidationError("deviceToken is required")
+        return cls(raw)
+
+    def __repr__(self) -> str:
+        if len(self.value) <= FULLY_MASKED_MAX_LENGTH:
+            return "DeviceToken(***)"
+        return f"DeviceToken(***{self.value[-4:]})"
+```
+
+`DeviceToken("")` のように直接生成しても `__post_init__` で拒否されます。ログに渡しても、末尾4文字より多くは出ません。
+
+### 例: 早期リターン
+
+悪い例です。正常系が深いネストの中にあり、`else` の後を追わないと結果が分かりません。
+
+```python
+def handler(event: dict[str, Any], _context: object) -> dict[str, Any]:
+    identity_id = IdentityId.from_event(event)
+    if identity_id:
+        body = parse_body(event)
+        if body is not None:
+            return success(HTTPStatus.CREATED, save(identity_id, body))
+        else:
+            return error(HTTPStatus.BAD_REQUEST, "Invalid JSON body")
+    else:
+        return error(HTTPStatus.FORBIDDEN, "Unauthorized")
+```
+
+良い例です。前提条件をガード節で先に返し、正常系を最後に置きます。
+
+```python
+def handler(event: dict[str, Any], _context: object) -> dict[str, Any]:
+    identity_id = IdentityId.from_event(event)
+    if identity_id is None:
+        return error(HTTPStatus.FORBIDDEN, "Unauthorized")
+
+    body = parse_body(event)
+    if body is None:
+        return error(HTTPStatus.BAD_REQUEST, "Invalid JSON body")
+
+    return success(HTTPStatus.CREATED, save(identity_id, body))
+```
+
+### 例: 状態の保持
+
+```python
+if TYPE_CHECKING:
+    # The stubs are a development dependency; the Lambda runtime never imports them.
+    from mypy_boto3_dynamodb import DynamoDBClient
+
+
+@functools.cache
+def get_dynamodb_client() -> "DynamoDBClient":
+    return boto3.client("dynamodb")
+```
+
+テストでは `get_dynamodb_client.cache_clear()` で、moto のモックに向いたクライアントを作り直します。`global` 文と、リセット用の関数を別に用意する必要がありません。
+
+戻り値の型は、`boto3-stubs` のクライアントの型にします。`botocore.client.BaseClient` にすると、`put_item` などの操作が型検査で見つからないと指摘されます。型スタブは開発用の依存のため、`TYPE_CHECKING` の中で import し、Lambda の実行時には読み込みません。
+
+### API Behavior
+
+- 認証は API Gateway の IAM 認証で行い、Lambda は `cloud_photos.common.auth` の `IdentityId.from_event` で Identity ID を取り出して所有者を確認します。Lambda で JWT は検証しません。
+- レスポンスは `cloud_photos.common.response` の `success` と `error` で作ります。
+- ステータスと本文の形式は、[lambda.md](lambda.md) の API 応答の契約に従います。
+- 既存のAPI契約を変える場合は、テストとドキュメントを更新します。
+
+### AWS Clients
+
+- テストしやすいよう、AWS呼び出しは薄い関数に分離します。
+- 外部サービス呼び出しはタイムアウト、エラー処理、ログの粒度を意識します。
+
+### Logging
+
+- PII、生トークン、認証情報をログに出さないでください。
+- Identity ID などの識別子は既存ヘルパーでマスクします。
+- ログは原因調査に必要な最小限の文脈に留めます。
+
 ## Terraform
+
+### 原則
+
+| 原則 | 内容 | 確かめ方 |
+|---|---|---|
+| モジュールの構成 | 各モジュールに `versions.tf` を置き、`required_providers` でプロバイダの取得元とバージョンの下限を宣言する。大きなモジュールは、モジュールを分けずに責務別のファイルに分ける | tflintの `terraform_required_providers`、`terraform_standard_module_structure` |
+| 変数と出力 | `type` と `description` を必ず付ける。値の範囲が決まる入力には `validation`、nullを受け付けない入力には `nullable = false`、機密値には `sensitive = true` を付ける | tflintの `terraform_typed_variables`、`terraform_documented_variables`、`terraform_documented_outputs` |
+| 繰り返し | 複数のリソースは安定したキーを持つ `for_each` で作り、`count` は有効と無効の切り替えだけに使う | レビュー |
+| 値の導出 | 同じ文字列や計算を繰り返さず、`locals` から導出する | レビュー |
+| 環境差 | モジュールの中で環境名による分岐をせず、ルートモジュールから変数で渡す。コメントアウトしたコードを残さない | レビュー |
+| 未使用の宣言 | 使われていない変数、data source、localsを残さない | tflintの `terraform_unused_declarations` |
+| 命名 | snake_case を使い、resource名にリソースの種別を繰り返さない。既存の名前を変える場合は `moved` ブロックを使う | tflintの `terraform_naming_convention`（snake_case）、レビュー（種別の繰り返し） |
+| IAM | `jsonencode()` で書き、アクションとARNを限定する | trivy、レビュー |
+
+各モジュールの `versions.tf` は、Terraform とプロバイダの下限（`>= 1.15.0`、`hashicorp/aws` の `>= 6.0`）を宣言します。ルートモジュール（`envs/*`、`bootstrap`）は、`required_version` とプロバイダのバージョンを完全に固定します。
 
 ### Structure
 
 - ルートモジュールは `envs/<env>/` に置きます。
 - 再利用可能なリソースは `modules/<name>/` に置きます。
-- 標準構成は `main.tf`、`variables.tf`、`outputs.tf` です。
+- `modules/` の標準構成は `main.tf`、`variables.tf`、`outputs.tf`、`versions.tf` です。
+- ルートモジュール（`envs/*`、`bootstrap`）は、`terraform` ブロック（バージョンの完全固定）と `provider` ブロックを `main.tf` に置き、`versions.tf` は置きません。入力がなくても、空の `variables.tf` を置きます。
 - モジュール内で `provider` ブロックを定義しないでください。
 - モジュール内に環境分岐を持ち込まないでください。差異は `envs/*` から変数として渡します。
 
@@ -38,38 +187,11 @@
 
 - `terraform fmt -recursive` を実行してください。
 - provider-level `default_tags` を優先し、リソースごとの重複タグを避けます。
-- 名前変更やモジュール移動では、resource replacement と state move の必要性を確認します。
-
-## Python Lambda
-
-### Style
-
-- Python 3.12 を前提にします。
-- 関数の引数と戻り値には型ヒントを付けます。
-- `ruff format` と `ruff check` に従います。
-- ビジネスロジックを `lambda_handler` に詰め込まず、責務ごとに分けます。
-
-### AWS Clients
-
-- `boto3` クライアントは再利用できるようにモジュールスコープで扱います。
-- テストしやすいよう、AWS呼び出しは薄い関数に分離します。
-- 外部サービス呼び出しはタイムアウト、エラー処理、ログの粒度を意識します。
-
-### API Behavior
-
-- API系Lambdaは `auth.py` パターンで Cognito JWT を検証します。
-- レスポンスは既存の `response.py` パターンに合わせます。
-- エラー時もレスポンス形式を崩さないでください。
-- 既存のAPI契約を変える場合は、テストとドキュメントを更新します。
-
-### Logging
-
-- PII、生トークン、認証情報をログに出さないでください。
-- Identity ID などの識別子は既存ヘルパーでマスクします。
-- ログは原因調査に必要な最小限の文脈に留めます。
+- 名前変更やモジュール移動では、resource replacement と state の移行の必要性を確認します。state の移行は、手作業の `terraform state mv` ではなく `moved` ブロックで行い、plan で移動を確認します。state の移行が必要になり得る変更は、[guardrails.md](guardrails.md) のとおり実装前に方針を提示します。
 
 ## Documentation
 
 - 手順は実行可能なコマンドと前提条件を分けて書きます。
 - 禁止事項、承認が必要な操作、検証ステータスは他文書と矛盾させないでください。
 - エージェント向け入口は短くし、詳細は領域別文書へ分けます。
+- 予定している構成やコマンドを、現行の手順として書かないでください。現状で失敗する手順も残さないでください。

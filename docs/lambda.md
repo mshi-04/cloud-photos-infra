@@ -1,37 +1,102 @@
 # Lambda 実装ガイド
 
-この文書は、`lambda/` 配下の Python Lambda を変更する際の実装規約です。
+この文書は、`lambda/` 配下の Python Lambda を変更する際の実装規約と、API 応答の契約の正本です。
 
 ## Layout
 
-標準的な関数ディレクトリは次の形に揃えます。
+Lambda のコードは、`lambda/` をソースのルートとして、`cloud_photos` パッケージの下に関数群ごとにまとめます。1 つの関数群に複数の handler を置きます。認証、応答、DynamoDB の値の変換、テーブルのキー属性名、保存パスのプレフィックスなど、関数群をまたぐ契約は `common/` に置きます。関数群の `constants.py` には、その関数群だけが使う項目名や上限を残します。
 
 ```text
 lambda/
-  <function_name>/
-    <function_name>.py
-    auth.py
-    response.py
-    constants.py
-    tests/
-      conftest.py
-      test_<behavior>.py
+  pytest.ini
+  cloud_photos/
+    common/                  # 複数の関数群で使う共有処理
+      auth.py                # IdentityId
+      response.py            # success / error
+      masking.py             # 伏せ字の定数
+      device_token.py        # DeviceToken
+      dynamodb.py            # serialize_item / deserialize_item
+      tables.py              # テーブルのキー属性名
+      storage.py             # PRIVATE_PATH_PREFIX
+      request.py             # parse_body
+      errors.py              # ValidationError / AuthorizationError
+      tests/                 # 共通処理の単体テスト
+    media_uploads/           # get_upload_records / create_upload_record / delete_upload_record
+    device_tokens/           # register_device_token / unregister_device_token
+    push_notification/       # notify_upload_complete
+    users/                   # delete_user（S3 の削除は storage.py、DynamoDB の削除は db.py）
+    <function_group>/
+      __init__.py
+      <handler_module>.py    # def handler(event, context)
+      constants.py
+      tests/
+        conftest.py
+        test_<behavior>.py
 ```
 
-既存関数の構成が異なる場合は、周辺の実装パターンを優先します。
+import は、本番とテストのどちらでも `from cloud_photos.<function_group>.<module> import ...` のように修飾付きで書きます。Lambda の `handler` 設定は `cloud_photos.<function_group>.<handler_module>.handler` です。
+
+ZIP は [scripts/build_lambda.py](../scripts/build_lambda.py) が関数群ごとに `.build/<function_group>.zip` へ作ります。ZIP には、関数群のパッケージと、そこから import している `cloud_photos` の共有パッケージが入り、`tests/` とキャッシュは入りません。Terraform は [modules/media_api/archives.tf](../modules/media_api/archives.tf) でこの ZIP を参照し、どの関数がどの ZIP を使うかは [modules/media_api/main.tf](../modules/media_api/main.tf) の `local.lambda_functions` の `package` で決まります。新しいファイルや共有処理を追加した場合は、[scripts/verify_lambda_packages.py](../scripts/verify_lambda_packages.py) で、ZIP から各 handler を読み込めることを確かめてください。手順は [commands.md](commands.md) にあります。
 
 ## Handler Design
 
-- `lambda_handler` は入力の受け渡しと最終レスポンスに留めます。
+- `handler` は入力の受け渡しと最終レスポンスに留めます。
 - 認証、バリデーション、永続化、外部呼び出しを関数単位に分離します。
 - API Gateway event の欠落値や不正JSONを明示的に扱います。
 - 既存のレスポンス契約を黙って変更しないでください。
 
 ## Authentication
 
-- API系Lambdaは `auth.py` の既存パターンで Cognito JWT を検証します。
-- 認証済みユーザーのリソース境界を確認します。
-- Identity ID や user sub を使う場合は、S3 prefix や DynamoDB key の境界を崩さないでください。
+認証は API Gateway の IAM 認証で行い、Lambda は所有者確認を行います。Lambda で JWT を検証する処理はありません。
+
+- 業務用のメソッドは `authorization = "AWS_IAM"` です。クライアントは Cognito Identity Pool が発行した一時認証情報で SigV4 署名し、API Gateway が署名を検証します。`authorization = "NONE"` は CORS の `OPTIONS` だけです。
+- Lambda は `event.requestContext.identity.cognitoIdentityId` を、呼び出したユーザーの Identity ID として使います。取得には、`cloud_photos.common.auth` から直接 import した値オブジェクトの `IdentityId.from_event` を使います。`requestContext`、`identity`、`cognitoIdentityId` のどれかが欠けている、null である、または型が想定と違う場合は `None` を返し、handler は未認証として扱います（401 または 403）。
+- 認証済みでも、操作するリソースが本人のものかを Lambda で確認します。S3 は `private/<identity_id>/` のプレフィックス、DynamoDB はパーティションキーの `userId`、ページングは `lastEvaluatedKey.userId` で確かめます。
+- 業務メソッドの `authorization` を変えると、Lambda のコードを変えずに認証が外れます。Terraform の変更では、この設定を必ず確認してください。
+
+信頼の境界、IDOR 防止、ログの要件は [security.md](security.md) を参照してください。
+
+## API Response Contract
+
+### 形式
+
+応答は `cloud_photos.common.response` の `success(status, body=None)` と `error(status, message)` で作ります。
+
+- ヘッダーは `Content-Type: application/json` です。
+- 本文は JSON の文字列です。JSON にできない値は `str` で文字列にします。エラーの本文は `{"message": "<理由>"}` です。
+- `success` の `body` が `None` の場合は、本文を空文字列にします。本文のない応答（204）で使います。
+- 外部サービスの例外内容やスタックトレースなど、内部の情報を本文に含めないでください。
+
+### ステータス
+
+| 状況 | ステータス |
+|---|---|
+| 作成・登録に成功した。`PUT /devices/token` は既存のトークンの更新でも 201 | 201 |
+| 取得・更新・削除に成功した（`PUT /devices/token` を除く） | 200 |
+| 返す本文がない | 204 |
+| 本文が不正な JSON、または JSON オブジェクトではない | 400 |
+| 必須項目の欠落、型の不正、列挙外の値 | 400 |
+| 認証情報（Identity ID）がない | 403。既存の `users` と `push_notification` は 401 |
+| 本人のものではないリソースを指定した（IDOR） | 403 |
+| 対象が存在しない | 404 |
+| AWS 呼び出しの失敗 | 500。API ごとの例外は「現在の API」の表に記載 |
+| 想定外の例外（環境変数の欠落など、設定や実装の誤り） | 捕捉せず、Lambda のエラーとして送出する。API Gateway の Lambda プロキシ統合が 502 を返す。ただし `users/delete_user` は、保存先（S3 と2つのテーブル）ごとの削除の中で起きた例外を記録して残りの削除を続け、500 を返す。環境変数は削除の前にすべて読むため、欠けている場合は何も削除せずに 502 になる |
+
+新しい API の未認証応答は 403 にします。API Gateway の IAM 認証に失敗したときの応答も 403 のためです。`users`（`DELETE /users`）と `push_notification`（`POST /media/uploads/complete`）の 401 は、クライアントとの互換性のために維持します。401 を 403 に変える場合は、API 互換性の変更として扱い、テストとクライアントへの影響を確認してください。
+
+条件付き書き込みの失敗は、操作ごとに意味を決めます。例えば `create_upload_record` は、同じレコードがある場合に 200 の `Record already exists, skipped` を返し、`delete_upload_record` は対象がない場合に 404 を返します。条件式の失敗を一律に同じステータスにしないでください。
+
+### 現在の API
+
+| メソッド / パス | handler | 未認証 | 成功時 |
+|---|---|---|---|
+| `GET /media/uploads` | `media_uploads/get_upload_records` | 403 | 200 |
+| `POST /media/uploads` | `media_uploads/create_upload_record` | 403 | 201。既存時は 200 |
+| `DELETE /media/uploads/{mediaId}` | `media_uploads/delete_upload_record` | 403 | 200 |
+| `POST /media/uploads/complete` | `push_notification/notify_upload_complete` | 401 | 201。`successCount` が 0 の場合と、通知先がない場合は 204。登録解除済みトークンの削除に失敗しても、記録して残りの端末へ送信し、201 を返す |
+| `PUT /devices/token` | `device_tokens/register_device_token` | 403 | 201 |
+| `DELETE /devices/token` | `device_tokens/unregister_device_token` | 403 | 200 |
+| `DELETE /users` | `users/delete_user` | 401 | 200。一部の削除に失敗した場合は 500 |
 
 ## AWS Calls
 
@@ -47,13 +112,14 @@ lambda/
 
 ## Tests
 
-動作を変更したらテストを追加または更新します。
+動作を変更したらテストを追加または更新します。テストは `lambda/` で全体を一度に実行できます。
 
 ```powershell
 ruff format lambda/
 ruff check lambda/
+pyright
 Set-Location lambda
-pytest <function_name>/tests/
+pytest
 ```
 
-AWS呼び出しはモックし、実リソースを作成しないでください。
+AWS呼び出しはモックし、実リソースを作成しないでください。テストの詳細は [testing.md](testing.md)、コマンドの前提は [commands.md](commands.md) を参照してください。

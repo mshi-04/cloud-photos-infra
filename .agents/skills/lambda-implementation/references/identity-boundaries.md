@@ -1,0 +1,96 @@
+# Identity 境界
+
+認証情報の入り口から、リソースごとの所有者境界までの実装です。
+
+## 信頼の前提
+
+認証は API Gateway の IAM 認証（`authorization = "AWS_IAM"`）で行い、Lambda は
+`event.requestContext.identity.cognitoIdentityId` を信頼します。説明の正本は
+[docs/lambda.md](../../../../docs/lambda.md) の Authentication です。
+
+認証の実効的な境界は Terraform 側にあります。`modules/media_api/api_gateway.tf` の業務メソッドから
+`authorization = "AWS_IAM"` が外れると、Lambda 側のコードを変えずに全ハンドラが無認証になります。
+
+## identity の取得
+
+`IdentityId` の正本は [lambda/cloud_photos/common/auth.py](../../../../lambda/cloud_photos/common/auth.py) です。Identity ID の取り出しと伏せ字は、このモジュールの非公開の処理です。
+`IdentityId` は Identity ID の値オブジェクトで、`from_event` で event から生成し、`str()` と `repr()` では伏せ字になります。生の値は `.value` で取り出し、所有者境界の比較と AWS/FCM 呼び出しの引数作成に限って使います。ログやエラー応答に識別子を含める場合は、伏せ字にする値オブジェクトを渡します。
+
+handler、`db.py`、`models.py`、テストのすべてで `IdentityId` を `cloud_photos.common.auth` から直接 import します。関数群ごとの再エクスポートは作りません。伏せ字の定数は `common.masking` にあり、Identity ID は先頭4文字と末尾4文字、デバイストークンは末尾4文字だけを残します。8文字以下はどちらも全体を伏せます。
+
+`requestContext`、`identity`、`cognitoIdentityId` の欠落・null・想定外の型は、例外にせず `None` を返します。handler は `None` を未認証として扱います。
+
+## 境界チェックの実装
+
+| リソース | 境界 | 実装箇所 |
+|---|---|---|
+| S3 オブジェクト | `private/<identity_id>/` プレフィックス一致 | `models.CloudStoragePath.belongs_to`（`create_upload_record.py` が書き込み前に呼ぶ）、`users/storage.py`（削除対象の列挙） |
+| DynamoDB（upload records） | HASH key `userId` に identity_id | `get_upload_records.py`、`create_upload_record.py`、`delete_upload_record.py` |
+| DynamoDB（device tokens） | HASH key `userId` に identity_id | `register_device_token.py`、`unregister_device_token.py` |
+| ページネーション継続キー | `lastEvaluatedKey.userId == identity_id` | `models.PageCursor.parse` |
+
+クライアントから来た値を、そのまま key やパスに使わないでください。
+`cloudStoragePath` と `lastEvaluatedKey` は攻撃者が自由に指定できます。
+
+### クライアント由来のパス
+
+所有者の判定は、保存パスの値オブジェクト `CloudStoragePath` が持ちます。handler は判定を呼び、結果を 403 に変換します。
+保存パスには Identity ID が含まれるため、`CloudStoragePath` は `str()` と `repr()` で伏せ字になります。
+`PRIVATE_PATH_PREFIX` は `cloud_photos.common.storage` から import し、所有者確認や S3 操作の直前にパスを組み立てます。`IdentityId` に S3 のパス規則を持たせません。
+
+```python
+def belongs_to(self, identity_id: IdentityId) -> bool:
+    return self.value.startswith(f"{PRIVATE_PATH_PREFIX}{identity_id.value}/")
+```
+
+```python
+if not request.cloud_storage_path.belongs_to(identity_id):
+    return error(HTTPStatus.FORBIDDEN, "cloudStoragePath does not match your identity")
+```
+
+### クライアント由来の継続キー
+
+`models.PageCursor.parse` は境界違反を `AuthorizationError`（`common/errors.py`）として投げ、handler が 403 に変換します。
+検証エラー（`ValidationError` → 400）と混ぜません。
+
+```python
+if key.get(FIELD_USER_ID) != identity_id.value:
+    raise AuthorizationError(f"{PARAM_LAST_EVALUATED_KEY} does not match your identity")
+```
+
+```python
+except ValidationError as e:
+    return error(HTTPStatus.BAD_REQUEST, str(e))
+except AuthorizationError as e:
+    return error(HTTPStatus.FORBIDDEN, str(e))
+```
+
+`ExclusiveStartKey` は、検証済みの `PageCursor`（`IdentityId` と `MediaId`）から `db.py` で組み直します。受け取った dict をそのまま渡しません。
+
+## Identity Pool 側の境界
+
+[modules/identity_pool/main.tf](../../../../modules/identity_pool/main.tf) が、クライアントへ発行する
+一時認証情報の範囲を決めます。Lambda 側の境界と二重化されています。
+
+- `allow_unauthenticated_identities = false`、`server_side_token_check = true`
+- S3 は `${var.media_bucket_arn}/private/$${cognito-identity.amazonaws.com:sub}/*` に限定。
+  `ListBucket` は `s3:prefix` の `Condition` 付き
+- `execute-api:Invoke` は `module.media_api.api_execution_arns`（メソッドとパス単位の列挙）に限定
+
+このポリシーで `sub` に展開されるのが、Lambda が受け取る `cognitoIdentityId` と同じ値です。
+S3 プレフィックスの形を変える場合は、両方を同時に変更します。
+
+## User Pool の設定
+
+[modules/cognito/main.tf](../../../../modules/cognito/main.tf) で弱めてはいけない設定です。
+
+- `generate_secret = false`（モバイルクライアントのため）
+- `prevent_user_existence_errors = "ENABLED"`
+- `explicit_auth_flows` は `ALLOW_USER_SRP_AUTH` と `ALLOW_REFRESH_TOKEN_AUTH` のみ。
+  `ALLOW_USER_PASSWORD_AUTH` を足さない
+- password policy の 4 種要求、`mfa_configuration`（prod は `ON`）、`deletion_protection`（prod は `ACTIVE`）
+
+## 参考資料
+
+- [docs/security.md](../../../../docs/security.md)
+- [docs/lambda.md](../../../../docs/lambda.md)

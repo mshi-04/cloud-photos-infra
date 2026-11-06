@@ -11,37 +11,52 @@
 
 ## Lambda Tests
 
-テストは `lambda/` を基準に実行します。
+テストは `lambda/` を作業ディレクトリにして実行します。CI も同じく `pytest` を一度だけ実行します。
 
 ```powershell
 Set-Location lambda
 pytest
 ```
 
-対象を絞る場合:
+[lambda/pytest.ini](../lambda/pytest.ini) が `lambda/` を import の起点にします。テストは `from cloud_photos.<function_group>.<module> import ...` のように修飾付きで import するため、関数群どうしで同じ名前のモジュールがあっても衝突しません。`conftest.py` で `sys.path` を操作しないでください。
+
+関数群を指定する場合や、詳細を表示する場合:
 
 ```powershell
 Set-Location lambda
-pytest <function_name>/tests/
-pytest -v <function_name>/tests/
+pytest cloud_photos/<function_group>/tests/
+pytest -v cloud_photos/<function_group>/tests/
 ```
 
 ## Test Structure
 
 ```text
 lambda/
-  <function_name>/
-    tests/
-      conftest.py
-      test_<behavior>.py
+  pytest.ini
+  cloud_photos/
+    common/
+      tests/
+        test_auth.py
+        test_response.py
+        test_dynamodb.py
+        test_device_token.py
+        test_request.py
+    <function_group>/
+      tests/
+        conftest.py
+        test_<behavior>.py
 ```
 
-`conftest.py` には API Gateway event、Cognito claims、環境変数、AWS mock などの共有フィクスチャを置きます。
+`conftest.py` には、API Gateway event、`requestContext.identity.cognitoIdentityId` を持つ認証済みの event、環境変数、AWS mock などの共有フィクスチャを置きます。API Gateway は IAM 認証のため、event に Cognito のクレームや JWT は含まれません。
+
+`common/tests/` では、Identity ID、応答、DynamoDB の値の変換、デバイストークン、本文の解析を直接テストします。共通処理のテストを関数群ごとに複製しません。テーブルやバケットを作る moto の fixture とクライアントキャッシュのクリアは、ライフサイクルが異なるため各関数群の `tests/conftest.py` に残します。
+
+`users/tests/test_delete_user.py` は、`delete_user.py` の handler と、`users/storage.py`・`users/db.py` の関数をテストします。クライアントキャッシュのクリア先は `storage.get_s3_client` と `db.get_dynamodb_client` です。
 
 ## What To Cover
 
 - 正常系
-- 認証エラー
+- 認証エラー（ステータスは [lambda.md](lambda.md) の API 応答の契約に従う）
 - 必須パラメータ不足
 - 不正JSONや不正型
 - AWS呼び出し失敗
@@ -69,4 +84,4 @@ prodに影響する場合は `envs/prod` でも確認します。state lock や�
 
 ## CI Expectations
 
-PRでは GitHub Actions が Terraform と Lambda の検証を実行します。ローカルで全てを再現できない場合でも、実行できた範囲と未実行理由を明確にしてください。
+PRでは GitHub Actions が Terraform と Lambda の検証を実行します。Lambda では ruff、Pyright、pytest と、ビルドした ZIP から各 handler を読み込む検証を実行します。ローカルで全てを再現できない場合でも、実行できた範囲と未実行理由を明確にしてください。

@@ -20,9 +20,9 @@
 | 変更対象 | 必須検証 |
 |---|---|
 | ドキュメントのみ | Markdownの整合性、リンク対象の存在確認 |
-| Terraform | `terraform fmt -recursive`、影響環境の `terraform validate`、可能なら `terraform plan` |
+| Terraform | `terraform fmt -recursive`、`tflint --recursive`、影響環境の `terraform validate`、可能なら `terraform plan`。`media_api` の API を変えた場合は `python scripts/check_api_deployment_inputs.py`、Lambda 関数を追加、削除、改名した場合は `python scripts/check_lambda_role_names.py` |
 | IAM / security | Terraform検証に加え、権限差分レビュー、可能なら `trivy conf .` |
-| Lambda | `ruff format`、`ruff check`、関連 `pytest` |
+| Lambda | `ruff check`、`ruff format --check`、`pyright`、`pytest`。ファイルや共有処理を追加・移動した場合は、ZIP のビルドと読み込み検証 |
 | CI/CD | ワークフロー構文と影響するコマンドの確認 |
 | bootstrap | 検証に加え、手動適用手順とリスクの明記 |
 
@@ -32,6 +32,7 @@
 
 ```powershell
 terraform fmt -recursive
+tflint --recursive --config "$PWD/.tflint.hcl"
 ```
 
 影響を受ける環境で検証します。
@@ -55,16 +56,19 @@ prodに影響する場合は `envs/prod` でも同様に確認します。認証
 
 ## Lambda
 
-Lambda変更時は `lambda/` を基準にテストします。
+Lambda変更時は、リポジトリルートで lint、整形、型検査を実行し、`lambda/` でテストを実行します。ツールのバージョンと仮想環境の準備は [commands.md](commands.md) を参照してください。
 
 ```powershell
-ruff format lambda/
 ruff check lambda/
+ruff format --check lambda/
+pyright
 Set-Location lambda
 pytest
 ```
 
-対象が限定されている場合は、関連するテストディレクトリだけを実行して構いません。ただし、その理由を報告してください。
+テストは全体を一度に実行します。実行しなかったテストがある場合は、その理由を報告してください。
+
+ファイルや共有処理を追加・移動した場合や、`scripts/build_lambda.py` を変えた場合は、[commands.md](commands.md) の手順で ZIP をビルドし、各 handler を ZIP から読み込めることを確かめます。boto3 やレイヤーを用意できず実行できない場合は、`Not executed` として理由を報告します。
 
 ## Security
 

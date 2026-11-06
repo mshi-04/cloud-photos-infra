@@ -67,7 +67,8 @@ bootstrap/          Terraform backend、GitHub OIDC、plan/apply IAM ロール
 envs/dev/           dev 環境の Terraform ルートモジュール
 envs/prod/          prod 環境の Terraform ルートモジュール
 modules/            再利用可能な AWS リソースモジュール
-lambda/             Lambda 実装、共有コード、レイヤー、pytest テスト
+lambda/             Lambda 実装（cloud_photos パッケージ）、レイヤー、pytest テスト
+scripts/            Lambda の ZIP のビルドと読み込み検証
 .github/workflows/  Terraform CI/CD と再利用可能なデプロイワークフロー
 docs/               実装、検証、セキュリティ、運用ルール
 .agents/skills/     Codex 向けリポジトリローカル Skills
@@ -81,7 +82,8 @@ docs/               実装、検証、セキュリティ、運用ルール
 - Terraform `1.15.6`（正確な値は [.terraform-version](.terraform-version) を参照）
 - Python `3.12`
 - Docker（Firebase Admin Lambda Layer のビルドに使用）
-- Ruff、pytest
+- Ruff、Pyright、pytest（[lambda/requirements-dev.txt](lambda/requirements-dev.txt) から入れます。Ruff と Pyright は CI と同じバージョンに固定し、pytest は `~=8.0` の互換リリース指定です）
+- TFLint `v0.58.0`（Terraform の規約の検査。CI と同じバージョン）
 - 任意: Trivy（IaC セキュリティスキャン）
 - `terraform plan` を行う場合のみ、対象環境の `gh-terraform-plan-<env>` ロール相当の AWS 権限と state bucket 名。リソースの参照に加え、state の KMS 復号と S3 lockfile の読み書き権限が必要です
 
@@ -91,34 +93,51 @@ docs/               実装、検証、セキュリティ、運用ルール
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-python -m pip install -r lambda/requirements-dev.txt ruff
+python -m pip install -r lambda/requirements-dev.txt
 ```
+
+`lambda/requirements-dev.txt` には、pytest と moto に加えて、CI と同じバージョンの ruff と Pyright が含まれます。
 
 ### 基本検証
 
 ```powershell
 terraform fmt -check -recursive
-ruff check lambda/
-ruff format --check lambda/
+tflint --recursive --config "$PWD/.tflint.hcl"
+python scripts/check_api_deployment_inputs.py
+python scripts/check_lambda_role_names.py
+ruff check lambda/ scripts/
+ruff format --check lambda/ scripts/
+pyright
 Push-Location lambda
 pytest
 Pop-Location
 trivy conf .
 ```
 
-Terraform の `validate` / `plan` では backend の初期化に加え、`.build/firebase_admin_layer.zip` が必要です。リポジトリルートで、CI と同じ AWS SAM Python 3.12 イメージを使ってレイヤーを生成します。
+pytest は `lambda/` で全体を一度に実行します。1 つの関数群だけを実行する場合は `pytest cloud_photos/<function_group>/tests/` を使います。`pyright` は、有効にした仮想環境の依存を使って型を検査します。
+
+Terraform の `validate` / `plan` では backend の初期化に加え、`.build/` に Lambda の ZIP と `firebase_admin_layer.zip` が必要です。どちらも `scripts/build_lambda.py` で作り、CI と CD も同じスクリプトを使います。リポジトリルートで次を実行すると、関数群ごとの ZIP だけを作ります。
 
 ```powershell
-New-Item -ItemType Directory -Force .build | Out-Null
-$repositoryRoot = (Get-Location).Path
-docker run --rm `
-  --mount "type=bind,source=$repositoryRoot\.build,target=/out" `
-  --mount "type=bind,source=$repositoryRoot\lambda\layers\firebase_admin,target=/requirements,readonly" `
-  public.ecr.aws/sam/build-python3.12:latest-x86_64 `
-  bash -c "pip install -r /requirements/requirements.txt -t /tmp/python --quiet && cd /tmp && zip -r9 /out/firebase_admin_layer.zip python"
+python scripts/build_lambda.py
 ```
 
-レイヤー生成後、対象環境を初期化して検証します。
+Terraform に必要な ZIP をすべて作るには、`--with-layers` を付けてレイヤーの ZIP も作ります。CI と CD と同じく、タグとダイジェストを固定した AWS SAM Python 3.12 のビルドイメージで依存を入れるため、Docker が必要です。同じ依存の定義からは、同じハッシュの ZIP ができます。
+
+```powershell
+python scripts/build_lambda.py --with-layers
+```
+
+Docker を使えない場合の手順は [docs/commands.md](docs/commands.md) にあります。
+
+ZIP から各 handler を読み込めるかは、次のように確かめます。boto3 は、Lambda ランタイムと同じく ZIP の外から読み込みます。`.build/` の外に入れてください。
+
+```powershell
+python -m pip install --target "$env:TEMP\lambda-runtime-deps" boto3
+python scripts/verify_lambda_packages.py --runtime-deps "$env:TEMP\lambda-runtime-deps" --layer push_notification=.build/firebase_admin_layer.zip
+```
+
+ZIP とレイヤーの生成後、対象環境を初期化して検証します。
 
 ```powershell
 Push-Location envs/dev
@@ -136,9 +155,9 @@ state lock が発生した場合、`-lock=false` や `terraform force-unlock` �
 
 `main` または `develop` 向けの Pull Request で対象パスが変更されると、次を実行します。
 
-- Terraform format check
-- Ruff lint / format check
-- Lambda unit tests
+- Terraform format check、tflint、API の再デプロイ判定の確認、`bootstrap` の PassRole の関数名の確認
+- Ruff lint / format check と Pyright の型検査
+- Lambda unit tests と、ZIP（レイヤーを含む）を2回作ってハッシュが一致することの確認
 - Trivy IaC scan と SARIF アップロード
 - dev / prod の `terraform validate` と `terraform plan`
 - サニタイズした plan 結果の PR コメント更新
