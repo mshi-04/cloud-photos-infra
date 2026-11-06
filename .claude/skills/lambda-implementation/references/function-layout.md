@@ -97,6 +97,7 @@ Terraform は [modules/media_api/archives.tf](../../../../modules/media_api/arch
 3. `modules/media_api/` の次のファイルに追加する。新規グループなら `archives.tf` の `local.lambda_packages` に ZIP のパスを足し、
    `main.tf` の `local.lambda_functions` に関数の定義、`iam.tf` にデータアクセスの `aws_iam_role_policy`、
    `api_gateway.tf` の `local.api_routes` にルート、`outputs.tf` の `api_execution_arns` に実行 ARN を足す。
+   `bootstrap/oidc_roles.tf` の `local.lambda_function_names` にも関数名を足し、管理者が手動で適用する。
 4. 新しいパスなら `api_gateway.tf` に `aws_api_gateway_resource`、`local.api_resource_ids`、`local.cors_preflights` を足す。
    手順は infra-implementation Skill の media-api-wiring にあります。
 5. `tests/` を追加し、`lambda/` で `pytest` を通す。CI も同じ `pytest` を実行するため、ジョブへの追加は要りません。

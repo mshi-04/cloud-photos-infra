@@ -43,6 +43,12 @@ tflint --recursive --config "$PWD/.tflint.hcl"
 python scripts/check_api_deployment_inputs.py
 ```
 
+`bootstrap` の PassRole の対象の関数名が、`media_api` の関数と一致しているかを確かめます。CI も同じスクリプトを実行します。
+
+```powershell
+python scripts/check_lambda_role_names.py
+```
+
 環境ごとの検証とプランです。
 
 ```powershell
