@@ -49,6 +49,8 @@ IAM権限を広げる場合や `bootstrap/` の変更が必要な場合は、実
 - 手動適用が必要な順序
 - 適用しない場合の制約
 
+dev と prod の plan・apply のロールとポリシーは、`bootstrap/oidc_roles.tf` の `local.environments` から `for_each` で作ります。`bootstrap/moved.tf` のブロックは、適用したことを確かめた後の別の変更で削除します。
+
 ## CI/CD
 
 ワークフローは `.github/workflows/` にあります。

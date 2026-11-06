@@ -59,6 +59,7 @@
 - `deletion_protection_enabled` / `force_destroy` / `noncurrent_version_expiration_days` の変更 → データ保護の後退
 - 新しい method / integration / レスポンスが `local.api_routes` か `local.cors_preflights` から作られ、新しい Gateway Response が `local.api_gateway_responses` に入り、API の動作に影響する新しい属性が `local.api_deployment_inputs` に入っているか（`scripts/check_api_deployment_inputs.py`）
 - 出力の `api_execution_arns` の順序を変えていないか。Identity Pool のロールのポリシーの JSON が変わる
+- `local.lambda_functions` に足した関数が `bootstrap` の `local.lambda_function_names` にも入っているか（`scripts/check_lambda_role_names.py`）。一覧の順序を変えていないか。ポリシーの JSON が変わる
 
 ## コード品質
 

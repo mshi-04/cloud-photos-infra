@@ -104,6 +104,7 @@ python -m pip install -r lambda/requirements-dev.txt
 terraform fmt -check -recursive
 tflint --recursive --config "$PWD/.tflint.hcl"
 python scripts/check_api_deployment_inputs.py
+python scripts/check_lambda_role_names.py
 ruff check lambda/ scripts/
 ruff format --check lambda/ scripts/
 pyright
@@ -154,7 +155,7 @@ If a state lock is encountered, do not bypass it with `-lock=false` or `terrafor
 
 When relevant paths change in a pull request targeting `main` or `develop`, CI runs:
 
-- Terraform formatting checks, tflint, and the check of the API redeployment inputs
+- Terraform formatting checks, tflint, the check of the API redeployment inputs, and the check of the Lambda function names for PassRole in `bootstrap`
 - Ruff lint and formatting checks, and Pyright type checks
 - Lambda unit tests, and a check that building the ZIPs (including the layer) twice gives the same hashes
 - Trivy IaC scanning with SARIF upload

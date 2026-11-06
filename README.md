@@ -104,6 +104,7 @@ python -m pip install -r lambda/requirements-dev.txt
 terraform fmt -check -recursive
 tflint --recursive --config "$PWD/.tflint.hcl"
 python scripts/check_api_deployment_inputs.py
+python scripts/check_lambda_role_names.py
 ruff check lambda/ scripts/
 ruff format --check lambda/ scripts/
 pyright
@@ -154,7 +155,7 @@ state lock が発生した場合、`-lock=false` や `terraform force-unlock` �
 
 `main` または `develop` 向けの Pull Request で対象パスが変更されると、次を実行します。
 
-- Terraform format check、tflint、API の再デプロイ判定の確認
+- Terraform format check、tflint、API の再デプロイ判定の確認、`bootstrap` の PassRole の関数名の確認
 - Ruff lint / format check と Pyright の型検査
 - Lambda unit tests と、ZIP（レイヤーを含む）を2回作ってハッシュが一致することの確認
 - Trivy IaC scan と SARIF アップロード
