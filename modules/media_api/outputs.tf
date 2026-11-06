@@ -10,6 +10,7 @@ output "api_id" {
 
 output "api_execution_arns" {
   description = "API Gateway 実行 ARN のリスト"
+  # The order is listed by hand: it goes into the identity pool role's policy JSON, which values() would reorder.
   value = [
     local.api_execution_arns.get_uploads,
     local.api_execution_arns.post_uploads,
@@ -18,31 +19,5 @@ output "api_execution_arns" {
     local.api_execution_arns.delete_devices_token,
     local.api_execution_arns.post_uploads_complete,
     local.api_execution_arns.delete_user,
-  ]
-}
-
-output "lambda_role_arns" {
-  description = "Lambda 実行ロール ARN リスト"
-  value = [
-    aws_iam_role.get_upload_records.arn,
-    aws_iam_role.create_upload_record.arn,
-    aws_iam_role.delete_upload_record.arn,
-    aws_iam_role.register_device_token.arn,
-    aws_iam_role.unregister_device_token.arn,
-    aws_iam_role.notify_upload_complete.arn,
-    aws_iam_role.delete_user.arn
-  ]
-}
-
-output "lambda_role_names" {
-  description = "Lambda 実行ロール名 リスト"
-  value = [
-    aws_iam_role.get_upload_records.name,
-    aws_iam_role.create_upload_record.name,
-    aws_iam_role.delete_upload_record.name,
-    aws_iam_role.register_device_token.name,
-    aws_iam_role.unregister_device_token.name,
-    aws_iam_role.notify_upload_complete.name,
-    aws_iam_role.delete_user.name
   ]
 }
