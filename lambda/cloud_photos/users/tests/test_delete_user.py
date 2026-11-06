@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from cloud_photos.common.auth import IdentityId
-from cloud_photos.users import delete_user
+from cloud_photos.users import db, delete_user, storage
 from cloud_photos.users.delete_user import handler
 
 IDENTITY_ID = "ap-northeast-1:test-user-id"
@@ -27,8 +27,8 @@ class TestDeleteUser:
     def test_unauthorized_does_not_touch_storage(self, monkeypatch):
         s3_mock = MagicMock()
         ddb_mock = MagicMock()
-        monkeypatch.setattr(delete_user, "_delete_s3_objects", s3_mock)
-        monkeypatch.setattr(delete_user, "_delete_dynamodb_records", ddb_mock)
+        monkeypatch.setattr(delete_user, "delete_s3_objects", s3_mock)
+        monkeypatch.setattr(delete_user, "delete_dynamodb_records", ddb_mock)
 
         resp = handler({"requestContext": {"identity": {}}}, None)
 
@@ -41,8 +41,8 @@ class TestDeleteUser:
     def test_unauthorized_null_identity_does_not_touch_storage(self, monkeypatch, request_context):
         s3_mock = MagicMock()
         ddb_mock = MagicMock()
-        monkeypatch.setattr(delete_user, "_delete_s3_objects", s3_mock)
-        monkeypatch.setattr(delete_user, "_delete_dynamodb_records", ddb_mock)
+        monkeypatch.setattr(delete_user, "delete_s3_objects", s3_mock)
+        monkeypatch.setattr(delete_user, "delete_dynamodb_records", ddb_mock)
 
         resp = handler({"requestContext": request_context}, None)
 
@@ -51,8 +51,8 @@ class TestDeleteUser:
         assert ddb_mock.call_count == 0
 
     def test_returns_200_with_message_when_all_succeed(self, aws_resources, monkeypatch):
-        monkeypatch.setattr(delete_user, "_delete_s3_objects", MagicMock())
-        monkeypatch.setattr(delete_user, "_delete_dynamodb_records", MagicMock())
+        monkeypatch.setattr(delete_user, "delete_s3_objects", MagicMock())
+        monkeypatch.setattr(delete_user, "delete_dynamodb_records", MagicMock())
 
         resp = handler(_make_event(), None)
 
@@ -60,8 +60,8 @@ class TestDeleteUser:
         assert json.loads(resp["body"]) == {"message": "User data deleted"}
 
     def test_returns_500_when_only_s3_fails(self, aws_resources, monkeypatch):
-        monkeypatch.setattr(delete_user, "_delete_s3_objects", MagicMock(side_effect=RuntimeError("boom")))
-        monkeypatch.setattr(delete_user, "_delete_dynamodb_records", MagicMock())
+        monkeypatch.setattr(delete_user, "delete_s3_objects", MagicMock(side_effect=RuntimeError("boom")))
+        monkeypatch.setattr(delete_user, "delete_dynamodb_records", MagicMock())
 
         resp = handler(_make_event(), None)
 
@@ -75,8 +75,8 @@ class TestDeleteUser:
             if table_name == upload_table:
                 raise RuntimeError("boom")
 
-        monkeypatch.setattr(delete_user, "_delete_s3_objects", MagicMock())
-        monkeypatch.setattr(delete_user, "_delete_dynamodb_records", MagicMock(side_effect=fail_upload))
+        monkeypatch.setattr(delete_user, "delete_s3_objects", MagicMock())
+        monkeypatch.setattr(delete_user, "delete_dynamodb_records", MagicMock(side_effect=fail_upload))
 
         resp = handler(_make_event(), None)
 
@@ -90,8 +90,8 @@ class TestDeleteUser:
             if table_name == device_table:
                 raise RuntimeError("boom")
 
-        monkeypatch.setattr(delete_user, "_delete_s3_objects", MagicMock())
-        monkeypatch.setattr(delete_user, "_delete_dynamodb_records", MagicMock(side_effect=fail_device))
+        monkeypatch.setattr(delete_user, "delete_s3_objects", MagicMock())
+        monkeypatch.setattr(delete_user, "delete_dynamodb_records", MagicMock(side_effect=fail_device))
 
         resp = handler(_make_event(), None)
 
@@ -99,8 +99,8 @@ class TestDeleteUser:
         assert "DynamoDB/device_tokens" in json.loads(resp["body"])["message"]
 
     def test_returns_500_with_all_failed_subsystems(self, aws_resources, monkeypatch):
-        monkeypatch.setattr(delete_user, "_delete_s3_objects", MagicMock(side_effect=RuntimeError("boom")))
-        monkeypatch.setattr(delete_user, "_delete_dynamodb_records", MagicMock(side_effect=RuntimeError("boom")))
+        monkeypatch.setattr(delete_user, "delete_s3_objects", MagicMock(side_effect=RuntimeError("boom")))
+        monkeypatch.setattr(delete_user, "delete_dynamodb_records", MagicMock(side_effect=RuntimeError("boom")))
 
         resp = handler(_make_event(), None)
 
@@ -195,8 +195,8 @@ class TestDeleteUser:
 
     def test_failure_in_one_store_does_not_skip_the_others(self, aws_resources, monkeypatch, caplog):
         ddb_mock = MagicMock()
-        monkeypatch.setattr(delete_user, "_delete_s3_objects", MagicMock(side_effect=RuntimeError("boom")))
-        monkeypatch.setattr(delete_user, "_delete_dynamodb_records", ddb_mock)
+        monkeypatch.setattr(delete_user, "delete_s3_objects", MagicMock(side_effect=RuntimeError("boom")))
+        monkeypatch.setattr(delete_user, "delete_dynamodb_records", ddb_mock)
 
         resp = handler(_make_event(), None)
 
@@ -210,8 +210,8 @@ class TestDeleteUser:
         # A configuration error propagates as a Lambda error, which API Gateway returns as 502.
         s3_mock = MagicMock()
         ddb_mock = MagicMock()
-        monkeypatch.setattr(delete_user, "_delete_s3_objects", s3_mock)
-        monkeypatch.setattr(delete_user, "_delete_dynamodb_records", ddb_mock)
+        monkeypatch.setattr(delete_user, "delete_s3_objects", s3_mock)
+        monkeypatch.setattr(delete_user, "delete_dynamodb_records", ddb_mock)
         monkeypatch.delenv(variable)
 
         with pytest.raises(KeyError, match=variable):
@@ -227,25 +227,25 @@ def _make_items(count) -> list[dict[str, Any]]:
 
 class TestBatchDeleteItems:
     def test_retries_then_succeeds_on_unprocessed_items(self, monkeypatch):
-        monkeypatch.setattr(delete_user.time, "sleep", MagicMock())
+        monkeypatch.setattr(db.time, "sleep", MagicMock())
         dynamodb = MagicMock()
         dynamodb.batch_write_item.side_effect = [
             {"UnprocessedItems": {"tbl": [{"DeleteRequest": {}}]}},
             {"UnprocessedItems": {}},
         ]
 
-        delete_user._batch_delete_items(dynamodb, "tbl", _make_items(1), "mediaId")
+        db._batch_delete_items(dynamodb, "tbl", _make_items(1), "mediaId")
 
         assert dynamodb.batch_write_item.call_count == 2
 
     def test_raises_after_max_retries_exceeded(self, monkeypatch):
         sleep_mock = MagicMock()
-        monkeypatch.setattr(delete_user.time, "sleep", sleep_mock)
+        monkeypatch.setattr(db.time, "sleep", sleep_mock)
         dynamodb = MagicMock()
         dynamodb.batch_write_item.return_value = {"UnprocessedItems": {"tbl": [{"DeleteRequest": {}}]}}
 
         with pytest.raises(RuntimeError, match="UnprocessedItems"):
-            delete_user._batch_delete_items(dynamodb, "tbl", _make_items(1), "mediaId")
+            db._batch_delete_items(dynamodb, "tbl", _make_items(1), "mediaId")
 
         assert dynamodb.batch_write_item.call_count == 6
         assert sleep_mock.call_count == 5
@@ -254,7 +254,7 @@ class TestBatchDeleteItems:
         dynamodb = MagicMock()
         dynamodb.batch_write_item.return_value = {"UnprocessedItems": {}}
 
-        delete_user._batch_delete_items(dynamodb, "tbl", _make_items(30), "mediaId")
+        db._batch_delete_items(dynamodb, "tbl", _make_items(30), "mediaId")
 
         assert dynamodb.batch_write_item.call_count == 2
         batch_sizes = [len(call.kwargs["RequestItems"]["tbl"]) for call in dynamodb.batch_write_item.call_args_list]
@@ -269,7 +269,7 @@ class TestFlushS3Batch:
         }
 
         with pytest.raises(RuntimeError) as exc:
-            delete_user._flush_s3_batch(s3, "bucket", [{"Key": "k1", "VersionId": "v1"}])
+            storage._flush_s3_batch(s3, "bucket", [{"Key": "k1", "VersionId": "v1"}])
 
         assert "2 object(s) failed" in str(exc.value)
         assert "AccessDenied" in str(exc.value)
@@ -278,7 +278,7 @@ class TestFlushS3Batch:
         s3 = MagicMock()
         s3.delete_objects.return_value = {}
 
-        delete_user._flush_s3_batch(s3, "bucket", [{"Key": "k1", "VersionId": "v1"}])
+        storage._flush_s3_batch(s3, "bucket", [{"Key": "k1", "VersionId": "v1"}])
 
 
 class TestDeleteS3Objects:
@@ -290,9 +290,9 @@ class TestDeleteS3Objects:
         paginator = MagicMock()
         paginator.paginate.return_value = [{"Versions": versions, "DeleteMarkers": markers}]
         fake_s3.get_paginator.return_value = paginator
-        monkeypatch.setattr(delete_user, "get_s3_client", lambda: fake_s3)
+        monkeypatch.setattr(storage, "get_s3_client", lambda: fake_s3)
 
-        delete_user._delete_s3_objects("bucket", IdentityId(IDENTITY_ID))
+        storage.delete_s3_objects("bucket", IdentityId(IDENTITY_ID))
 
         batches = [call.kwargs["Delete"]["Objects"] for call in fake_s3.delete_objects.call_args_list]
         assert [len(b) for b in batches] == [1000, 1000, 100]
@@ -309,9 +309,9 @@ class TestDeleteDynamodbRecords:
             {"Items": [{"userId": {"S": IDENTITY_ID}, "mediaId": {"S": "m2"}}]},
         ]
         fake.batch_write_item.return_value = {"UnprocessedItems": {}}
-        monkeypatch.setattr(delete_user, "get_dynamodb_client", lambda: fake)
+        monkeypatch.setattr(db, "get_dynamodb_client", lambda: fake)
 
-        delete_user._delete_dynamodb_records("tbl", IdentityId(IDENTITY_ID), "mediaId")
+        db.delete_dynamodb_records("tbl", IdentityId(IDENTITY_ID), "mediaId")
 
         assert fake.query.call_count == 2
         assert fake.query.call_args_list[1].kwargs["ExclusiveStartKey"] == {
@@ -323,10 +323,10 @@ class TestDeleteDynamodbRecords:
 
 class TestObjectIdentifier:
     def test_returns_key_and_version(self):
-        assert delete_user._object_identifier({"Key": "k1", "VersionId": "v1"}) == {"Key": "k1", "VersionId": "v1"}
+        assert storage._object_identifier({"Key": "k1", "VersionId": "v1"}) == {"Key": "k1", "VersionId": "v1"}
 
     def test_returns_key_only_without_version(self):
-        assert delete_user._object_identifier({"Key": "k1"}) == {"Key": "k1"}
+        assert storage._object_identifier({"Key": "k1"}) == {"Key": "k1"}
 
     def test_returns_none_without_key(self):
-        assert delete_user._object_identifier({"VersionId": "v1"}) is None
+        assert storage._object_identifier({"VersionId": "v1"}) is None
