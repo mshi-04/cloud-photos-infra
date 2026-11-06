@@ -22,10 +22,10 @@
 | `common.dynamodb.serialize_item(item)` | `TypeSerializer` で AttributeValue 形式へ |
 | `common.dynamodb.deserialize_item(item)` | `TypeDeserializer` + `Decimal` を int / float へ変換 |
 | 各 `db.py` の `get_dynamodb_client()` | クライアントを `functools.cache` でキャッシュ |
-| 各 `db.py` の `get_table_name()` | `os.environ["TABLE_NAME"]` を `functools.cache` でキャッシュ |
+| `users` 以外の `db.py` の `get_table_name()` | `os.environ["TABLE_NAME"]` を `functools.cache` でキャッシュ |
 | `media_uploads/db.py` の `put_upload_record` / `mark_upload_record_deleted` / `query_upload_records` | 操作ごとの DynamoDB の呼び出し |
 
-テストでは `get_dynamodb_client.cache_clear()` と `get_table_name.cache_clear()` を呼びます。DynamoDB の呼び出しは操作ごとの関数に分け、値オブジェクトを受け取って、呼び出しの直前に生の値を取り出します。条件式の失敗は関数の中で `bool` に変え、それ以外の `ClientError` はそのまま送出します。応答への変換は handler が行います。
+テストでは `get_dynamodb_client.cache_clear()` と、`users` 以外では `get_table_name.cache_clear()` を呼びます。DynamoDB の呼び出しは操作ごとの関数に分け、値オブジェクトを受け取って、呼び出しの直前に生の値を取り出します。条件式の失敗は関数の中で `bool` に変え、それ以外の `ClientError` はそのまま送出します。応答への変換は handler が行います。
 
 low-level client（`boto3.client("dynamodb")`）を使うため、値は必ず AttributeValue 形式です。
 `serialize_item` は `ExpressionAttributeValues` にも使えます。
@@ -107,7 +107,7 @@ get_dynamodb_client().update_item(
 
 ## BatchWrite
 
-`users/db.py` のみ物理削除を行います。
+`batch_write_item` で一括して物理削除するのは、ユーザー削除の `users/db.py` だけです。`device_tokens/db.py` と `push_notification/db.py` の `delete_device_token` は、`DeleteItem` で 1 件ずつ物理削除します。
 
 - `ProjectionExpression` で key 属性だけを取得してから削除する
 - 25 件ずつ `batch_write_item` する
